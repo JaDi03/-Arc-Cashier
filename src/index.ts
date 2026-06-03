@@ -1,20 +1,22 @@
 import dotenv from 'dotenv';
 import { createServer } from './server';
+import config from './cashier.config';
 
 // Initialize environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || config.port || 3000;
 
 async function main() {
     try {
-        const app = createServer();
-        
+        const app = await createServer(config.connectors);
+
         app.listen(PORT, () => {
-            console.log(`🚀 [Production Engine] x402 Webhook Sidecar running on http://localhost:${PORT}`);
+            console.log(`🚀 Arc Cashier running on http://localhost:${PORT}`);
+            console.log(`📋 Active connectors: ${config.connectors.map(c => c.name).join(', ')}`);
         });
     } catch (error) {
-        console.error("❌ Critical failure starting the server:", error);
+        console.error('❌ Critical failure starting the server:', error);
         process.exit(1);
     }
 }

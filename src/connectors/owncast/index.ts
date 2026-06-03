@@ -2,16 +2,32 @@ import express from 'express';
 import path from 'path';
 import owncastRouter from './webhooks';
 import { setupOwncastProxy } from './proxy';
+import type { Connector, ConnectorConfig } from '../../core/types';
 
-export function registerConnector(app: express.Express) {
-    // 1. Serve static files specific to Owncast paywall
-    app.use('/owncast-assets', express.static(path.join(__dirname, 'public')));
+/**
+ * Owncast Connector
+ * 
+ * Integrates with Owncast's webhook system to enable per-second billing.
+ * Owncast emits USER_JOINED and USER_PARTED webhooks which this connector
+ * translates into sessionService.recordJoin() / recordPartAndSettle() calls.
+ * 
+ * The connector also:
+ * - Serves the paywall frontend assets (paywall.js, paywall.css)
+ * - Sets up a reverse proxy that injects the paywall into Owncast's HTML
+ */
+const owncastConnector: Connector = {
+    name: 'Owncast',
 
-    // 2. Register Owncast webhooks
-    app.use('/api/connectors/owncast', owncastRouter);
+    register(app: express.Express, config: ConnectorConfig): void {
+        // 1. Serve static paywall assets
+        app.use('/owncast-assets', express.static(path.join(__dirname, 'public')));
 
-    // 3. Setup the reverse proxy for Owncast stream interface
-    setupOwncastProxy(app);
-    
-    console.log('[Connectors] 🔌 Owncast Connector registered successfully');
-}
+        // 2. Register webhook handler
+        app.use('/api/connectors/owncast', owncastRouter);
+
+        // 3. Setup reverse proxy to Owncast (injects paywall.js into HTML)
+        setupOwncastProxy(app, config.upstreamUrl);
+    },
+};
+
+export default owncastConnector;

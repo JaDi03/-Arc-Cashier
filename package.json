@@ -1,15 +1,17 @@
 {
   "name": "arc-cashier",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Per-second streaming payments for self-hosted platforms, powered by Circle x402.",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node src/index.ts",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["arc", "x402", "circle", "usdc", "streaming", "micropayments", "sidecar", "owncast"],
+  "author": "JaDi03",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@circle-fin/x402-batching": "^3.0.4",

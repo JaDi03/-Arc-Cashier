@@ -1,44 +1,48 @@
-import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex } from 'viem';
 
-export interface BatchEvmSigner {
-    address: `0x${string}`;
-    signTypedData: (params: any) => Promise<`0x${string}`>;
+export interface SessionRecord {
+    privateKey: Hex;
+    returnAddress: string;
 }
 
 /**
  * Wallet Abstraction Service
- * Manages the custody of Session Keys delegated by the viewers.
+ * Manages the custody of ephemeral Session Keys delegated by the viewers.
+ * 
+ * In production, this should be backed by a secure vault (e.g., AWS KMS, HashiCorp Vault).
+ * For the demo, keys are stored in memory and destroyed when the process exits.
  */
 export class WalletService {
-    // Stores ephemeral private keys in memory mapped by userId
-    private sessionKeys = new Map<string, Hex>();
+    private sessionRecords = new Map<string, SessionRecord>();
 
     /**
-     * Registers a funded ephemeral key for a user
+     * Registers a funded ephemeral key and return address for a user.
      */
-    public registerSessionKey(userId: string, privateKey: string): void {
-        this.sessionKeys.set(userId, privateKey as Hex);
-        console.log(`[Wallet] 🔐 Ephemeral Key registered securely for user: ${userId}`);
+    public registerSessionKey(userId: string, privateKey: string, returnAddress: string): void {
+        this.sessionRecords.set(userId, {
+            privateKey: privateKey as Hex,
+            returnAddress,
+        });
+        console.log(`[Wallet] 🔐 Ephemeral Key registered for user: ${userId}`);
     }
 
     /**
-     * Retrieves the session key (BatchEvmSigner) for a specific user.
+     * Retrieves the session record for a specific user.
+     * Throws if no session exists (user never funded).
      */
-    public async getSessionSignerForUser(userId: string): Promise<BatchEvmSigner> {
-        // Retrieve the ephemeral key provided during the Lobby phase
-        const privateKeyHex = this.sessionKeys.get(userId);
-        
-        if (!privateKeyHex) {
+    public getSessionRecord(userId: string): SessionRecord {
+        const record = this.sessionRecords.get(userId);
+        if (!record) {
             throw new Error(`No session key found for user ${userId}. User must fund a session key via the Lobby.`);
         }
+        return record;
+    }
 
-        const account = privateKeyToAccount(privateKeyHex);
-
-        return {
-            address: account.address,
-            signTypedData: async (params) => account.signTypedData(params)
-        };
+    /**
+     * Removes a session record after settlement is complete.
+     */
+    public clearSession(userId: string): void {
+        this.sessionRecords.delete(userId);
     }
 }
 

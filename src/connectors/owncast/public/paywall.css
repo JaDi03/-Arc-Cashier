@@ -82,3 +82,97 @@ body.arc-locked > *:not(#arc-paywall-overlay) {
     pointer-events: none;
     user-select: none;
 }
+
+/* Session Manager Widget */
+#arc-session-manager {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99998;
+    background: linear-gradient(145deg, rgba(26,26,46,0.9), rgba(22,33,62,0.9));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    width: 280px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    font-family: 'Inter', sans-serif;
+    color: white;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#arc-session-manager h3 {
+    margin: 0 0 15px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #00f2fe;
+    display: flex;
+    align-items: center;
+}
+
+.arc-sm-stats {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.arc-sm-stats div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #a0aec0;
+}
+
+.arc-sm-stats div:last-child {
+    margin-bottom: 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 8px;
+    color: #fff;
+    font-weight: bold;
+}
+
+.arc-sm-stats span:last-child {
+    color: #fff;
+}
+
+.arc-btn-danger {
+    background: linear-gradient(90deg, #e53e3e, #c53030);
+    box-shadow: 0 4px 14px 0 rgba(229, 62, 62, 0.39);
+    padding: 10px;
+    font-size: 14px;
+}
+
+.arc-btn-danger:hover {
+    box-shadow: 0 6px 20px rgba(229, 62, 62, 0.23);
+}
+
+/* Loading Spinner & Warnings */
+.arc-spinner {
+    border: 3px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    border-top: 3px solid #00f2fe;
+    width: 20px;
+    height: 20px;
+    animation: arc-spin 1s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+@keyframes arc-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.arc-warning {
+    color: #fc8181 !important;
+    font-weight: bold;
+    font-size: 14px !important;
+    background: rgba(252, 129, 129, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(252, 129, 129, 0.3);
+    margin-top: 15px;
+}

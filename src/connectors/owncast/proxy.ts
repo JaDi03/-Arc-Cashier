@@ -2,13 +2,12 @@ import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middlewar
 import * as cheerio from 'cheerio';
 import express from 'express';
 
-export function setupOwncastProxy(app: express.Express) {
+export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'http://localhost:8080') {
     // The Magic Reverse Proxy (Catch-all)
-    // Proxies everything under /owncast to the Mock Owncast running on port 8080
-    app.use('/owncast', createProxyMiddleware({
-        target: 'http://localhost:8080',
+    // Proxies everything to the Owncast instance
+    app.use('/', createProxyMiddleware({
+        target: upstreamUrl,
         changeOrigin: true,
-        pathRewrite: { '^/owncast': '' }, // remove /owncast when requesting to backend
         selfHandleResponse: true, // We will handle the response to inject HTML
         on: {
             proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
@@ -16,13 +15,13 @@ export function setupOwncastProxy(app: express.Express) {
                 if (proxyRes.headers['content-type'] && proxyRes.headers['content-type'].includes('text/html')) {
                     const html = responseBuffer.toString('utf8');
                     const $ = cheerio.load(html);
-                    
+
                     // Inject our Arc Paywall script at the end of the body
                     $('body').append('<script src="/owncast-assets/paywall.js"></script>');
-                    
+
                     return $.html();
                 }
-                
+
                 // For images, videos, and other assets, just pass them through unmodified
                 return responseBuffer;
             }),

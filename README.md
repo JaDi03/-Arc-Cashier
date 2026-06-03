@@ -1,124 +1,145 @@
-# ⚙️ Arc Cashier Core Engine
+# Arc Cashier
 
-<div align="center">
+**Per-second streaming payments for self-hosted platforms, powered by Circle x402.**
 
-![Core Architecture Cover](../../public/cover.PNG)
+Arc Cashier is a payment sidecar that sits between your viewers and your self-hosted streaming platform. It bills viewers by the second using [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org) — gasless off-chain micropayments settled in batches on-chain.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Circle USDC](https://img.shields.io/badge/Circle_Nanopayments-1F2A37?style=for-the-badge&logo=circle&logoColor=white)](https://www.circle.com/)
-[![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)](https://expressjs.com/)
-
-*The agnostic, hyper-scalable, and secure heart of the Arc Web3 Streaming Payment ecosystem.*
-
-</div>
+The platform (Owncast, PeerTube, Jellyfin, etc.) never sees a wallet or a payment. It emits the same `USER_JOINED` / `USER_PARTED` events it has always emitted. Arc Cashier does the rest.
 
 ---
 
-## 📖 Overview
+## How It Works
 
-The **Arc Cashier Core Engine** is the central nervous system of the Arc Web3 payment infrastructure. It is a strictly platform-agnostic, headless microservice designed to handle the complex financial lifecycle of **Circle Nanopayments (x402 Batched Settlement)**. 
-
-By abstracting away the intricacies of blockchain transactions, EIP-3009 mathematical signatures, and ephemeral session key management, the Core Engine allows external **Connectors** (Content Platform Plugins) to effortlessly monetize streaming content. The Core does not care *how* a connector tracks users (whether via Webhooks, WebSockets, API polling, or client-side heartbeats)—it simply exposes a standard set of internal methods to start billing and settle on-chain.
-
----
-
-## 🧠 Architecture / Logic
-
-The Core operates on a strictly Off-Chain signature batching model to ensure zero-gas latency during live streams, only touching the blockchain for the initial deposit and the final Batched Settlement.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Viewer
-    participant Connector as Content Platform Connector
-    
-    box rgb(30, 40, 50) Arc Cashier Core Engine
-    participant CoreRoutes as Core Routes
-    participant Wallet as Wallet Service
-    participant Session as Session Service
-    participant Settlement as Settlement Service
-    end
-    
-    participant Gateway as Circle Gateway (Blockchain)
-
-    %% 1. Onboarding Phase
-    note over Viewer, Gateway: Phase 1: Onboarding & Deposit
-    Viewer->>Connector: Access Content
-    Viewer->>Viewer: Generates Ephemeral Key
-    Viewer->>Gateway: Funds Ephemeral Key with 1 USDC
-    Viewer->>CoreRoutes: Sends User ID & Ephemeral Key (/register-session)
-    CoreRoutes->>Gateway: Executes deposit() using Ephemeral Key
-    CoreRoutes->>Wallet: Stores Ephemeral Key securely
-    CoreRoutes-->>Connector: Session Registered
-
-    %% 2. Consumption Phase
-    note over Viewer, Settlement: Phase 2: Content Consumption
-    Connector->>Session: Platform Native Event: recordJoin(userId)
-    Note over Viewer, Connector: Viewer consumes content...
-    Connector->>Session: Platform Native Event: recordPartAndSettle(userId)
-    
-    %% 3. Settlement Phase
-    note over Session, Gateway: Phase 3: Off-chain Billing & Settlement
-    Session->>Session: Calculates duration and owed USDC
-    Session->>Wallet: Requests User's Ephemeral Key
-    Wallet-->>Session: Returns Key
-    Session->>Settlement: triggerSettlement(amount, Key)
-    Settlement->>Settlement: Signs EIP-3009 payload silently
-    Settlement->>Gateway: Submits Batch Settlement to Blockchain
-    Gateway-->>Settlement: Transaction Confirmed
+```
+Viewer ──► Arc Cashier (port 3000) ──► Owncast (port 8080)
+              │                              │
+              │ injects paywall.js           │ emits webhooks
+              │ into HTML via proxy          │ USER_JOINED / USER_PARTED
+              │                              │
+              ▼                              ▼
+         Circle Gateway ◄──── webhook ──── Owncast
+         (deposit, pay,         events
+          withdraw)
 ```
 
----
-
-## 🏗️ System Structure
-
-The Core directory is surgically isolated from any platform-specific proxying, HTML injection, or UI logic.
-
-```text
-src/core/
-├── routes.ts        # Exposes the base API (e.g., /register-session) for initial Gateway funding.
-├── session.ts       # Tracks stream join/part events, calculates viewership duration, and triggers billing.
-├── settlement.ts    # Interfaces directly with the Circle BatchFacilitatorClient for on-chain settlement.
-└── wallet.ts        # The secure Wallet Abstraction layer mapping Session IDs to Ephemeral Private Keys.
-```
+1. **Viewer opens stream** → Arc Cashier proxies the page and injects a paywall overlay.
+2. **Viewer deposits 1 USDC** → Funds flow to an ephemeral wallet, then into Circle Gateway.
+3. **Stream access is purchased** → A gasless EIP-3009 signature pays $0.01 via x402.
+4. **Viewer watches** → Owncast tracks presence; webhooks fire on join/part.
+5. **Viewer leaves** → Arc Cashier withdraws remaining Gateway balance back to the viewer.
 
 ---
 
-## 🌟 Key Features
+## Quick Start
 
-- **Platform Agnostic**: The core has zero dependencies on any streaming protocol. It simply listens for `recordJoin` and `recordPartAndSettle` invocations from surrounding connectors.
-- **Batched Settlement (x402)**: Leverages Circle's advanced EIP-3009 authorization patterns to silently batch off-chain signatures without requiring users to sign every second.
-- **Wallet Abstraction**: Completely shields the end-user from complex key management. Ephemeral keys are generated client-side, funded, and securely handed to the `wallet.ts` service for background signing.
-- **Micro-billing Precision**: Calculates fractional USDC debt per-second based on exact streaming duration, ensuring creators get paid fairly and viewers only pay for what they consume.
-
----
-
-## 🚀 Getting Started
-
-### 1. Prerequisites
+### Prerequisites
 - Node.js v18+
-- Active Circle Web3 Developer Account (Gateway configurations)
-- Base Sepolia testnet RPC access
+- An Owncast instance (or any supported platform) running
+- MetaMask with Arc Testnet USDC ([Circle Faucet](https://faucet.circle.com))
 
-### 2. Implementation inside a Connector
-To utilize the core from a new platform connector, simply import the specific services. The Core does NOT run standalone; it is mounted into an Express app by `src/server.ts`.
+### Setup
+
+```bash
+git clone https://github.com/JaDi03/-Arc-Cashier.git
+cd arc-cashier
+npm install
+cp .env.example .env
+```
+
+Edit `.env` with your seller wallet address:
+```
+SELLER_ADDRESS=0xYourWalletAddress
+```
+
+Edit `src/cashier.config.ts` to point to your platform:
+```typescript
+connectors: [
+    {
+        name: 'owncast',
+        upstreamUrl: 'http://localhost:8080', // your Owncast URL
+        ratePerSecond: 0.0001,
+    },
+],
+```
+
+### Run
+
+```bash
+npx ts-node src/index.ts
+```
+
+Open `http://localhost:3000` — the paywall is live.
+
+---
+
+## Project Structure
+
+```
+src/
+├── core/                        # The payment engine (platform-agnostic)
+│   ├── types.ts                 # Connector interface — the main primitive
+│   ├── routes.ts                # x402 Gateway integration (deposit, pay)
+│   ├── session.ts               # Per-second billing + refund via withdraw()
+│   └── wallet.ts                # Ephemeral key management
+│
+├── connectors/                  # Platform adapters (plug-in architecture)
+│   └── owncast/                 # Reference connector
+│       ├── index.ts             # Implements Connector interface
+│       ├── webhooks.ts          # Translates Owncast events → engine calls
+│       ├── proxy.ts             # Reverse proxy + paywall injection
+│       └── public/              # Frontend paywall assets
+│
+├── cashier.config.ts            # Which connectors to load
+├── server.ts                    # Dynamic connector loader
+└── index.ts                     # Entry point
+```
+
+---
+
+## Building a Connector
+
+Arc Cashier is designed so that adding a new platform takes ~100 lines of code. See [docs/BUILDING_A_CONNECTOR.md](docs/BUILDING_A_CONNECTOR.md) for the full guide.
+
+The short version: implement the `Connector` interface from `src/core/types.ts`:
 
 ```typescript
-import { sessionService } from '../../core/session';
+import type { Connector, ConnectorConfig } from '../../core/types';
 
-// Example: When a viewer joins your custom streaming platform
-sessionService.recordJoin(userId);
+const myConnector: Connector = {
+    name: 'MyPlatform',
+    register(app, config) {
+        // 1. Listen for your platform's presence events
+        // 2. Call sessionService.recordJoin(userId) on join
+        // 3. Call sessionService.recordPartAndSettle(userId) on leave
+    },
+};
 
-// Example: When a viewer leaves
-await sessionService.recordPartAndSettle(userId);
+export default myConnector;
 ```
 
 ---
 
-## 🛠️ Built With
+## Primitives for Arc Builders
 
-- [Circle x402-batching SDK](https://developers.circle.com) - Core nanopayments engine
-- [Viem](https://viem.sh/) - Type-safe Ethereum interactions
-- [Express](https://expressjs.com/) - High-performance routing
-- [TypeScript](https://www.typescriptlang.org/) - Strict typing for financial security
+| Primitive | Description |
+|---|---|
+| **Per-second billing engine** | `session.ts` — tracks presence, computes duration, settles per-second |
+| **Sidecar pattern** | Monetize any platform without modifying its source code |
+| **Reverse proxy injection** | Inject payment UI into upstream HTML via Cheerio |
+| **Ephemeral wallet abstraction** | Disposable keys so users never expose their main private key |
+| **Connector interface** | Standardized contract for adapting any webhook-emitting platform |
+| **x402 Gateway lifecycle** | Full deposit → pay → withdraw flow via Circle SDK |
+
+---
+
+## Tech Stack
+
+- [Circle x402-batching SDK](https://www.npmjs.com/package/@circle-fin/x402-batching) — Gasless micropayments
+- [Viem](https://viem.sh/) — Type-safe Ethereum interactions
+- [Express](https://expressjs.com/) — HTTP server
+- [TypeScript](https://www.typescriptlang.org/) — Strict typing
+- [Cheerio](https://cheerio.js.org/) — HTML injection
+
+## License
+
+MIT
