@@ -60,10 +60,12 @@ sequenceDiagram
 ## Proof of Concept
 
 **Live Demo (Viewer Flow)**  
-![Viewer Flow](media/demo.gif)
+<p align="center">
+  <img src="media/demo.gif" alt="Viewer Flow" width="100%">
+</p>
 
 **Backend Verification & On-Chain Settlement**  
-The backend silently handles gasless x402 signatures every second, eventually settling the remainder directly on the Polygon blockchain via the Circle Gateway smart contract.
+The backend silently handles gasless x402 signatures every second, eventually settling the remainder directly on the Arc Testnet via the Circle Gateway smart contract.
 
 <p align="center">
   <img src="media/terminal.PNG" alt="Terminal Logs" width="48%">
