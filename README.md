@@ -10,23 +10,50 @@ The platform (Owncast, PeerTube, Jellyfin, etc.) never sees a wallet or a paymen
 
 ## How It Works
 
-```
-Viewer ──► Arc Cashier (port 3000) ──► Owncast (port 8080)
-              │                              │
-              │ injects paywall.js           │ emits webhooks
-              │ into HTML via proxy          │ USER_JOINED / USER_PARTED
-              │                              │
-              ▼                              ▼
-         Circle Gateway ◄──── webhook ──── Owncast
-         (deposit, pay,         events
-          withdraw)
+```mermaid
+sequenceDiagram
+    actor Viewer as 👤 Viewer
+    participant Browser as 🌐 paywall.js (Client)
+    participant Cashier as 🛡️ Arc Cashier (Proxy)
+    participant Owncast as 🎥 Owncast (Media)
+    participant Gateway as 💎 Circle Gateway
+
+    %% 1. Initial Load & Injection
+    Viewer->>Cashier: GET / (Visits Stream)
+    Cashier->>Owncast: Proxies Request
+    Owncast-->>Cashier: Returns original HTML
+    Note over Cashier,Browser: Arc Cashier injects paywall script
+    Cashier-->>Viewer: HTML + Injected paywall.js
+    
+    %% 2. Deposit & Connection
+    Viewer->>Browser: Clicks "Connect Wallet & Deposit"
+    Browser->>Gateway: Transfers Initial Guarantee to Contract
+    Gateway-->>Browser: Deposit Confirmed
+    
+    %% 3. Session Registration
+    Browser->>Cashier: POST /api/core/register-session
+    Note over Browser,Cashier: Transmits Ephemeral Private Key
+    Cashier-->>Browser: 200 OK (Session Started)
+    
+    %% 4. Consumption (x402 streaming)
+    loop While watching stream (Per Second)
+        Note over Browser,Cashier: Silent x402 Micropayments
+    end
+    
+    %% 5. Withdrawal & End
+    Viewer->>Browser: Clicks "End Session & Withdraw"
+    Browser->>Cashier: POST /api/core/end-session (XMLHttpRequest)
+    Cashier->>Gateway: Settles & Withdraws Remaining Balance (-0.5% fee)
+    Gateway-->>Cashier: Withdrawal Confirmed
+    Cashier-->>Browser: 200 OK (Refund Processed)
+    Browser-->>Viewer: UI Shows "✅ Session Ended"
 ```
 
-1. **Viewer opens stream** → Arc Cashier proxies the page and injects a paywall overlay.
-2. **Viewer deposits 1 USDC** → Funds flow to an ephemeral wallet, then into Circle Gateway.
-3. **Stream access is purchased** → A gasless EIP-3009 signature pays $0.01 via x402.
-4. **Viewer watches** → Owncast tracks presence; webhooks fire on join/part.
-5. **Viewer leaves** → Arc Cashier withdraws remaining Gateway balance back to the viewer.
+1. **Viewer opens stream** → Arc Cashier proxies the request to Owncast and injects the paywall overlay.
+2. **Viewer deposits an initial guarantee** → Funds flow to an ephemeral wallet, then into the Circle Gateway smart contract.
+3. **Session begins** → The client calls `POST /api/core/register-session` with their ephemeral key.
+4. **Micropayments flow** → The system bills the viewer continuously via gasless x402 signatures.
+5. **Viewer leaves** → The client triggers `POST /api/core/end-session` to immediately settle the final amount and withdraw the unused balance back to the viewer's wallet.
 
 ---
 
@@ -40,7 +67,7 @@ Viewer ──► Arc Cashier (port 3000) ──► Owncast (port 8080)
 ### Setup
 
 ```bash
-git clone https://github.com/JaDi03/-Arc-Cashier.git
+git clone https://github.com/JaDi03/Arc-Cashier.git
 cd arc-cashier
 npm install
 cp .env.example .env
