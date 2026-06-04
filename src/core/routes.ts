@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
-
+import { sessionService } from './session';
 const coreRouter = Router();
 
 // Seller address - the stream creator's address where payments are received
@@ -93,6 +93,22 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         );
     } catch (error: any) {
         console.error(`[Core] ❌ Failed:`, error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// --- CLIENT SIDE: Explicitly end session and refund ---
+coreRouter.post('/end-session', async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        await sessionService.recordPartAndSettle(userId);
+        return res.status(200).json({ status: 'Refund processed successfully.' });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Failed to end session manually:`, error.message);
         return res.status(500).json({ error: error.message });
     }
 });

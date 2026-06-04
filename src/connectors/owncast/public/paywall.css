@@ -98,16 +98,46 @@ body.arc-locked > *:not(#arc-paywall-overlay) {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     font-family: 'Inter', sans-serif;
     color: white;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity 0.3s ease;
+}
+
+.arc-sm-minimized {
+    height: 48px !important;
+    overflow: hidden;
+}
+
+#arc-sm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: grab;
+    margin-bottom: 15px;
+}
+
+#arc-sm-header:active {
+    cursor: grabbing;
 }
 
 #arc-session-manager h3 {
-    margin: 0 0 15px;
+    margin: 0;
     font-size: 16px;
     font-weight: 600;
     color: #00f2fe;
     display: flex;
     align-items: center;
+}
+
+#arc-sm-minimize-btn {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 5px;
+}
+
+#arc-sm-minimize-btn:hover {
+    color: #fff;
 }
 
 .arc-sm-stats {

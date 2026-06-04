@@ -14,17 +14,16 @@ export class SessionService {
     }
 
     public async recordPartAndSettle(userId: string): Promise<void> {
+        let durationSeconds = 0;
         const joinedTime = this.activeSessions.get(userId);
 
-        if (!joinedTime) {
-            console.warn(`[Session] ⚠️ User ${userId} parted, but no join record found. Ignoring.`);
-            return;
+        if (joinedTime) {
+            this.activeSessions.delete(userId);
+            durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
+            console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
+        } else {
+            console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
         }
-
-        this.activeSessions.delete(userId);
-
-        const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
-        console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
 
         try {
             // Get the user's session record (ephemeral key + return address)
@@ -44,10 +43,13 @@ export class SessionService {
             console.log(`[Session] 💰 Remaining Gateway balance: ${availableFormatted} USDC`);
 
             if (available > 0.001) {
-                // Withdraw remaining Gateway balance back to user's original wallet
-                console.log(`[Session] 🧹 Withdrawing ${availableFormatted} USDC back to ${sessionRecord.returnAddress}...`);
+                // Subtract Gateway withdrawal fee (~0.5%) to avoid "Insufficient balance" error
+                const withdrawAmount = (available * 0.99).toFixed(6);
 
-                const withdrawResult = await gatewayClient.withdraw(availableFormatted, {
+                // Withdraw remaining Gateway balance back to user's original wallet
+                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${availableFormatted} available) back to ${sessionRecord.returnAddress}...`);
+
+                const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
                     recipient: sessionRecord.returnAddress as `0x${string}`,
                 });
 
