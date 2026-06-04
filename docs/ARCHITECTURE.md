@@ -6,29 +6,38 @@ Arc Cashier is a **payment sidecar** — a standalone process that sits between 
 
 ## System Diagram
 
-```
-┌─────────────┐     ┌──────────────────────────────────────┐     ┌──────────────┐
-│             │     │          ARC CASHIER (Sidecar)        │     │              │
-│   Viewer    │────►│                                      │────►│   Owncast    │
-│  (Browser)  │◄────│  ┌────────┐  ┌─────────┐  ┌───────┐ │◄────│  (Port 8080) │
-│             │     │  │ Proxy  │  │  Core   │  │Owncast│ │     │              │
-│  Port 3000  │     │  │--------|  │ Engine  │  │Connec.│ │     │  Webhooks:   │
-│             │     │  │Injects │  │---------|  │-------│ │     │ USER_JOINED  │
-│             │     │  │paywall │  │routes.ts│  │ webhk │ │     │ USER_PARTED  │
-│             │     │  │into    │  │session  │  │ proxy │ │     │              │
-│             │     │  │HTML    │  │wallet   │  │ UI    │ │     │              │
-│             │     │  └────────┘  └─────────┘  └───────┘ │     └──────────────┘
-└─────────────┘     └──────────┬───────────────────────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │   Circle Gateway     │
-                    │   (x402 Protocol)    │
-                    │                      │
-                    │  deposit() ── on-chain│
-                    │  pay()     ── gasless │
-                    │  withdraw()── on-chain│
-                    └──────────────────────┘
+```mermaid
+flowchart LR
+    %% Custom Premium Styling
+    classDef viewer fill:#1A1B26,stroke:#7AA2F7,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
+    classDef cashier fill:#24283B,stroke:#BB9AF7,stroke-width:3px,color:#FFFFFF,rx:10,ry:10,stroke-dasharray: 5 5
+    classDef internal fill:#1F2335,stroke:#7DCFFF,stroke-width:2px,color:#FFFFFF,rx:5,ry:5
+    classDef platform fill:#1F2335,stroke:#9ECE6A,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
+    classDef blockchain fill:#24283B,stroke:#F7768E,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
+
+    %% Nodes
+    V["👤 Viewer<br/>(Browser)"]:::viewer
+    
+    subgraph ArcCashier ["🛡️ Arc Cashier (Sidecar)"]
+        direction TB
+        P["🔄 Proxy<br/>(Injects paywall)"]:::internal
+        C["⚙️ Core Engine<br/>(routes, session, wallet)"]:::internal
+        OC["🔌 Owncast Connector<br/>(webhooks, UI)"]:::internal
+    end
+    class ArcCashier cashier
+
+    O["🎥 Owncast<br/>(Port 8080)"]:::platform
+    G["💎 Circle Gateway<br/>(x402 Protocol)"]:::blockchain
+
+    %% Connections
+    V -- "Visits Stream<br/>(Port 3000)" --> P
+    P -- "Proxies HTML/Video" --> O
+    P -. "Injects paywall into HTML" .-> V
+    
+    O -- "Webhooks:<br/>USER_JOINED/PARTED" --> OC
+    OC -- "Trigger Events" --> C
+    
+    C -- "deposit() - on-chain<br/>pay() - gasless<br/>withdraw() - on-chain" --> G
 ```
 
 ## Payment Lifecycle
