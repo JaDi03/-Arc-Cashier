@@ -11,10 +11,9 @@ owncastRouter.post('/webhook', async (req: Request, res: Response) => {
         return res.status(400).json({ error: "Invalid Owncast Webhook format" });
     }
 
-    const userId = payload.eventData.user.id;
-
     if (payload.type === 'USER_JOINED') {
         const eventData = payload.eventData as WebhookUserJoinedEventData;
+        console.log(`[Owncast] 📥 Received USER_JOINED webhook for ${eventData.user.id}`);
         sessionService.recordJoin(eventData.user.id);
         return res.json({ status: "recorded" });
     } 

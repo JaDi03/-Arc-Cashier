@@ -16,8 +16,8 @@ const gateway = createGatewayMiddleware({
     networks: ['eip155:5042002'], // Arc Testnet
 });
 
-// This endpoint costs $0.01 to access. Circle Gateway handles verification + settlement.
-coreRouter.get('/stream-access', gateway.require('$0.01'), (req: any, res: Response) => {
+// This endpoint costs $0.0001 to access. Circle Gateway handles verification + settlement.
+coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
     res.json({ access: true, payment: req.payment });
 });
@@ -30,7 +30,11 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
     }
 
-    const stringifyBigInt = (_key: string, value: any) =>
+    if (!sessionService.hasActiveSession(userId)) {
+        return res.status(400).json({ error: 'Bloqueado: Owncast aún no confirma que estás en el stream.' });
+    }
+
+    const stringifyBigInt = (_key: string, value: unknown) =>
         typeof value === 'bigint' ? value.toString() : value;
 
     try {
@@ -91,9 +95,10 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)
         );
-    } catch (error: any) {
-        console.error(`[Core] ❌ Failed:`, error.message);
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed:`, err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -107,9 +112,81 @@ coreRouter.post('/end-session', async (req: Request, res: Response) => {
     try {
         await sessionService.recordPartAndSettle(userId);
         return res.status(200).json({ status: 'Refund processed successfully.' });
-    } catch (error: any) {
-        console.error(`[Core] ❌ Failed to end session manually:`, error.message);
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to end session manually:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- CLIENT SIDE: Check Session Status ---
+coreRouter.get('/session-status', (req: Request, res: Response) => {
+    const userId = req.query.userId as string;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    if (walletService.hasSessionRecord(userId)) {
+        return res.status(200).json({ status: 'active' });
+    } else {
+        return res.status(404).json({ error: 'No active session key found' });
+    }
+});
+
+// --- SELLER SIDE: Admin Routes ---
+coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
+    try {
+        const sellerKey = process.env.SELLER_PRIVATE_KEY;
+        if (!sellerKey) return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
+
+        const sellerClient = new GatewayClient({
+            chain: 'arcTestnet',
+            privateKey: sellerKey as `0x${string}`,
+        });
+
+        const balances = await sellerClient.getBalances();
+        return res.json({ 
+            status: 'success', 
+            gatewayBalance: balances.gateway.formattedAvailable,
+            walletBalance: balances.wallet.formatted
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
+    try {
+        const sellerKey = process.env.SELLER_PRIVATE_KEY;
+        if (!sellerKey) {
+            return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
+        }
+
+        const sellerClient = new GatewayClient({
+            chain: 'arcTestnet',
+            privateKey: sellerKey as `0x${string}`,
+        });
+
+        const balances = await sellerClient.getBalances();
+        const available = Number(balances.gateway.formattedAvailable);
+        
+        if (available <= 0) {
+            return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
+        }
+
+        // Withdraw everything
+        const withdrawResult = await sellerClient.withdraw(balances.gateway.formattedAvailable);
+        
+        return res.json({
+            status: 'success',
+            withdrawnAmount: withdrawResult.formattedAmount,
+            txHash: withdrawResult.mintTxHash
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Seller withdrawal failed:`, err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 

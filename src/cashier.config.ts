@@ -12,7 +12,7 @@ const config: CashierConfig = {
     connectors: [
         {
             name: 'owncast',
-            upstreamUrl: 'http://localhost:8080',
+            upstreamUrl: 'http://127.0.0.1:8080',
             ratePerSecond: 0.0001, // $0.0001 USDC per second (~$0.36/hour)
         },
 

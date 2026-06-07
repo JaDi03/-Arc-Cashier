@@ -8,9 +8,7 @@ export interface OwncastUser {
     previousNames?: string[];
 }
 
-export interface BaseWebhookData {
-    // Common fields for all Owncast webhooks
-}
+export type BaseWebhookData = Record<string, unknown>;
 
 export interface WebhookUserJoinedEventData extends BaseWebhookData {
     id: string;
@@ -27,5 +25,5 @@ export interface WebhookUserPartEventData extends BaseWebhookData {
 // Standard payload sent by Owncast to the webhook server
 export interface OwncastWebhookPayload {
     type: string; // e.g., 'USER_JOINED' | 'USER_PARTED' | 'CHAT'
-    eventData: WebhookUserJoinedEventData | WebhookUserPartEventData | any;
+    eventData: WebhookUserJoinedEventData | WebhookUserPartEventData | Record<string, unknown>;
 }
