@@ -8,6 +8,18 @@ The platform (Owncast, PeerTube, Jellyfin, etc.) never sees a wallet or a paymen
 
 ---
 
+## Table of Contents
+- [How It Works](#how-it-works)
+- [Proof of Concept](#proof-of-concept)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Building a Connector](#building-a-connector)
+- [Primitives for Arc Builders](#primitives-for-arc-builders)
+- [Tech Stack](#tech-stack)
+- [License](#license)
+
+---
+
 ## How It Works
 
 ```mermaid
