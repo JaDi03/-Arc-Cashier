@@ -129,23 +129,31 @@ Alternatively, you can use the provided `Dockerfile` to deploy a containerized i
 ## Project Structure
 
 ```
-src/
-├── core/                        # The payment engine (platform-agnostic)
-│   ├── types.ts                 # Connector interface — the main primitive
-│   ├── routes.ts                # x402 Gateway integration (deposit, pay)
-│   ├── session.ts               # Per-second billing + refund via withdraw()
-│   └── wallet.ts                # Ephemeral key management
+.
+├── src/
+│   ├── core/                        # The payment engine (platform-agnostic)
+│   │   ├── types.ts                 # Connector interface — the main primitive
+│   │   ├── routes.ts                # x402 Gateway integration (deposit, pay)
+│   │   ├── session.ts               # Per-second billing + refund via withdraw()
+│   │   ├── session.spec.ts          # Unit tests
+│   │   ├── wallet.ts                # Ephemeral key management
+│   │   └── wallet.spec.ts           # Unit tests
+│   │
+│   ├── connectors/                  # Platform adapters (plug-in architecture)
+│   │   └── owncast/                 # Reference connector
+│   │       ├── index.ts             # Implements Connector interface
+│   │       ├── webhooks.ts          # Translates Owncast events → engine calls
+│   │       ├── proxy.ts             # Reverse proxy + paywall injection
+│   │       └── public/              # Frontend paywall assets
+│   │
+│   ├── cashier.config.ts            # Which connectors to load
+│   ├── server.ts                    # Dynamic connector loader
+│   └── index.ts                     # Entry point
 │
-├── connectors/                  # Platform adapters (plug-in architecture)
-│   └── owncast/                 # Reference connector
-│       ├── index.ts             # Implements Connector interface
-│       ├── webhooks.ts          # Translates Owncast events → engine calls
-│       ├── proxy.ts             # Reverse proxy + paywall injection
-│       └── public/              # Frontend paywall assets
-│
-├── cashier.config.ts            # Which connectors to load
-├── server.ts                    # Dynamic connector loader
-└── index.ts                     # Entry point
+├── .github/workflows/ci.yml         # GitHub Actions CI pipeline
+├── CONTRIBUTING.md                  # Guidelines for new developers
+├── Dockerfile                       # Production container build
+└── eslint.config.mjs                # Code quality rules
 ```
 
 ---
