@@ -48,6 +48,10 @@ export class SessionService {
         console.log(`[Session] 🟢 Session started for user: ${userId}`);
     }
 
+    public hasActiveSession(userId: string): boolean {
+        return this.activeSessions.has(userId);
+    }
+
     public async recordPartAndSettle(userId: string): Promise<void> {
         let durationSeconds = 0;
         const joinedTime = this.activeSessions.get(userId);

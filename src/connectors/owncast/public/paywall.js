@@ -224,11 +224,35 @@ async function handleFundSession() {
         sessionManager.classList.remove('arc-hidden');
 
         let seconds = 0;
-        window.sessionTimer = setInterval(() => {
+        window.sessionTimer = setInterval(async () => {
             seconds++;
             document.getElementById('arc-sm-time').innerText = seconds + 's';
             document.getElementById('arc-sm-cost').innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
             document.getElementById('arc-sm-balance').innerText = '$' + (1.0000 - (seconds * 0.0001)).toFixed(4) + ' USDC';
+
+            // Heartbeat: Check if the backend killed the session every 5 seconds
+            if (seconds % 5 === 0) {
+                try {
+                    const statusRes = await fetch('/api/core/session-status?userId=' + viewerId);
+                    if (statusRes.status === 404) {
+                        console.warn("[Arc Cashier] Session was cleared by the backend due to inactivity. Re-locking screen.");
+                        clearInterval(window.sessionTimer);
+                        
+                        // Hide session manager
+                        const sm = document.getElementById('arc-session-manager');
+                        if (sm) sm.classList.add('arc-hidden');
+                        
+                        // Remove the old overlay if it exists so we don't duplicate
+                        const oldOverlay = document.getElementById('arc-paywall-overlay');
+                        if (oldOverlay) oldOverlay.remove();
+
+                        // Re-initialize the paywall to force a new deposit
+                        initPaywall();
+                    }
+                } catch (e) {
+                    console.error("[Arc Cashier] Heartbeat failed", e);
+                }
+            }
         }, 1000);
 
         // Tell the user it's ready in console
@@ -337,7 +361,7 @@ window.arcEndSession = async function() {
         }
     };
 
-    xhr.timeout = 60000; // 60 second timeout for blockchain mining
+    xhr.timeout = 15000; // 15 second timeout
 
     const payload = JSON.stringify({ userId: viewerId });
     console.log("[Arc Cashier] Sending XHR with payload:", payload);

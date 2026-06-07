@@ -44,6 +44,13 @@ export class WalletService {
     public clearSession(userId: string): void {
         this.sessionRecords.delete(userId);
     }
+
+    /**
+     * Checks if a session record exists for a user.
+     */
+    public hasSessionRecord(userId: string): boolean {
+        return this.sessionRecords.has(userId);
+    }
 }
 
 export const walletService = new WalletService();

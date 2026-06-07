@@ -30,6 +30,10 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
     }
 
+    if (!sessionService.hasActiveSession(userId)) {
+        return res.status(400).json({ error: 'Bloqueado: Owncast aún no confirma que estás en el stream.' });
+    }
+
     const stringifyBigInt = (_key: string, value: any) =>
         typeof value === 'bigint' ? value.toString() : value;
 
@@ -61,7 +65,16 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         console.log(`[Core]    Deposit Tx:  ${depositResult.depositTxHash}`);
         console.log(`[Core]    Amount:      ${depositResult.formattedAmount} USDC`);
 
-        // 4. Register the session key for future settlement
+        // 4. Pay for stream access via x402 (gasless off-chain signature!)
+        console.log(`[Core] 🔓 Paying for stream access via x402...`);
+        const payResult = await gatewayClient.pay<{ access: boolean }>(
+            `http://localhost:${PORT}/api/core/stream-access`
+        );
+        console.log(`[Core] ✅ Stream access granted!`);
+        console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
+        console.log(`[Core]    Settlement Tx: ${payResult.transaction}`);
+
+        // 5. Register the session key for future settlement
         walletService.registerSessionKey(userId, privateKey, returnAddress);
 
         // 6. Check remaining Gateway balance
@@ -74,6 +87,10 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
                 deposit: {
                     txHash: depositResult.depositTxHash,
                     amount: depositResult.formattedAmount,
+                },
+                payment: {
+                    amount: payResult.formattedAmount,
+                    transaction: payResult.transaction,
                 },
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)
@@ -97,6 +114,20 @@ coreRouter.post('/end-session', async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error(`[Core] ❌ Failed to end session manually:`, error.message);
         return res.status(500).json({ error: error.message });
+    }
+});
+
+// --- CLIENT SIDE: Check Session Status ---
+coreRouter.get('/session-status', (req: Request, res: Response) => {
+    const userId = req.query.userId as string;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    if (walletService.hasSessionRecord(userId)) {
+        return res.status(200).json({ status: 'active' });
+    } else {
+        return res.status(404).json({ error: 'No active session key found' });
     }
 });
 
