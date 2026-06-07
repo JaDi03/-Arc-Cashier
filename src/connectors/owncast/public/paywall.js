@@ -50,7 +50,7 @@ function initPaywall() {
     sessionManager.className = 'arc-hidden';
     sessionManager.innerHTML = `
         <div id="arc-sm-header">
-            <h3>🟢 Arc Premium</h3>
+            <h3><span class="arc-pulse-dot"></span> Active Session</h3>
             <button id="arc-sm-minimize-btn" title="Minimize/Maximize">−</button>
         </div>
         <div id="arc-sm-content">
