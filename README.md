@@ -151,6 +151,8 @@ Alternatively, you can use the provided `Dockerfile` to deploy a containerized i
 │   └── index.ts                     # Entry point
 │
 ├── .github/workflows/ci.yml         # GitHub Actions CI pipeline
+├── docs/                            # Deep-dive documentation and guides
+│   └── BUILDING_A_CONNECTOR.md      # How to build custom platform connectors
 ├── CONTRIBUTING.md                  # Guidelines for new developers
 ├── Dockerfile                       # Production container build
 └── eslint.config.mjs                # Code quality rules
