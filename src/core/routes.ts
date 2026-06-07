@@ -16,8 +16,8 @@ const gateway = createGatewayMiddleware({
     networks: ['eip155:5042002'], // Arc Testnet
 });
 
-// This endpoint costs $0.01 to access. Circle Gateway handles verification + settlement.
-coreRouter.get('/stream-access', gateway.require('$0.01'), (req: any, res: Response) => {
+// This endpoint costs $0.0001 to access. Circle Gateway handles verification + settlement.
+coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: any, res: Response) => {
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
     res.json({ access: true, payment: req.payment });
 });
@@ -61,16 +61,7 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         console.log(`[Core]    Deposit Tx:  ${depositResult.depositTxHash}`);
         console.log(`[Core]    Amount:      ${depositResult.formattedAmount} USDC`);
 
-        // 4. Pay for stream access via x402 (gasless off-chain signature!)
-        console.log(`[Core] 🔓 Paying for stream access via x402...`);
-        const payResult = await gatewayClient.pay<{ access: boolean }>(
-            `http://localhost:${PORT}/api/core/stream-access`
-        );
-        console.log(`[Core] ✅ Stream access granted!`);
-        console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
-        console.log(`[Core]    Settlement Tx: ${payResult.transaction}`);
-
-        // 5. Register the session key for future settlement
+        // 4. Register the session key for future settlement
         walletService.registerSessionKey(userId, privateKey, returnAddress);
 
         // 6. Check remaining Gateway balance
@@ -83,10 +74,6 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
                 deposit: {
                     txHash: depositResult.depositTxHash,
                     amount: depositResult.formattedAmount,
-                },
-                payment: {
-                    amount: payResult.formattedAmount,
-                    transaction: payResult.transaction,
                 },
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)
@@ -109,6 +96,61 @@ coreRouter.post('/end-session', async (req: Request, res: Response) => {
         return res.status(200).json({ status: 'Refund processed successfully.' });
     } catch (error: any) {
         console.error(`[Core] ❌ Failed to end session manually:`, error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// --- SELLER SIDE: Admin Routes ---
+coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
+    try {
+        const sellerKey = process.env.SELLER_PRIVATE_KEY;
+        if (!sellerKey) return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
+
+        const sellerClient = new GatewayClient({
+            chain: 'arcTestnet',
+            privateKey: sellerKey as `0x${string}`,
+        });
+
+        const balances = await sellerClient.getBalances();
+        return res.json({ 
+            status: 'success', 
+            gatewayBalance: balances.gateway.formattedAvailable,
+            walletBalance: balances.wallet.formatted
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
+    try {
+        const sellerKey = process.env.SELLER_PRIVATE_KEY;
+        if (!sellerKey) {
+            return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
+        }
+
+        const sellerClient = new GatewayClient({
+            chain: 'arcTestnet',
+            privateKey: sellerKey as `0x${string}`,
+        });
+
+        const balances = await sellerClient.getBalances();
+        const available = Number(balances.gateway.formattedAvailable);
+        
+        if (available <= 0) {
+            return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
+        }
+
+        // Withdraw everything
+        const withdrawResult = await sellerClient.withdraw(balances.gateway.formattedAvailable);
+        
+        return res.json({
+            status: 'success',
+            withdrawnAmount: withdrawResult.formattedAmount,
+            txHash: withdrawResult.mintTxHash
+        });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Seller withdrawal failed:`, error.message);
         return res.status(500).json({ error: error.message });
     }
 });

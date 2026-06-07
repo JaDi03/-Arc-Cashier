@@ -337,7 +337,7 @@ window.arcEndSession = async function() {
         }
     };
 
-    xhr.timeout = 15000; // 15 second timeout
+    xhr.timeout = 60000; // 60 second timeout for blockchain mining
 
     const payload = JSON.stringify({ userId: viewerId });
     console.log("[Arc Cashier] Sending XHR with payload:", payload);

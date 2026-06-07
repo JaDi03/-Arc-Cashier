@@ -10,9 +10,10 @@ export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'h
         changeOrigin: true,
         selfHandleResponse: true, // We will handle the response to inject HTML
         pathFilter: (path) => {
-            // Block ALL /api/ routes from being proxied — they must be handled by Express
-            // This prevents the proxy from consuming browser connections on /api/ping etc.
-            if (path.startsWith('/api/')) return false;
+            // Block our specific Arc /api/ routes from being proxied
+            // This prevents our sidecar endpoints from going upstream
+            if (path.startsWith('/api/core/')) return false;
+            if (path.startsWith('/api/connectors/')) return false;
             if (path.startsWith('/owncast-assets/')) return false;
             return true;
         },
