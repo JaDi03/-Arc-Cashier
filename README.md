@@ -199,4 +199,4 @@ export default myConnector;
 
 ## License
 
-MIT
+Apache-2.0

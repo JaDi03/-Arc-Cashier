@@ -12,7 +12,7 @@
   },
   "keywords": ["arc", "x402", "circle", "usdc", "streaming", "micropayments", "sidecar", "owncast"],
   "author": "JaDi03",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "commonjs",
   "dependencies": {
     "@circle-fin/x402-batching": "^3.0.4",
