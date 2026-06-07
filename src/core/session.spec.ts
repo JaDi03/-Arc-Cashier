@@ -6,6 +6,7 @@ import { walletService } from './wallet';
 vi.mock('./wallet', () => ({
     walletService: {
         getSessionRecord: vi.fn(),
+        clearSession: vi.fn(),
     }
 }));
 
