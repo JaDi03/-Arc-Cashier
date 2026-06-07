@@ -4,8 +4,9 @@
   "description": "Per-second streaming payments for self-hosted platforms, powered by Circle x402.",
   "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
