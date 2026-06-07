@@ -31,7 +31,7 @@ export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'h
             return true;
         },
         on: {
-            proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
+            proxyRes: responseInterceptor(async (responseBuffer, proxyRes) => {
                 if (proxyRes.headers['content-type'] && proxyRes.headers['content-type'].includes('text/html')) {
                     const html = responseBuffer.toString('utf8');
                     const $ = cheerio.load(html);
@@ -43,7 +43,7 @@ export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'h
                 }
                 return responseBuffer;
             }),
-            error: (err, req, res) => {
+            error: (err) => {
                 console.error('[Owncast HTML Proxy Error]', err);
             }
         }

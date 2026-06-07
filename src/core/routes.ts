@@ -17,7 +17,7 @@ const gateway = createGatewayMiddleware({
 });
 
 // This endpoint costs $0.0001 to access. Circle Gateway handles verification + settlement.
-coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: any, res: Response) => {
+coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
     res.json({ access: true, payment: req.payment });
 });
@@ -34,7 +34,7 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Bloqueado: Owncast aún no confirma que estás en el stream.' });
     }
 
-    const stringifyBigInt = (_key: string, value: any) =>
+    const stringifyBigInt = (_key: string, value: unknown) =>
         typeof value === 'bigint' ? value.toString() : value;
 
     try {
@@ -95,9 +95,10 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)
         );
-    } catch (error: any) {
-        console.error(`[Core] ❌ Failed:`, error.message);
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed:`, err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -111,9 +112,10 @@ coreRouter.post('/end-session', async (req: Request, res: Response) => {
     try {
         await sessionService.recordPartAndSettle(userId);
         return res.status(200).json({ status: 'Refund processed successfully.' });
-    } catch (error: any) {
-        console.error(`[Core] ❌ Failed to end session manually:`, error.message);
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to end session manually:`, err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -148,8 +150,9 @@ coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
             gatewayBalance: balances.gateway.formattedAvailable,
             walletBalance: balances.wallet.formatted
         });
-    } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -180,9 +183,10 @@ coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
             withdrawnAmount: withdrawResult.formattedAmount,
             txHash: withdrawResult.mintTxHash
         });
-    } catch (error: any) {
-        console.error(`[Core] ❌ Seller withdrawal failed:`, error.message);
-        return res.status(500).json({ error: error.message });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Seller withdrawal failed:`, err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 

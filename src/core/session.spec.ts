@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SessionService } from './session';
 import { walletService } from './wallet';
-import { GatewayClient } from '@circle-fin/x402-batching/client';
 
 // Mock the walletService
 vi.mock('./wallet', () => ({

@@ -45,8 +45,9 @@ export async function createServer(connectors: ConnectorConfig[]) {
             const connector = module.default;
             connector.register(app, config);
             console.log(`[Engine] 🔌 Connector "${connector.name}" registered (upstream: ${config.upstreamUrl})`);
-        } catch (error: any) {
-            console.error(`[Engine] ❌ Failed to load connector "${config.name}":`, error.message);
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[Engine] ❌ Failed to load connector "${config.name}":`, err.message);
         }
     }
 
