@@ -90,42 +90,39 @@ The backend silently handles gasless x402 signatures every second, eventually se
 ## Quick Start
 
 ### Prerequisites
-- Node.js v24+
+- Node.js v22+
 - An Owncast instance (or any supported platform) running
 - MetaMask with Arc Testnet USDC ([Circle Faucet](https://faucet.circle.com))
 
-### Setup
+### Ideal Fork Flow (Development)
+
+Arc Cashier provides a streamlined workflow for developers looking to fork, test, and contribute:
 
 ```bash
 git clone https://github.com/JaDi03/Arc-Cashier.git
 cd arc-cashier
+nvm use          # Reads .nvmrc and switches to Node v22
 npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your seller wallet address:
-```
-SELLER_ADDRESS=0xYourWalletAddress
+Edit `.env` and `src/cashier.config.ts` with your specific settings (see comments in the files).
+
+Run the development server:
+```bash
+npm run dev      # Hot reloads using ts-node
 ```
 
-Edit `src/cashier.config.ts` to point to your platform:
-```typescript
-connectors: [
-    {
-        name: 'owncast',
-        upstreamUrl: 'http://localhost:8080', // your Owncast URL
-        ratePerSecond: 0.0001,
-    },
-],
-```
+### Production Deployment
 
-### Run
+For production, compile the TypeScript code to JavaScript. Using `ts-node` in production is not recommended.
 
 ```bash
-npx ts-node src/index.ts
+npm run build    # Compiles code to dist/
+npm start        # Runs production-ready js
 ```
 
-Open `http://localhost:3000` — the paywall is live.
+Alternatively, you can use the provided `Dockerfile` to deploy a containerized instance of Arc Cashier anywhere Docker is supported.
 
 ---
 
