@@ -90,7 +90,7 @@ The backend silently handles gasless x402 signatures every second, eventually se
 ## Quick Start
 
 ### Prerequisites
-- Node.js v18+
+- Node.js v24+
 - An Owncast instance (or any supported platform) running
 - MetaMask with Arc Testnet USDC ([Circle Faucet](https://faucet.circle.com))
 
