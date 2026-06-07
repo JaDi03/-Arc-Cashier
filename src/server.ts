@@ -16,15 +16,18 @@ const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> 
 export async function createServer(connectors: ConnectorConfig[]) {
     const app = express();
 
-    // Base middlewares
-    app.use(cors());
-    app.use(bodyParser.json());
-
-    // Logging middleware
+    // Logging middleware MUST be first to catch everything
     app.use((req, res, next) => {
         console.log(`[API] ${req.method} ${req.url}`);
         next();
     });
+
+    // Base middlewares
+    app.use(cors());
+
+    // Only parse JSON for our own API routes, NOT globally
+    app.use('/api/core', bodyParser.json());
+    app.use('/api/connectors', bodyParser.json());
 
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);

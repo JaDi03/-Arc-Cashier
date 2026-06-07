@@ -3,40 +3,48 @@ import * as cheerio from 'cheerio';
 import express from 'express';
 
 export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'http://localhost:8080') {
-    // The Magic Reverse Proxy (Catch-all)
-    // Proxies everything to the Owncast instance EXCEPT our own API routes and assets
+    // 1. Manual API Proxy for /api/ping
+    app.post('/api/ping', express.json(), async (req, res) => {
+        try {
+            const response = await fetch(`${upstreamUrl}/api/ping`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(req.body)
+            });
+            const data = await response.json();
+            res.status(response.status).json(data);
+        } catch (err) {
+            console.error('[Owncast API Proxy Error]', err);
+            res.status(502).json({ error: 'Error proxying API to Owncast.' });
+        }
+    });
+
+    // 2. Main Reverse Proxy (Intercepts HTML to inject paywall)
     app.use('/', createProxyMiddleware({
         target: upstreamUrl,
         changeOrigin: true,
-        selfHandleResponse: true, // We will handle the response to inject HTML
+        selfHandleResponse: true,
         pathFilter: (path) => {
-            // Block our specific Arc /api/ routes from being proxied
-            // This prevents our sidecar endpoints from going upstream
-            if (path.startsWith('/api/core/')) return false;
-            if (path.startsWith('/api/connectors/')) return false;
+            // Exclude what we already handled or what doesn't need interception
             if (path.startsWith('/owncast-assets/')) return false;
+            if (path.startsWith('/api/')) return false;
             return true;
         },
         on: {
             proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
-                // If it's an HTML page (like the main stream page), we inject our paywall!
                 if (proxyRes.headers['content-type'] && proxyRes.headers['content-type'].includes('text/html')) {
                     const html = responseBuffer.toString('utf8');
                     const $ = cheerio.load(html);
 
-                    // Inject our Arc Paywall script at the end of the body
                     const cacheBuster = Date.now();
                     $('body').append(`<script src="/owncast-assets/paywall.js?v=${cacheBuster}"></script>`);
 
                     return $.html();
                 }
-
-                // For images, videos, and other assets, just pass them through unmodified
                 return responseBuffer;
             }),
             error: (err, req, res) => {
-                console.error('[Owncast Proxy Error]', err);
-                (res as express.Response).status(502).send('Error proxying to Owncast. Is it running on port 8080?');
+                console.error('[Owncast HTML Proxy Error]', err);
             }
         }
     }));

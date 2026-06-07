@@ -5,13 +5,13 @@ import config from './cashier.config';
 // Initialize environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || config.port || 3000;
+const PORT = Number(process.env.PORT || config.port || 3000);
 
 async function main() {
     try {
         const app = await createServer(config.connectors);
 
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Arc Cashier running on http://localhost:${PORT}`);
             console.log(`📋 Active connectors: ${config.connectors.map(c => c.name).join(', ')}`);
         });

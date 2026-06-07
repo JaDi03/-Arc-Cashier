@@ -15,6 +15,7 @@ owncastRouter.post('/webhook', async (req: Request, res: Response) => {
 
     if (payload.type === 'USER_JOINED') {
         const eventData = payload.eventData as WebhookUserJoinedEventData;
+        console.log(`[Owncast] 📥 Received USER_JOINED webhook for ${eventData.user.id}`);
         sessionService.recordJoin(eventData.user.id);
         return res.json({ status: "recorded" });
     } 
