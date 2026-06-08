@@ -1,8 +1,17 @@
 # Arc Cashier
 
+<div align="center">
+  <p>
+    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
+    <img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" />
+    <img src="https://img.shields.io/badge/Circle_x402-2B3139?style=for-the-badge&logo=web3dotjs&logoColor=white" alt="Circle x402" />
+  </p>
+</div>
+
 **Per-second streaming payments for self-hosted platforms, powered by Circle x402.**
 
-Arc Cashier is a payment sidecar that sits between your viewers and your self-hosted streaming platform. It bills viewers by the second using [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org) — gasless off-chain micropayments settled in batches on-chain.
+Arc Cashier is a payment sidecar that sits between your viewers and your self-hosted streaming platform. It bills viewers by the second using [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org): gasless off-chain micropayments settled in batches on-chain.
 
 The platform (Owncast, PeerTube, Jellyfin, etc.) never sees a wallet or a payment. It emits the same `USER_JOINED` / `USER_PARTED` events it has always emitted. Arc Cashier does the rest.
 
@@ -132,7 +141,7 @@ Alternatively, you can use the provided `Dockerfile` to deploy a containerized i
 .
 ├── src/
 │   ├── core/                        # The payment engine (platform-agnostic)
-│   │   ├── types.ts                 # Connector interface — the main primitive
+│   │   ├── types.ts                 # Connector interface: the main primitive
 │   │   ├── routes.ts                # x402 Gateway integration (deposit, pay)
 │   │   ├── session.ts               # Per-second billing + refund via withdraw()
 │   │   ├── session.spec.ts          # Unit tests
@@ -187,7 +196,7 @@ export default myConnector;
 
 | Primitive | Description |
 |---|---|
-| **Per-second billing engine** | `session.ts` — tracks presence, computes duration, settles per-second |
+| **Per-second billing engine** | `session.ts`: tracks presence, computes duration, settles per-second |
 | **Sidecar pattern** | Monetize any platform without modifying its source code |
 | **Reverse proxy injection** | Inject payment UI into upstream HTML via Cheerio |
 | **Ephemeral wallet abstraction** | Disposable keys so users never expose their main private key |
@@ -220,11 +229,11 @@ Arc Cashier V1 is designed to be a robust, developer-friendly MVP. To ensure sta
 
 ## Tech Stack
 
-- [Circle x402-batching SDK](https://www.npmjs.com/package/@circle-fin/x402-batching) — Gasless micropayments
-- [Viem](https://viem.sh/) — Type-safe Ethereum interactions
-- [Express](https://expressjs.com/) — HTTP server
-- [TypeScript](https://www.typescriptlang.org/) — Strict typing
-- [Cheerio](https://cheerio.js.org/) — HTML injection
+- **[Circle x402-batching SDK](https://www.npmjs.com/package/@circle-fin/x402-batching)**: Gasless micropayments
+- **[Viem](https://viem.sh/)**: Type-safe Ethereum interactions
+- **[Express](https://expressjs.com/)**: HTTP server
+- **[TypeScript](https://www.typescriptlang.org/)**: Strict typing
+- **[Cheerio](https://cheerio.js.org/)**: HTML injection
 
 ## License
 
