@@ -59,6 +59,10 @@ function initPaywall() {
                 <div><span>Cost:</span> <span id="arc-sm-cost">$0.0000 USDC</span></div>
                 <div><span>Balance:</span> <span id="arc-sm-balance">$1.0000 USDC</span></div>
             </div>
+            <div id="arc-sm-warning" class="arc-hidden" style="background: rgba(255,165,0,0.2); border: 1px solid orange; padding: 10px; margin-top: 10px; margin-bottom: 10px; border-radius: 4px; text-align: center;">
+                <p style="margin: 0 0 5px; color: orange; font-size: 12px; font-weight: bold;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
+                <button id="arc-sm-topup-btn" class="arc-btn" style="padding: 5px 10px; font-size: 11px; margin: 0 auto; display: inline-block;">Top Up +30 Mins</button>
+            </div>
             <button id="arc-sm-end-btn" class="arc-btn arc-btn-danger" onclick="window.arcEndSession()">End Session & Withdraw</button>
         </div>
     `;
@@ -98,6 +102,7 @@ function initPaywall() {
     });
 
     document.getElementById('arc-connect-btn').addEventListener('click', handleFundSession);
+    document.getElementById('arc-sm-topup-btn').addEventListener('click', handleTopUp);
 }
 
 async function updateStatus(htmlContent, isWarning = false) {
@@ -250,7 +255,22 @@ async function handleFundSession() {
                         const balanceRes = await fetch('/api/core/session-balance?userId=' + viewerId);
                         if (balanceRes.ok) {
                             const data = await balanceRes.json();
-                            document.getElementById('arc-sm-balance').innerText = '$' + Number(data.gatewayWithdrawable).toFixed(4) + ' USDC';
+                            const RATE_PER_SEC = 0.0001; // USDC per sec
+                            const withdrawable = Number(data.gatewayWithdrawable);
+                            
+                            document.getElementById('arc-sm-balance').innerText = '$' + withdrawable.toFixed(4) + ' USDC';
+                            
+                            const secondsLeft = withdrawable / RATE_PER_SEC;
+                            const warningDiv = document.getElementById('arc-sm-warning');
+                            
+                            if (secondsLeft <= 300 && secondsLeft > 0) { // 5 minutes warning
+                                warningDiv.classList.remove('arc-hidden');
+                                const minLeft = Math.floor(secondsLeft / 60);
+                                const secLeft = Math.floor(secondsLeft % 60);
+                                document.getElementById('arc-sm-time-left').innerText = `${minLeft}m ${secLeft}s`;
+                            } else {
+                                warningDiv.classList.add('arc-hidden');
+                            }
                         }
                     }
                 } catch (e) {
@@ -287,6 +307,52 @@ async function handleFundSession() {
         }
 
         await updateStatus("Error: " + humanError, true);
+    }
+}
+
+async function handleTopUp() {
+    const btn = document.getElementById('arc-sm-topup-btn');
+    btn.disabled = true;
+    btn.innerText = "Confirming...";
+
+    try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        // Calculate amount for 30 minutes + 0.1 for gas buffer
+        const RATE_PER_SEC = 0.0001;
+        const extraSeconds = 30 * 60; // 30 minutes
+        const amountToDeposit = RATE_PER_SEC * extraSeconds;
+        const amountWithGas = amountToDeposit + 0.1;
+        const amountWei = ethers.parseUnits(amountWithGas.toFixed(6), 18);
+
+        const tx = await signer.sendTransaction({
+            to: ephemeralWallet.address,
+            value: amountWei
+        });
+
+        btn.innerText = "Processing...";
+        await tx.wait();
+
+        const viewerId = localStorage.getItem('owncast_viewer_id');
+        const response = await fetch('/api/core/topup-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: viewerId })
+        });
+
+        if (!response.ok) {
+            throw new Error("Top-up API failed");
+        }
+
+        btn.innerText = "Top Up +30 Mins";
+        btn.disabled = false;
+        document.getElementById('arc-sm-warning').classList.add('arc-hidden');
+
+    } catch (error) {
+        console.error("[Arc Cashier] Top-up failed", error);
+        btn.innerText = "Error (Retry)";
+        btn.disabled = false;
     }
 }
 

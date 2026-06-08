@@ -211,6 +211,45 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
     }
 });
 
+// --- CLIENT SIDE: Top-Up Session ---
+coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    try {
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const sessionRecord = walletService.getSessionRecord(userId);
+        const gatewayClient = new GatewayClient({
+            privateKey: sessionRecord.privateKey as `0x${string}`,
+            chain: 'arcTestnet',
+        });
+        
+        const balances = await gatewayClient.getBalances();
+        const walletBalance = Number(balances.wallet.formatted);
+        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.1);
+
+        // How much to deposit to gateway? Everything minus gas buffer
+        let depositAmount = walletBalance;
+        if (walletBalance > RETAINED_GAS_AMOUNT) {
+            depositAmount = walletBalance - RETAINED_GAS_AMOUNT;
+        }
+
+        if (depositAmount > 0.001) {
+            console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
+            await gatewayClient.deposit(depositAmount.toFixed(6));
+            return res.json({ status: 'success', deposited: depositAmount.toFixed(6) });
+        } else {
+            return res.status(400).json({ error: 'Insufficient wallet balance for top-up' });
+        }
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to process top-up for ${userId}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // --- SELLER SIDE: Admin Routes ---
 coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
     try {
