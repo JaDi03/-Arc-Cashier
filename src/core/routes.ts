@@ -3,6 +3,16 @@ import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
+import rateLimit from 'express-rate-limit';
+
+const sessionLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // limit each IP to 20 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
 const coreRouter = Router();
 
 // Seller address - the stream creator's address where payments are received
@@ -23,7 +33,7 @@ coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: Request & { p
 });
 
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
-coreRouter.post('/register-session', async (req: Request, res: Response) => {
+coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId, privateKey, returnAddress } = req.body;
 
     if (!userId || !privateKey || !returnAddress) {
@@ -133,7 +143,7 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
 });
 
 // --- CLIENT SIDE: Explicitly end session and refund ---
-coreRouter.post('/end-session', async (req: Request, res: Response) => {
+coreRouter.post('/end-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId } = req.body;
     if (!userId) {
         return res.status(400).json({ error: 'Missing userId' });
