@@ -2,14 +2,21 @@
 
 <div align="center">
   <p>
+    <img src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white" alt="CI Status" />
+    <img src="https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge" alt="License" />
+    <img src="https://img.shields.io/badge/node-%3E%3D_22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
+  </p>
+  <p>
     <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
     <img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" />
     <img src="https://img.shields.io/badge/Circle_x402-2B3139?style=for-the-badge&logo=web3dotjs&logoColor=white" alt="Circle x402" />
   </p>
 </div>
 
 **Per-second streaming payments for self-hosted platforms, powered by Circle x402.**
+
+> **TL;DR:** Monetize any video stream by the second. Viewers deposit USDC from any chain via CCTP, unlock the stream via gasless x402 signatures, and settle efficiently on the Arc Network. Zero modifications required to your media server.
 
 Arc Cashier is a payment sidecar that sits between your viewers and your self-hosted streaming platform. It bills viewers by the second using [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org): gasless off-chain micropayments settled in batches on-chain.
 
@@ -256,6 +263,15 @@ By leveraging the **Arc Network** combined with the **x402 protocol**:
 - **Gasless Streaming**: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.
 - **Batched Settlement**: The Circle Gateway aggregates thousands of these micro-signatures and settles the final balances efficiently on the Arc Network.
 - **Economic Viability**: Arc's ultra-low latency and negligible transaction costs ensure that network fees never consume the actual value of the stream. On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc makes the math work.
+
+### 💸 Transparent Fee Structure
+
+Arc Cashier minimizes fees, but it is not entirely free. Here is exactly where network and protocol fees apply:
+
+1. **Initial Bridge / CCTP (On-chain):** The viewer pays standard gas fees on their origin network (e.g., Base or Ethereum) to bridge and fund their ephemeral wallet.
+2. **Gateway Deposit (On-chain):** The initial deposit into the Circle Gateway smart contract requires a negligible Arc Network gas fee.
+3. **Streaming (Off-chain):** **FREE.** The per-second signatures incur absolutely zero gas fees. This is the core x402 advantage.
+4. **Settlement & Withdrawal:** When the session ends, Circle Gateway charges a **~0.5% protocol fee** on the final withdrawn amount.
 
 ### Environment Configuration
 - **Dynamic Routing:** `PUBLIC_URL` is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded `localhost` limitations.
