@@ -7,6 +7,7 @@ import { walletService } from './wallet';
  */
 export class SessionService {
     private activeSessions = new Map<string, number>();
+    private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
     private readonly PAYMENT_INTERVAL_MS = 1000; // 1 second
@@ -23,11 +24,15 @@ export class SessionService {
             console.log(`[Session] ⏱️ Running continuous payment loop for ${this.activeSessions.size} active sessions...`);
             for (const [userId] of this.activeSessions) {
                 try {
-                    const sessionRecord = walletService.getSessionRecord(userId);
-                    const gatewayClient = new GatewayClient({
-                        privateKey: sessionRecord.privateKey as `0x${string}`,
-                        chain: 'arcTestnet',
-                    });
+                    let gatewayClient = this.gatewayClients.get(userId);
+                    if (!gatewayClient) {
+                        const sessionRecord = walletService.getSessionRecord(userId);
+                        gatewayClient = new GatewayClient({
+                            privateKey: sessionRecord.privateKey as `0x${string}`,
+                            chain: 'arcTestnet',
+                        });
+                        this.gatewayClients.set(userId, gatewayClient);
+                    }
                     
                     const PORT = process.env.PORT || 3000;
                     const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -77,14 +82,17 @@ export class SessionService {
                 console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
             }
 
-            // Get the user's session record (ephemeral key + return address)
+            // Get the user's session record
             const sessionRecord = walletService.getSessionRecord(userId);
 
-            // Create GatewayClient with the ephemeral key
-            const gatewayClient = new GatewayClient({
-                privateKey: sessionRecord.privateKey as `0x${string}`,
-                chain: 'arcTestnet',
-            });
+            // Re-use GatewayClient if available, otherwise create it
+            let gatewayClient = this.gatewayClients.get(userId);
+            if (!gatewayClient) {
+                gatewayClient = new GatewayClient({
+                    privateKey: sessionRecord.privateKey as `0x${string}`,
+                    chain: 'arcTestnet',
+                });
+            }
 
             // Check remaining Gateway balance
             const balances = await gatewayClient.getBalances();
@@ -116,7 +124,8 @@ export class SessionService {
         } finally {
             walletService.clearSession(userId);
             this.settlementLocks.delete(userId);
-            console.log(`[Session] 🧹 Cleared ephemeral keys and locks from memory for ${userId}`);
+            this.gatewayClients.delete(userId);
+            console.log(`[Session] 🧹 Cleared ephemeral keys, clients and locks from memory for ${userId}`);
         }
     }
 }
