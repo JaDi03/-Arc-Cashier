@@ -84,17 +84,17 @@ export class SessionService {
 
             // Check remaining Gateway balance
             const balances = await gatewayClient.getBalances();
-            const availableFormatted = balances.gateway.formattedAvailable;
-            const available = Number(availableFormatted);
+            const withdrawableFormatted = balances.gateway.formattedWithdrawable;
+            const withdrawable = Number(withdrawableFormatted);
 
-            console.log(`[Session] 💰 Remaining Gateway balance: ${availableFormatted} USDC`);
+            console.log(`[Session] 💰 Remaining Gateway withdrawable balance: ${withdrawableFormatted} USDC`);
 
-            if (available > 0.001) {
+            if (withdrawable > 0.001) {
                 // Subtract Gateway withdrawal fee (~0.5%) to avoid "Insufficient balance" error
-                const withdrawAmount = (available * 0.99).toFixed(6);
+                const withdrawAmount = (withdrawable * 0.99).toFixed(6);
 
                 // Withdraw remaining Gateway balance back to user's original wallet
-                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${availableFormatted} available) back to ${sessionRecord.returnAddress}...`);
+                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${withdrawableFormatted} withdrawable) back to ${sessionRecord.returnAddress}...`);
 
                 const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
                     recipient: sessionRecord.returnAddress as `0x${string}`,

@@ -188,6 +188,7 @@ coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
         return res.json({ 
             status: 'success', 
             gatewayBalance: balances.gateway.formattedAvailable,
+            gatewayWithdrawable: balances.gateway.formattedWithdrawable,
             walletBalance: balances.wallet.formatted
         });
     } catch (error) {
@@ -209,14 +210,14 @@ coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
         });
 
         const balances = await sellerClient.getBalances();
-        const available = Number(balances.gateway.formattedAvailable);
+        const withdrawable = Number(balances.gateway.formattedWithdrawable);
         
-        if (available <= 0) {
-            return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
+        if (withdrawable <= 0) {
+            return res.json({ status: 'no_funds', balance: balances.gateway.formattedWithdrawable });
         }
 
         // Withdraw everything
-        const withdrawResult = await sellerClient.withdraw(balances.gateway.formattedAvailable);
+        const withdrawResult = await sellerClient.withdraw(balances.gateway.formattedWithdrawable);
         
         return res.json({
             status: 'success',
