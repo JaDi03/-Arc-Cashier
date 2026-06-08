@@ -173,6 +173,35 @@ coreRouter.get('/session-status', (req: Request, res: Response) => {
     }
 });
 
+// --- CLIENT SIDE: Check Session Balance ---
+coreRouter.get('/session-balance', async (req: Request, res: Response) => {
+    const userId = req.query.userId as string;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const sessionRecord = walletService.getSessionRecord(userId);
+        const gatewayClient = new GatewayClient({
+            privateKey: sessionRecord.privateKey as `0x${string}`,
+            chain: 'arcTestnet',
+        });
+        const balances = await gatewayClient.getBalances();
+        res.json({
+            gatewayAvailable: balances.gateway.formattedAvailable,
+            gatewayWithdrawable: balances.gateway.formattedWithdrawable,
+            walletBalance: balances.wallet.formatted,
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to fetch balance for ${userId}:`, err.message);
+        res.status(500).json({ error: 'Failed to fetch balance' });
+    }
+});
+
 // --- SELLER SIDE: Admin Routes ---
 coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
     try {

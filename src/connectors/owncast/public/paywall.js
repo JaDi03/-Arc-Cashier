@@ -228,7 +228,6 @@ async function handleFundSession() {
             seconds++;
             document.getElementById('arc-sm-time').innerText = seconds + 's';
             document.getElementById('arc-sm-cost').innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
-            document.getElementById('arc-sm-balance').innerText = '$' + (1.0000 - (seconds * 0.0001)).toFixed(4) + ' USDC';
 
             // Heartbeat: Check if the backend killed the session every 5 seconds
             if (seconds % 5 === 0) {
@@ -248,6 +247,12 @@ async function handleFundSession() {
 
                         // Re-initialize the paywall to force a new deposit
                         initPaywall();
+                    } else if (statusRes.ok) {
+                        const balanceRes = await fetch('/api/core/session-balance?userId=' + viewerId);
+                        if (balanceRes.ok) {
+                            const data = await balanceRes.json();
+                            document.getElementById('arc-sm-balance').innerText = '$' + Number(data.gatewayWithdrawable).toFixed(4) + ' USDC';
+                        }
                     }
                 } catch (e) {
                     console.error("[Arc Cashier] Heartbeat failed", e);
