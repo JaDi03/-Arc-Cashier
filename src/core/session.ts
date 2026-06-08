@@ -96,7 +96,10 @@ export class SessionService {
 
             // Check remaining Gateway balance
             const balances = await gatewayClient.getBalances();
-            const withdrawableFormatted = balances.gateway.formattedWithdrawable;
+            console.log(`[Session] 🔍 DEBUG Gateway Balances:`, balances.gateway);
+            
+            // Revert back to formattedAvailable for withdrawal until we understand why withdrawable is 0
+            const withdrawableFormatted = balances.gateway.formattedAvailable;
             const withdrawable = Number(withdrawableFormatted);
 
             console.log(`[Session] 💰 Remaining Gateway withdrawable balance: ${withdrawableFormatted} USDC`);
