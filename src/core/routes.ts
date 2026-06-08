@@ -96,8 +96,9 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
 
         // 4. Pay for stream access via x402 (gasless off-chain signature!)
         console.log(`[Core] 🔓 Paying for stream access via x402...`);
+        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
         const payResult = await gatewayClient.pay<{ access: boolean }>(
-            `http://localhost:${PORT}/api/core/stream-access`
+            `${sidecarUrl}/api/core/stream-access`
         );
         console.log(`[Core] ✅ Stream access granted!`);
         console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);

@@ -30,8 +30,9 @@ export class SessionService {
                     });
                     
                     const PORT = process.env.PORT || 3000;
+                    const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
                     const payResult = await gatewayClient.pay<{ access: boolean }>(
-                        `http://localhost:${PORT}/api/core/stream-access`
+                        `${sidecarUrl}/api/core/stream-access`
                     );
                     console.log(`[Session] ✅ Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
                 } catch (error) {
