@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import coreRouter from './core/routes';
+import { sessionService } from './core/session';
 import type { Connector, ConnectorConfig } from './core/types';
 
 /**
@@ -51,8 +52,31 @@ export async function createServer(connectors: ConnectorConfig[]) {
     }
 
     // Healthcheck
-    app.get('/health', (req, res) => {
-        res.json({ status: 'healthy', version: '1.0.0' });
+    app.get('/health', async (req, res) => {
+        try {
+            // Basic connectivity check to Circle API (with 3 second timeout)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            
+            const gatewayHealth = await fetch('https://api-testnet.circle.com/ping', { 
+                signal: controller.signal 
+            }).catch(() => ({ ok: false }));
+            
+            clearTimeout(timeoutId);
+
+            res.json({ 
+                status: 'healthy', 
+                version: '1.0.0',
+                gateway: gatewayHealth.ok ? 'connected' : 'degraded',
+                activeSessions: sessionService.getActiveSessionCount(),
+            });
+        } catch (error) {
+            res.status(503).json({ 
+                status: 'degraded', 
+                gateway: 'unreachable',
+                activeSessions: sessionService.getActiveSessionCount()
+            });
+        }
     });
 
     return app;

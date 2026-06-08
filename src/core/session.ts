@@ -55,6 +55,10 @@ export class SessionService {
         return this.activeSessions.has(userId);
     }
 
+    public getActiveSessionCount(): number {
+        return this.activeSessions.size;
+    }
+
     public async recordPartAndSettle(userId: string): Promise<void> {
         if (this.settlementLocks.has(userId)) {
             console.log(`[Session] 🔒 Settlement already in progress for ${userId}, skipping.`);
