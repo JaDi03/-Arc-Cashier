@@ -72,7 +72,9 @@ sequenceDiagram
 ## Proof of Concept
 
 **Live Demo (Viewer Flow)**  
-https://github.com/JaDi03/Arc-Cashier/raw/main/media/cashier.mp4
+https://github.com/user-attachments/assets/616387d0-0704-403e-93c3-1f808dd0d0ca
+
+
 
 **Backend Verification & On-Chain Settlement**  
 The backend silently handles gasless x402 signatures every second, eventually settling the remainder directly on the Arc Testnet via the Circle Gateway smart contract.
