@@ -7,6 +7,8 @@ import { walletService } from './wallet';
  */
 export class SessionService {
     private activeSessions = new Map<string, number>();
+    private gatewayClients = new Map<string, GatewayClient>();
+    private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
     private readonly PAYMENT_INTERVAL_MS = 1000; // 1 second
 
@@ -22,15 +24,20 @@ export class SessionService {
             console.log(`[Session] ⏱️ Running continuous payment loop for ${this.activeSessions.size} active sessions...`);
             for (const [userId] of this.activeSessions) {
                 try {
-                    const sessionRecord = walletService.getSessionRecord(userId);
-                    const gatewayClient = new GatewayClient({
-                        privateKey: sessionRecord.privateKey as `0x${string}`,
-                        chain: 'arcTestnet',
-                    });
+                    let gatewayClient = this.gatewayClients.get(userId);
+                    if (!gatewayClient) {
+                        const sessionRecord = walletService.getSessionRecord(userId);
+                        gatewayClient = new GatewayClient({
+                            privateKey: sessionRecord.privateKey as `0x${string}`,
+                            chain: 'arcTestnet',
+                        });
+                        this.gatewayClients.set(userId, gatewayClient);
+                    }
                     
                     const PORT = process.env.PORT || 3000;
+                    const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
                     const payResult = await gatewayClient.pay<{ access: boolean }>(
-                        `http://localhost:${PORT}/api/core/stream-access`
+                        `${sidecarUrl}/api/core/stream-access`
                     );
                     console.log(`[Session] ✅ Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
                 } catch (error) {
@@ -53,40 +60,56 @@ export class SessionService {
         return this.activeSessions.has(userId);
     }
 
-    public async recordPartAndSettle(userId: string): Promise<void> {
-        const joinedTime = this.activeSessions.get(userId);
+    public getActiveSessionCount(): number {
+        return this.activeSessions.size;
+    }
 
-        if (joinedTime) {
-            this.activeSessions.delete(userId);
-            const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
-            console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
-        } else {
-            console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
+    public async recordPartAndSettle(userId: string): Promise<void> {
+        if (this.settlementLocks.has(userId)) {
+            console.log(`[Session] 🔒 Settlement already in progress for ${userId}, skipping.`);
+            return;
         }
+        this.settlementLocks.add(userId);
 
         try {
-            // Get the user's session record (ephemeral key + return address)
+            const joinedTime = this.activeSessions.get(userId);
+
+            if (joinedTime) {
+                this.activeSessions.delete(userId);
+                const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
+                console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
+            } else {
+                console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
+            }
+
+            // Get the user's session record
             const sessionRecord = walletService.getSessionRecord(userId);
 
-            // Create GatewayClient with the ephemeral key
-            const gatewayClient = new GatewayClient({
-                privateKey: sessionRecord.privateKey as `0x${string}`,
-                chain: 'arcTestnet',
-            });
+            // Re-use GatewayClient if available, otherwise create it
+            let gatewayClient = this.gatewayClients.get(userId);
+            if (!gatewayClient) {
+                gatewayClient = new GatewayClient({
+                    privateKey: sessionRecord.privateKey as `0x${string}`,
+                    chain: 'arcTestnet',
+                });
+            }
 
             // Check remaining Gateway balance
             const balances = await gatewayClient.getBalances();
-            const availableFormatted = balances.gateway.formattedAvailable;
-            const available = Number(availableFormatted);
+            console.log(`[Session] 🔍 DEBUG Gateway Balances:`, balances.gateway);
+            
+            // Revert back to formattedAvailable for withdrawal until we understand why withdrawable is 0
+            const withdrawableFormatted = balances.gateway.formattedAvailable;
+            const withdrawable = Number(withdrawableFormatted);
 
-            console.log(`[Session] 💰 Remaining Gateway balance: ${availableFormatted} USDC`);
+            console.log(`[Session] 💰 Remaining Gateway withdrawable balance: ${withdrawableFormatted} USDC`);
 
-            if (available > 0.001) {
+            if (withdrawable > 0.001) {
                 // Subtract Gateway withdrawal fee (~0.5%) to avoid "Insufficient balance" error
-                const withdrawAmount = (available * 0.99).toFixed(6);
+                const withdrawAmount = (withdrawable * 0.99).toFixed(6);
 
                 // Withdraw remaining Gateway balance back to user's original wallet
-                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${availableFormatted} available) back to ${sessionRecord.returnAddress}...`);
+                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${withdrawableFormatted} withdrawable) back to ${sessionRecord.returnAddress}...`);
 
                 const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
                     recipient: sessionRecord.returnAddress as `0x${string}`,
@@ -103,7 +126,9 @@ export class SessionService {
             console.error(`[Session] ❌ Failed to process session close for ${userId}: ${err.message}`);
         } finally {
             walletService.clearSession(userId);
-            console.log(`[Session] 🧹 Cleared ephemeral keys from memory for ${userId}`);
+            this.settlementLocks.delete(userId);
+            this.gatewayClients.delete(userId);
+            console.log(`[Session] 🧹 Cleared ephemeral keys, clients and locks from memory for ${userId}`);
         }
     }
 }

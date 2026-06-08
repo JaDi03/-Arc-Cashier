@@ -3,6 +3,17 @@ import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
+import rateLimit from 'express-rate-limit';
+import { isAddress, isHex } from 'viem';
+
+const sessionLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // limit each IP to 20 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
 const coreRouter = Router();
 
 // Seller address - the stream creator's address where payments are received
@@ -23,11 +34,19 @@ coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: Request & { p
 });
 
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
-coreRouter.post('/register-session', async (req: Request, res: Response) => {
+coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId, privateKey, returnAddress } = req.body;
 
     if (!userId || !privateKey || !returnAddress) {
         return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
+    }
+
+    if (!isHex(privateKey)) {
+        return res.status(400).json({ error: 'Invalid privateKey format' });
+    }
+
+    if (!isAddress(returnAddress)) {
+        return res.status(400).json({ error: 'Invalid returnAddress' });
     }
 
     if (!sessionService.hasActiveSession(userId)) {
@@ -51,12 +70,14 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
 
         const walletUsdc = Number(balances.wallet.formatted);
 
-        if (walletUsdc < 0.01) {
+        const minWalletBalance = Number(process.env.MIN_WALLET_BALANCE || '0.01');
+        if (walletUsdc < minWalletBalance) {
             return res.status(400).json({ error: 'Ephemeral wallet has insufficient USDC balance.' });
         }
 
-        // 3. Deposit to Gateway — leave 0.10 USDC for gas (approve tx + deposit tx)
-        const depositAmount = Math.max(0, walletUsdc - 0.10).toFixed(2);
+        // 3. Deposit to Gateway — leave gas fee amount in wallet (approve tx + deposit tx)
+        const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.10');
+        const depositAmount = Math.max(0, walletUsdc - retainedGasAmount).toFixed(2);
         console.log(`[Core] 💳 Depositing ${depositAmount} USDC to Circle Gateway...`);
 
         const depositResult = await gatewayClient.deposit(depositAmount);
@@ -65,10 +86,38 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         console.log(`[Core]    Deposit Tx:  ${depositResult.depositTxHash}`);
         console.log(`[Core]    Amount:      ${depositResult.formattedAmount} USDC`);
 
+        // 3.5 Wait for deposit to reflect in Gateway balance
+        console.log(`[Core] ⏳ Waiting for deposit to reflect in Gateway balance...`);
+        let currentGatewayBalance = Number(balances.gateway.formattedAvailable);
+        const expectedMinBalance = currentGatewayBalance + Number(depositAmount);
+        
+        let attempts = 0;
+        const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds
+        let gatewayUpdated = false;
+
+        while (attempts < maxAttempts) {
+            const currentBalances = await gatewayClient.getBalances();
+            const newGatewayBalance = Number(currentBalances.gateway.formattedAvailable);
+            
+            if (newGatewayBalance >= expectedMinBalance) {
+                console.log(`[Core] ✅ Gateway balance updated successfully! (${newGatewayBalance} USDC)`);
+                gatewayUpdated = true;
+                break;
+            }
+            
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2s
+        }
+
+        if (!gatewayUpdated) {
+            return res.status(500).json({ error: 'Timeout waiting for deposit to reflect in Gateway. Transaction might be delayed.' });
+        }
+
         // 4. Pay for stream access via x402 (gasless off-chain signature!)
         console.log(`[Core] 🔓 Paying for stream access via x402...`);
+        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
         const payResult = await gatewayClient.pay<{ access: boolean }>(
-            `http://localhost:${PORT}/api/core/stream-access`
+            `${sidecarUrl}/api/core/stream-access`
         );
         console.log(`[Core] ✅ Stream access granted!`);
         console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
@@ -103,7 +152,7 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
 });
 
 // --- CLIENT SIDE: Explicitly end session and refund ---
-coreRouter.post('/end-session', async (req: Request, res: Response) => {
+coreRouter.post('/end-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId } = req.body;
     if (!userId) {
         return res.status(400).json({ error: 'Missing userId' });
@@ -133,6 +182,74 @@ coreRouter.get('/session-status', (req: Request, res: Response) => {
     }
 });
 
+// --- CLIENT SIDE: Check Session Balance ---
+coreRouter.get('/session-balance', async (req: Request, res: Response) => {
+    const userId = req.query.userId as string;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const sessionRecord = walletService.getSessionRecord(userId);
+        const gatewayClient = new GatewayClient({
+            privateKey: sessionRecord.privateKey as `0x${string}`,
+            chain: 'arcTestnet',
+        });
+        const balances = await gatewayClient.getBalances();
+        res.json({
+            gatewayAvailable: balances.gateway.formattedAvailable,
+            gatewayWithdrawable: balances.gateway.formattedAvailable,
+            walletBalance: balances.wallet.formatted,
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to fetch balance for ${userId}:`, err.message);
+        res.status(500).json({ error: 'Failed to fetch balance' });
+    }
+});
+
+// --- CLIENT SIDE: Top-Up Session ---
+coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    try {
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const sessionRecord = walletService.getSessionRecord(userId);
+        const gatewayClient = new GatewayClient({
+            privateKey: sessionRecord.privateKey as `0x${string}`,
+            chain: 'arcTestnet',
+        });
+        
+        const balances = await gatewayClient.getBalances();
+        const walletBalance = Number(balances.wallet.formatted);
+        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.1);
+
+        // How much to deposit to gateway? Everything minus gas buffer
+        let depositAmount = walletBalance;
+        if (walletBalance > RETAINED_GAS_AMOUNT) {
+            depositAmount = walletBalance - RETAINED_GAS_AMOUNT;
+        }
+
+        if (depositAmount > 0.001) {
+            console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
+            await gatewayClient.deposit(depositAmount.toFixed(6));
+            return res.json({ status: 'success', deposited: depositAmount.toFixed(6) });
+        } else {
+            return res.status(400).json({ error: 'Insufficient wallet balance for top-up' });
+        }
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to process top-up for ${userId}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // --- SELLER SIDE: Admin Routes ---
 coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
     try {
@@ -148,6 +265,7 @@ coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
         return res.json({ 
             status: 'success', 
             gatewayBalance: balances.gateway.formattedAvailable,
+            gatewayWithdrawable: balances.gateway.formattedAvailable,
             walletBalance: balances.wallet.formatted
         });
     } catch (error) {
@@ -169,9 +287,9 @@ coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
         });
 
         const balances = await sellerClient.getBalances();
-        const available = Number(balances.gateway.formattedAvailable);
+        const withdrawable = Number(balances.gateway.formattedAvailable);
         
-        if (available <= 0) {
+        if (withdrawable <= 0) {
             return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
         }
 

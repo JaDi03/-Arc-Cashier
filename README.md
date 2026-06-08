@@ -72,9 +72,7 @@ sequenceDiagram
 ## Proof of Concept
 
 **Live Demo (Viewer Flow)**  
-<p align="center">
-  <img src="media/demo.gif" alt="Viewer Flow" width="100%">
-</p>
+<video src="media/cashier.mp4" controls autoplay loop muted playsinline width="100%"></video>
 
 **Backend Verification & On-Chain Settlement**  
 The backend silently handles gasless x402 signatures every second, eventually settling the remainder directly on the Arc Testnet via the Circle Gateway smart contract.
@@ -193,6 +191,28 @@ export default myConnector;
 | **Ephemeral wallet abstraction** | Disposable keys so users never expose their main private key |
 | **Connector interface** | Standardized contract for adapting any webhook-emitting platform |
 | **x402 Gateway lifecycle** | Full deposit → pay → withdraw flow via Circle SDK |
+
+---
+
+## Production & Architecture (V1)
+
+Arc Cashier V1 is designed to be a robust, developer-friendly MVP. To ensure stability and ease of deployment, the following architectural decisions and limitations are present in this version:
+
+### Environment Configuration
+- **Dynamic Routing:** `PUBLIC_URL` is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded `localhost` limitations.
+- **Gas Buffer:** `RETAINED_GAS_AMOUNT` (default 0.1 USDC) is utilized to ensure the ephemeral wallet always retains enough native token for on-chain interactions without failing.
+
+### Security & Performance
+- **Rate Limiting:** Critical endpoints (`/register-session` and `/end-session`) are protected by IP rate limiting to prevent spam and DDoS attempts.
+- **Memory Optimization:** `GatewayClient` instances are cached in memory. Ephemeral keys and instances are strictly wiped using a safe sweep upon session termination.
+- **Dynamic Top-Up:** Viewers are alerted dynamically when their balance drops below 5 minutes of viewing time, allowing them to top-up without interrupting the video stream.
+
+### Observability
+- **Healthcheck:** A robust endpoint at `GET /health` provides real-time status of active sessions and connectivity to the Circle Gateway, suitable for integration with Prometheus or UptimeKuma.
+
+### V1 Limitations & Trade-offs
+- **Polling over Webhooks:** To maximize developer experience (DX) and allow seamless testing on `localhost` without tunnels (like ngrok), V1 actively polls Circle for deposit confirmations instead of relying on Webhooks.
+- **Fixed Payment Scheme:** The protocol currently forces the `GatewayWalletBatched` scheme on Arc Testnet. While x402 supports dynamic schemes like `CompositeEvmScheme`, they are disabled in V1 to maintain strict focus on streaming micro-payments.
 
 ---
 
