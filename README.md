@@ -72,7 +72,7 @@ sequenceDiagram
 ## Proof of Concept
 
 **Live Demo (Viewer Flow)**  
-https://github.com/user-attachments/assets/616387d0-0704-403e-93c3-1f808dd0d0ca
+<video src="https://github.com/user-attachments/assets/616387d0-0704-403e-93c3-1f808dd0d0ca" controls autoplay loop muted playsinline width="100%"></video>
 
 
 
