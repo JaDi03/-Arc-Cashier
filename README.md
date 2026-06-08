@@ -72,9 +72,7 @@ sequenceDiagram
 ## Proof of Concept
 
 **Live Demo (Viewer Flow)**  
-<p align="center">
-  <img src="media/demo.gif" alt="Viewer Flow" width="100%">
-</p>
+<video src="media/cashier.mp4" controls autoplay loop muted playsinline width="100%"></video>
 
 **Backend Verification & On-Chain Settlement**  
 The backend silently handles gasless x402 signatures every second, eventually settling the remainder directly on the Arc Testnet via the Circle Gateway smart contract.
