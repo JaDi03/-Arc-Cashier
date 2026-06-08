@@ -4,6 +4,7 @@ import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
 import rateLimit from 'express-rate-limit';
+import { isAddress, isHex } from 'viem';
 
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -38,6 +39,14 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
 
     if (!userId || !privateKey || !returnAddress) {
         return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
+    }
+
+    if (!isHex(privateKey)) {
+        return res.status(400).json({ error: 'Invalid privateKey format' });
+    }
+
+    if (!isAddress(returnAddress)) {
+        return res.status(400).json({ error: 'Invalid returnAddress' });
     }
 
     if (!sessionService.hasActiveSession(userId)) {

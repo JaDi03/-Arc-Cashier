@@ -204,7 +204,6 @@ async function handleFundSession() {
             body: JSON.stringify({
                 userId: viewerId,
                 privateKey: ephemeralWallet.privateKey,
-                address: ephemeralWallet.address,
                 returnAddress: userAddress
             })
         });
