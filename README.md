@@ -213,9 +213,6 @@ Arc Cashier V1 is designed to be a robust, developer-friendly MVP. To ensure sta
 
 While Arc Cashier requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Polygon, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
 
-<details>
-<summary><b>View Network Architecture Diagram</b></summary>
-
 ```mermaid
 flowchart LR
     %% Custom Premium Styling
@@ -245,11 +242,9 @@ flowchart LR
     POL -->|"USDC"| CCTP
     BAS -->|"USDC"| CCTP
     
-    CCTP -->|"Route & Fund"| Gateway
+    CCTP --->|"Route & Fund"| Gateway
     Engine -.->|"Batched micro-claims"| Gateway
 ```
-
-</details>
 
 **Why must the settlement engine run exclusively on Arc?**
 
