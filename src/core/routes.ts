@@ -51,12 +51,14 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
 
         const walletUsdc = Number(balances.wallet.formatted);
 
-        if (walletUsdc < 0.01) {
+        const minWalletBalance = Number(process.env.MIN_WALLET_BALANCE || '0.01');
+        if (walletUsdc < minWalletBalance) {
             return res.status(400).json({ error: 'Ephemeral wallet has insufficient USDC balance.' });
         }
 
-        // 3. Deposit to Gateway — leave 0.10 USDC for gas (approve tx + deposit tx)
-        const depositAmount = Math.max(0, walletUsdc - 0.10).toFixed(2);
+        // 3. Deposit to Gateway — leave gas fee amount in wallet (approve tx + deposit tx)
+        const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.10');
+        const depositAmount = Math.max(0, walletUsdc - retainedGasAmount).toFixed(2);
         console.log(`[Core] 💳 Depositing ${depositAmount} USDC to Circle Gateway...`);
 
         const depositResult = await gatewayClient.deposit(depositAmount);
@@ -64,6 +66,33 @@ coreRouter.post('/register-session', async (req: Request, res: Response) => {
         console.log(`[Core]    Approval Tx: ${depositResult.approvalTxHash || 'skipped'}`);
         console.log(`[Core]    Deposit Tx:  ${depositResult.depositTxHash}`);
         console.log(`[Core]    Amount:      ${depositResult.formattedAmount} USDC`);
+
+        // 3.5 Wait for deposit to reflect in Gateway balance
+        console.log(`[Core] ⏳ Waiting for deposit to reflect in Gateway balance...`);
+        let currentGatewayBalance = Number(balances.gateway.formattedAvailable);
+        const expectedMinBalance = currentGatewayBalance + Number(depositAmount);
+        
+        let attempts = 0;
+        const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds
+        let gatewayUpdated = false;
+
+        while (attempts < maxAttempts) {
+            const currentBalances = await gatewayClient.getBalances();
+            const newGatewayBalance = Number(currentBalances.gateway.formattedAvailable);
+            
+            if (newGatewayBalance >= expectedMinBalance) {
+                console.log(`[Core] ✅ Gateway balance updated successfully! (${newGatewayBalance} USDC)`);
+                gatewayUpdated = true;
+                break;
+            }
+            
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2s
+        }
+
+        if (!gatewayUpdated) {
+            return res.status(500).json({ error: 'Timeout waiting for deposit to reflect in Gateway. Transaction might be delayed.' });
+        }
 
         // 4. Pay for stream access via x402 (gasless off-chain signature!)
         console.log(`[Core] 🔓 Paying for stream access via x402...`);
