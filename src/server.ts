@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
 import coreRouter from './core/routes';
 import type { Connector, ConnectorConfig } from './core/types';
 
@@ -26,8 +25,8 @@ export async function createServer(connectors: ConnectorConfig[]) {
     app.use(cors());
 
     // Only parse JSON for our own API routes, NOT globally
-    app.use('/api/core', bodyParser.json());
-    app.use('/api/connectors', bodyParser.json());
+    app.use('/api/core', express.json());
+    app.use('/api/connectors', express.json());
 
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);
