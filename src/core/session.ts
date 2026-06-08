@@ -7,6 +7,7 @@ import { walletService } from './wallet';
  */
 export class SessionService {
     private activeSessions = new Map<string, number>();
+    private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
     private readonly PAYMENT_INTERVAL_MS = 1000; // 1 second
 
@@ -54,17 +55,23 @@ export class SessionService {
     }
 
     public async recordPartAndSettle(userId: string): Promise<void> {
-        const joinedTime = this.activeSessions.get(userId);
-
-        if (joinedTime) {
-            this.activeSessions.delete(userId);
-            const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
-            console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
-        } else {
-            console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
+        if (this.settlementLocks.has(userId)) {
+            console.log(`[Session] 🔒 Settlement already in progress for ${userId}, skipping.`);
+            return;
         }
+        this.settlementLocks.add(userId);
 
         try {
+            const joinedTime = this.activeSessions.get(userId);
+
+            if (joinedTime) {
+                this.activeSessions.delete(userId);
+                const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
+                console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
+            } else {
+                console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
+            }
+
             // Get the user's session record (ephemeral key + return address)
             const sessionRecord = walletService.getSessionRecord(userId);
 
@@ -103,7 +110,8 @@ export class SessionService {
             console.error(`[Session] ❌ Failed to process session close for ${userId}: ${err.message}`);
         } finally {
             walletService.clearSession(userId);
-            console.log(`[Session] 🧹 Cleared ephemeral keys from memory for ${userId}`);
+            this.settlementLocks.delete(userId);
+            console.log(`[Session] 🧹 Cleared ephemeral keys and locks from memory for ${userId}`);
         }
     }
 }
