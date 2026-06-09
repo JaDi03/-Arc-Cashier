@@ -1,0 +1,3 @@
+[submodule "src/connectors/peertube/plugin"]
+	path = src/connectors/peertube/plugin
+	url = https://github.com/JaDi03/peertube-plugin-arc-cashier.git
