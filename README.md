@@ -115,7 +115,8 @@ The backend silently handles gasless x402 signatures every second, eventually se
 Arc Cashier provides a streamlined workflow for developers looking to fork, test, and contribute:
 
 ```bash
-git clone https://github.com/JaDi03/Arc-Cashier.git
+# We use --recursive to ensure plugins (like PeerTube) stored as submodules are downloaded
+git clone --recursive https://github.com/JaDi03/Arc-Cashier.git
 cd arc-cashier
 nvm use          # Reads .nvmrc and switches to Node v22
 npm install
