@@ -95,6 +95,13 @@ connectors: [
 5. Trigger a "viewer left" event
 6. Verify `[Session] 🔴 User parted` and `[Session] ✅ Refund complete` appear
 
+## Step 6: Multi-Tenant Architecture Rules
+
+To ensure Arc-Cashier can run multiple connectors simultaneously (e.g., Owncast and PeerTube on the same server) without routing collisions, you **MUST** adhere to these two architectural rules:
+
+1. **Asset Routing Convention:** Any frontend assets (like `paywall.js` or `paywall.css`) must be served under a route named exactly `/[your-platform-name]-assets`. The core reverse proxies automatically ignore any routes matching `/*-assets/` to prevent swallowing requests meant for other connectors.
+2. **Reverse Proxy Limitations:** While Arc-Cashier can run 10 connectors simultaneously, **only one** connector can mount a global catch-all reverse proxy (`app.use('/')`) per instance. If your platform requires a root proxy (like Owncast), users cannot enable another platform that *also* requires a root proxy on the same Arc-Cashier port.
+
 ## Reference: Owncast Connector
 
 The Owncast connector in `src/connectors/owncast/` is the reference implementation. It demonstrates:
