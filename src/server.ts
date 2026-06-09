@@ -11,6 +11,7 @@ import type { Connector, ConnectorConfig } from './core/types';
  */
 const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> = {
     owncast: () => import('./connectors/owncast'),
+    peertube: () => import('./connectors/peertube'),
 };
 
 export async function createServer(connectors: ConnectorConfig[]) {
@@ -27,7 +28,12 @@ export async function createServer(connectors: ConnectorConfig[]) {
 
     // Only parse JSON for our own API routes, NOT globally
     app.use('/api/core', express.json());
-    app.use('/api/connectors', express.json());
+    // Attach rawBody for connectors (required for PeerTube HMAC signature verification)
+    app.use('/api/connectors', express.json({
+        verify: (req: any, res, buf) => {
+            req.rawBody = buf;
+        }
+    }));
 
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);

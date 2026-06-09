@@ -17,11 +17,11 @@ const config: CashierConfig = {
         },
 
         // To add a new connector, uncomment and configure:
-        // {
-        //     name: 'peertube',
-        //     upstreamUrl: 'http://localhost:9000',
-        //     ratePerSecond: 0.0001,
-        // },
+        {
+            name: 'peertube',
+            upstreamUrl: 'http://localhost:9000',
+            ratePerSecond: 0.0001,
+        },
     ],
 };
 
