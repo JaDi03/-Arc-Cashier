@@ -10,6 +10,7 @@ if (!window.ethers) {
 // Arc Testnet uses Native USDC for gas and payments, so no ERC20 ABI is needed.
 
 let ephemeralWallet = null;
+const ARC_API_BASE = (document.currentScript && document.currentScript.src) ? new URL(document.currentScript.src).origin : '';
 
 function initPaywall() {
     // Inject CSS if not present
@@ -199,11 +200,11 @@ async function handleFundSession() {
 
         btn.innerText = "Opening Stream...";
         await updateStatus("Funding Gateway and Opening Stream...");
-        const viewerId = localStorage.getItem('owncast_viewer_id');
+        const viewerId = localStorage.getItem('owncast_viewer_id') || localStorage.getItem('arc_cashier_user_id');
         const userAddress = await signer.getAddress();
 
         // Send the ephemeral private key to the Sidecar so it can deposit to Gateway and settle later
-        const response = await fetch('/api/core/register-session', {
+        const response = await fetch(ARC_API_BASE + '/api/core/register-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -236,7 +237,7 @@ async function handleFundSession() {
             // Heartbeat: Check if the backend killed the session every 5 seconds
             if (seconds % 5 === 0) {
                 try {
-                    const statusRes = await fetch('/api/core/session-status?userId=' + viewerId);
+                    const statusRes = await fetch(ARC_API_BASE + '/api/core/session-status?userId=' + viewerId);
                     if (statusRes.status === 404) {
                         console.warn("[Arc Cashier] Session was cleared by the backend due to inactivity. Re-locking screen.");
                         clearInterval(window.sessionTimer);
@@ -252,7 +253,7 @@ async function handleFundSession() {
                         // Re-initialize the paywall to force a new deposit
                         initPaywall();
                     } else if (statusRes.ok) {
-                        const balanceRes = await fetch('/api/core/session-balance?userId=' + viewerId);
+                        const balanceRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerId);
                         if (balanceRes.ok) {
                             const data = await balanceRes.json();
                             const RATE_PER_SEC = 0.0001; // USDC per sec
@@ -334,8 +335,8 @@ async function handleTopUp() {
         btn.innerText = "Processing...";
         await tx.wait();
 
-        const viewerId = localStorage.getItem('owncast_viewer_id');
-        const response = await fetch('/api/core/topup-session', {
+        const viewerId = localStorage.getItem('owncast_viewer_id') || localStorage.getItem('arc_cashier_user_id');
+        const response = await fetch(ARC_API_BASE + '/api/core/topup-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: viewerId })
@@ -371,14 +372,14 @@ window.arcEndSession = async function() {
         clearInterval(window.owncastPingInterval);
     }
 
-    const viewerId = localStorage.getItem('owncast_viewer_id');
+    const viewerId = localStorage.getItem('owncast_viewer_id') || localStorage.getItem('arc_cashier_user_id');
     const userAddress = ephemeralWallet ? ephemeralWallet.address : '';
 
     console.log("[Arc Cashier] Viewer ID:", viewerId);
 
     // Use XMLHttpRequest instead of fetch — fetch is being silently intercepted
     const xhr = new XMLHttpRequest();
-    const url = window.location.protocol + '//' + window.location.host + '/api/core/end-session';
+    const url = ARC_API_BASE + '/api/core/end-session';
     console.log("[Arc Cashier] XHR URL:", url);
 
     xhr.open('POST', url, true);
