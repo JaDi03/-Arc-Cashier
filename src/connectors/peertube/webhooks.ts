@@ -4,6 +4,8 @@ import { sessionService } from '../../core/session';
 
 const router = express.Router();
 
+const usedNonces = new Map<string, number>();
+
 /**
  * Validates the HMAC SHA-256 signature from PeerTube
  * Requires access to req.rawBody which must be populated by a middleware earlier in the chain.
@@ -60,16 +62,41 @@ router.post('/webhook', (req, res) => {
         return res.status(400).json({ error: 'Invalid JSON payload' });
     }
 
-    const { event, userId, videoId, instanceUrl, ratePerSecond } = payload;
+    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce } = payload;
 
     if (!event || !userId) {
         return res.status(400).json({ error: 'Missing required fields: event, userId' });
     }
 
+    const now = Date.now();
+    // Validate timestamp to prevent replay attacks (within 60 seconds)
+    if (!timestamp || now - timestamp > 60000) {
+        console.warn(`[PeerTube] ⚠️ Invalid or expired timestamp: ${timestamp}`);
+        return res.status(401).json({ error: 'Unauthorized: Expired or missing timestamp' });
+    }
+
+    if (!nonce || usedNonces.has(nonce)) {
+        return res.status(401).json({ error: 'Unauthorized: Missing or duplicated nonce' });
+    }
+    usedNonces.set(nonce, now);
+
+    // Cleanup expired nonces inline
+    for (const [key, t] of usedNonces.entries()) {
+        if (now - t > 60000) usedNonces.delete(key);
+    }
+
     // Determine the dynamic rate
+    const MIN_RATE = 0.000001;
+    const MAX_RATE = 0.01;
     let activeRate = 0.0001; // default fallback
+    
     if (ratePerSecond !== undefined && !isNaN(Number(ratePerSecond))) {
-        activeRate = Number(ratePerSecond);
+        const rate = Number(ratePerSecond);
+        if (rate >= MIN_RATE && rate <= MAX_RATE) {
+            activeRate = rate;
+        } else {
+            console.warn(`[PeerTube] ⚠️ Rate ${rate} out of bounds, using default`);
+        }
     } else if (instanceUrl && videoId) {
         // Best effort: Log the metadata for future expansion (e.g., fetching custom pricing from API)
         console.log(`[PeerTube] ℹ️ Video ${videoId} from ${instanceUrl} joined without explicit rate. Using default $0.0001/s.`);
