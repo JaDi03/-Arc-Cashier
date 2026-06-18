@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
@@ -27,8 +27,28 @@ const gateway = createGatewayMiddleware({
     networks: ['eip155:5042002'], // Arc Testnet
 });
 
-// This endpoint costs $0.0001 to access. Circle Gateway handles verification + settlement.
-coreRouter.get('/stream-access', gateway.require('$0.0001'), (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
+// This endpoint uses dynamic pricing based on the session's active rate. Circle Gateway handles verification + settlement.
+coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunction) => {
+    // 1. Identify the user from the custom header set by session.ts
+    const userId = req.headers['x-user-id'] as string;
+    
+    // 2. Resolve the dynamic rate
+    let ratePerSecond = 0.0001; // default fallback
+    if (userId) {
+        const userRate = sessionService.getRateForUser(userId);
+        if (userRate !== null) {
+            ratePerSecond = userRate;
+        }
+    } else {
+        console.warn(`[Core] ⚠️ No x-user-id header provided to /stream-access. Falling back to $0.0001.`);
+    }
+
+    const priceString = `$${ratePerSecond.toFixed(4)}`;
+
+    // 3. Create a dynamic middleware for this specific price and execute it
+    const dynamicMiddleware = gateway.require(priceString);
+    dynamicMiddleware(req as any, res as any, next);
+}, (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
     res.json({ access: true, payment: req.payment });
 });
