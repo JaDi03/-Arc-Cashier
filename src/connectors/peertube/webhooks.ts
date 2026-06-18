@@ -60,15 +60,24 @@ router.post('/webhook', (req, res) => {
         return res.status(400).json({ error: 'Invalid JSON payload' });
     }
 
-    const { event, userId } = payload;
+    const { event, userId, videoId, instanceUrl, ratePerSecond } = payload;
 
     if (!event || !userId) {
         return res.status(400).json({ error: 'Missing required fields: event, userId' });
     }
 
+    // Determine the dynamic rate
+    let activeRate = 0.0001; // default fallback
+    if (ratePerSecond !== undefined && !isNaN(Number(ratePerSecond))) {
+        activeRate = Number(ratePerSecond);
+    } else if (instanceUrl && videoId) {
+        // Best effort: Log the metadata for future expansion (e.g., fetching custom pricing from API)
+        console.log(`[PeerTube] ℹ️ Video ${videoId} from ${instanceUrl} joined without explicit rate. Using default $0.0001/s.`);
+    }
+
     // 3. Process Events (Following BUILDING_A_CONNECTOR.md)
     if (event === 'viewer_joined') {
-        sessionService.recordJoin(userId);
+        sessionService.recordJoin(userId, activeRate);
     } else if (event === 'viewer_left') {
         sessionService.recordPartAndSettle(userId).catch(console.error);
     } else {

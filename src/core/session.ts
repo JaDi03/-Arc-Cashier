@@ -6,7 +6,7 @@ import { walletService } from './wallet';
  * Uses Circle Gateway for real settlement and refunds.
  */
 export class SessionService {
-    private activeSessions = new Map<string, number>();
+    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number }>();
     private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
@@ -36,8 +36,14 @@ export class SessionService {
                     
                     const PORT = process.env.PORT || 3000;
                     const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+                    // Pass userId in the headers so the route knows who is paying and how much to charge
                     const payResult = await gatewayClient.pay<{ access: boolean }>(
-                        `${sidecarUrl}/api/core/stream-access`
+                        `${sidecarUrl}/api/core/stream-access`,
+                        {
+                            headers: {
+                                'x-user-id': userId
+                            }
+                        }
                     );
                     console.log(`[Session] ✅ Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
                 } catch (error) {
@@ -51,9 +57,9 @@ export class SessionService {
         }, this.PAYMENT_INTERVAL_MS);
     }
 
-    public recordJoin(userId: string): void {
-        this.activeSessions.set(userId, Date.now());
-        console.log(`[Session] 🟢 Session started for user: ${userId}`);
+    public recordJoin(userId: string, ratePerSecond: number = 0.0001): void {
+        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond });
+        console.log(`[Session] 🟢 Session started for user: ${userId} at rate $${ratePerSecond}/s`);
     }
 
     public hasActiveSession(userId: string): boolean {
@@ -64,6 +70,11 @@ export class SessionService {
         return this.activeSessions.size;
     }
 
+    public getRateForUser(userId: string): number | null {
+        const session = this.activeSessions.get(userId);
+        return session ? session.ratePerSecond : null;
+    }
+
     public async recordPartAndSettle(userId: string): Promise<void> {
         if (this.settlementLocks.has(userId)) {
             console.log(`[Session] 🔒 Settlement already in progress for ${userId}, skipping.`);
@@ -72,11 +83,11 @@ export class SessionService {
         this.settlementLocks.add(userId);
 
         try {
-            const joinedTime = this.activeSessions.get(userId);
+            const sessionData = this.activeSessions.get(userId);
 
-            if (joinedTime) {
+            if (sessionData) {
                 this.activeSessions.delete(userId);
-                const durationSeconds = Math.ceil((Date.now() - joinedTime) / 1000);
+                const durationSeconds = Math.ceil((Date.now() - sessionData.joinedAt) / 1000);
                 console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
             } else {
                 console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
