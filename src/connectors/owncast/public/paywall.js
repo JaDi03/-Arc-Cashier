@@ -43,7 +43,8 @@ function initPaywall() {
                 <label for="arc-network-select" style="display:block; margin-bottom: 5px; font-size: 13px; color: #cbd5e0;">Deposit Network</label>
                 <select id="arc-network-select" style="width: 100%; padding: 10px; background: #2d3748; color: white; border: 1px solid #4a5568; border-radius: 4px;">
                     <option value="arc">Arc Testnet (Native USDC)</option>
-                    <option value="baseSepolia">Base Sepolia (CCTP Forwarding)</option>
+                    <option value="baseSepolia">Base Sepolia → Arc (CCTP Forwarding)</option>
+                    <option value="arbSepolia">Arbitrum Sepolia → Arc (CCTP Forwarding)</option>
                 </select>
             </div>
 
@@ -236,39 +237,59 @@ async function handleFundSession() {
                 const tx = await signer.sendTransaction({ to: ephemeralWallet.address, value: amount });
                 await updateStatus(`Processing native deposit... <a href="https://testnet.arcscan.app/tx/${tx.hash}" target="_blank">Track TX</a>`, true);
                 await tx.wait();
-            } else if (selectedNetwork === 'baseSepolia') {
+            } else if (selectedNetwork === 'baseSepolia' || selectedNetwork === 'arbSepolia') {
                 isCCTP = true;
+
+                // Network-specific config
+                const CCTP_NETWORKS = {
+                    baseSepolia: {
+                        chainId: 84532n,
+                        chainIdHex: '0x14a34',
+                        chainName: 'Base Sepolia',
+                        rpcUrls: ['https://sepolia.base.org'],
+                        tmAddress: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+                        usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+                    },
+                    arbSepolia: {
+                        chainId: 421614n,
+                        chainIdHex: '0x66EEE',
+                        chainName: 'Arbitrum Sepolia',
+                        rpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+                        tmAddress: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+                        usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+                    }
+                };
+
+                const net = CCTP_NETWORKS[selectedNetwork];
                 const network = await provider.getNetwork();
-                if (network.chainId !== 84532n) {
+                if (network.chainId !== net.chainId) {
                     try {
-                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x14a34' }] });
+                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: net.chainIdHex }] });
                     } catch (e) {
                         if (e.code === 4902) {
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
-                                params: [{ chainId: '0x14a34', chainName: 'Base Sepolia', rpcUrls: ['https://sepolia.base.org'], nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }]
+                                params: [{ chainId: net.chainIdHex, chainName: net.chainName, rpcUrls: net.rpcUrls, nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }]
                             });
                         } else throw e;
                     }
                 }
-                
-                const tmAddress = "0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5";
-                const usdcAddress = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
-                const amount = ethers.parseUnits("5.0", 6); // 5 USDC (requires 5 USDC on Base Sepolia)
-                const maxFee = ethers.parseUnits("0.2", 6); // 0.20 USDC forwarding fee
-                const destDomain = 26; // Arc Testnet
-                const mintRecipient = ethers.zeroPadValue(ephemeralWallet.address, 32);
-                const hookData = "0x636374702d666f72776172640000000000000000000000000000000000000000";
 
-                const usdcContract = new ethers.Contract(usdcAddress, ["function approve(address spender, uint256 amount) public returns (bool)"], signer);
-                await updateStatus("Approving 5 USDC for CCTP...");
-                const approveTx = await usdcContract.approve(tmAddress, amount);
+                const amount = ethers.parseUnits('5.0', 6); // 5 USDC
+                const maxFee = ethers.parseUnits('0.2', 6);  // 0.20 USDC Circle Forwarding fee
+                const destDomain = 26;                        // Arc Testnet domain
+                const mintRecipient = ethers.zeroPadValue(ephemeralWallet.address, 32);
+                const hookData = '0x636374702d666f72776172640000000000000000000000000000000000000000';
+
+                const usdcContract = new ethers.Contract(net.usdcAddress, ['function approve(address spender, uint256 amount) public returns (bool)'], signer);
+                await updateStatus(`Approving 5 USDC on ${net.chainName} for CCTP...`);
+                const approveTx = await usdcContract.approve(net.tmAddress, amount);
                 await approveTx.wait();
 
-                const tmContract = new ethers.Contract(tmAddress, ["function depositForBurnWithHook(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, uint256 maxFee, bytes hookData) returns (uint64 _nonce)"], signer);
-                await updateStatus("Initiating CCTP Cross-Chain Deposit... (Fee: 0.20 USDC)");
-                const depositTx = await tmContract.depositForBurnWithHook(amount, destDomain, mintRecipient, usdcAddress, maxFee, hookData);
-                await updateStatus(`CCTP Burn TX sent! Wait for block confirmation...`, true);
+                const tmContract = new ethers.Contract(net.tmAddress, ['function depositForBurnWithHook(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, uint256 maxFee, bytes hookData) returns (uint64 _nonce)'], signer);
+                await updateStatus(`Initiating CCTP Cross-Chain Deposit from ${net.chainName}... (Fee: 0.20 USDC)`);
+                const depositTx = await tmContract.depositForBurnWithHook(amount, destDomain, mintRecipient, net.usdcAddress, maxFee, hookData);
+                await updateStatus(`CCTP Burn TX sent from ${net.chainName}! Waiting for block confirmation...`, true);
                 await depositTx.wait();
             }
         }
