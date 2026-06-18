@@ -70,7 +70,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
     }
 
     if (!sessionService.hasActiveSession(userId)) {
-        return res.status(400).json({ error: 'Bloqueado: Owncast aún no confirma que estás en el stream.' });
+        return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
     }
 
     const stringifyBigInt = (_key: string, value: unknown) =>
