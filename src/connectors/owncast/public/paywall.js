@@ -104,6 +104,22 @@ function initPaywall() {
 
     document.getElementById('arc-connect-btn').addEventListener('click', handleFundSession);
     document.getElementById('arc-sm-topup-btn').addEventListener('click', handleTopUp);
+
+    // --- ARC MEDIA LOCK ---
+    // Globally prevent any video/audio from playing while paywall is active
+    document.addEventListener('play', (e) => {
+        if (document.body.classList.contains('arc-locked') && (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
+            e.target.pause();
+        }
+    }, true); // Capture phase to intercept before player UI
+
+    setInterval(() => {
+        if (document.body.classList.contains('arc-locked')) {
+            document.querySelectorAll('video, audio').forEach(media => {
+                if (!media.paused) media.pause();
+            });
+        }
+    }, 500); // Aggressive fallback
 }
 
 async function updateStatus(htmlContent, isWarning = false) {
