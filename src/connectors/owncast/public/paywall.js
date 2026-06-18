@@ -170,6 +170,14 @@ async function handleFundSession() {
 
         // 1. Session Recovery
         let savedPk = localStorage.getItem('arc_ephemeral_pk');
+        let savedOwner = localStorage.getItem('arc_owner_address');
+
+        // If the user switched their MetaMask wallet, invalidate the cached ephemeral key
+        if (savedOwner && savedOwner.toLowerCase() !== userAddress.toLowerCase()) {
+            console.log('[Arc Cashier] Wallet switched! Clearing cached ephemeral key.');
+            savedPk = null;
+        }
+
         if (!savedPk) {
             try {
                 const signature = await signer.signMessage('Login to Arc-Cashier to recover or create your session.');
@@ -179,21 +187,27 @@ async function handleFundSession() {
                     body: JSON.stringify({ returnAddress: userAddress, signature })
                 });
                 if (recoverRes.ok) {
-                    const data = await recoverRes.json();
-                    savedPk = data.privateKey;
-                    viewerId = data.userId;
-                    localStorage.setItem('arc_ephemeral_pk', savedPk);
-                    localStorage.setItem('arc_cashier_user_id', viewerId);
-                    console.log("Recovered session from backend.");
+                    const rData = await recoverRes.json();
+                    if (rData.privateKey || rData.ephemeralPrivateKey) {
+                        savedPk = rData.privateKey || rData.ephemeralPrivateKey;
+                        viewerId = rData.userId;
+                        localStorage.setItem('arc_ephemeral_pk', savedPk);
+                        localStorage.setItem('arc_cashier_user_id', viewerId);
+                        localStorage.setItem('arc_owner_address', userAddress);
+                        console.log('[Arc Cashier] Session recovered securely from backend.');
+                    }
                 }
-            } catch (e) { console.log('Recovery skipped or failed', e); }
+            } catch (e) {
+                console.warn("[Arc Cashier] Recovery failed or user denied signature. Proceeding to create new session.", e);
+            }
         }
 
         if (savedPk) {
-            ephemeralWallet = new ethers.Wallet(savedPk);
+            ephemeralWallet = new ethers.Wallet(savedPk, provider);
         } else {
-            ephemeralWallet = ethers.Wallet.createRandom();
+            ephemeralWallet = ethers.Wallet.createRandom(provider);
             localStorage.setItem('arc_ephemeral_pk', ephemeralWallet.privateKey);
+            localStorage.setItem('arc_owner_address', userAddress);
         }
 
         // 2. Check existing balance to skip deposit
