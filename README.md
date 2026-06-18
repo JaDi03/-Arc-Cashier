@@ -14,11 +14,11 @@
   </p>
 </div>
 
-**Per-second streaming payments for self-hosted platforms, powered by Circle x402.**
+**The Monetization Layer for the Fediverse, powered by Circle x402.**
 
-> **TL;DR:** Monetize any video stream by the second. Viewers deposit USDC from any chain via CCTP, unlock the stream via gasless x402 signatures, and settle efficiently on the Arc Network. Zero modifications required to your media server.
+> **TL;DR:** Monetize any decentralized platform (PeerTube, Owncast, Mastodon) by the second. Viewers deposit USDC via CCTP, unlock content via gasless x402 signatures, and settle efficiently on the Arc Network. Empower creators to earn fairly and server admins to sustain their instances through automated revenue splits.
 
-Arc Cashier is a payment sidecar that sits between your viewers and your self-hosted streaming platform. It bills viewers by the second using [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org): gasless off-chain micropayments settled in batches on-chain.
+Arc Cashier is a universal payment sidecar that bridges the gap between open-source Web3 infrastructure and high-frequency micro-billing. Using the [Circle Gateway](https://developers.circle.com/gateway) and the [x402 protocol](https://x402.org), it securely intercepts traffic to your self-hosted platforms, dynamically fetching the creator's custom price and billing the viewer by the second without modifying the core platform.
 
 The platform (Owncast, PeerTube, Jellyfin, etc.) never sees a wallet or a payment. It emits the same `USER_JOINED` / `USER_PARTED` events it has always emitted. Arc Cashier does the rest.
 
