@@ -6,7 +6,7 @@ import { walletService } from './wallet';
  * Uses Circle Gateway for real settlement and refunds.
  */
 export class SessionService {
-    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number }>();
+    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number, creatorAddress?: string }>();
     private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
@@ -33,17 +33,17 @@ export class SessionService {
                         });
                         this.gatewayClients.set(userId, gatewayClient);
                     }
-                    
+                    const sessionData = this.activeSessions.get(userId);
+                    const headers: Record<string, string> = { 'x-user-id': userId };
+                    if (sessionData?.creatorAddress) {
+                        headers['x-seller-address'] = sessionData.creatorAddress;
+                    }
+
                     const PORT = process.env.PORT || 3000;
                     const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-                    // Pass userId in the headers so the route knows who is paying and how much to charge
                     const payResult = await gatewayClient.pay<{ access: boolean }>(
                         `${sidecarUrl}/api/core/stream-access`,
-                        {
-                            headers: {
-                                'x-user-id': userId
-                            }
-                        }
+                        { headers }
                     );
                     console.log(`[Session] ✅ Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
                 } catch (error) {
@@ -57,9 +57,9 @@ export class SessionService {
         }, this.PAYMENT_INTERVAL_MS);
     }
 
-    public recordJoin(userId: string, ratePerSecond: number = 0.0001): void {
-        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond });
-        console.log(`[Session] 🟢 Session started for user: ${userId} at rate $${ratePerSecond}/s`);
+    public recordJoin(userId: string, ratePerSecond: number = 0.0001, creatorAddress?: string): void {
+        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond, creatorAddress });
+        console.log(`[Session] 🟢 Session started for user: ${userId} at rate $${ratePerSecond}/s (Creator: ${creatorAddress || 'Default Admin'})`);
     }
 
     public hasActiveSession(userId: string): boolean {
@@ -90,56 +90,19 @@ export class SessionService {
                 const durationSeconds = Math.ceil((Date.now() - sessionData.joinedAt) / 1000);
                 console.log(`[Session] 🔴 User ${userId} parted. Watch time: ${durationSeconds}s.`);
             } else {
-                console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found. Assuming 0s watch time.`);
+                console.warn(`[Session] ⚠️ User ${userId} requested settlement, but no active session found.`);
             }
 
-            // Get the user's session record
-            const sessionRecord = walletService.getSessionRecord(userId);
-
-            // Re-use GatewayClient if available, otherwise create it
-            let gatewayClient = this.gatewayClients.get(userId);
-            if (!gatewayClient) {
-                gatewayClient = new GatewayClient({
-                    privateKey: sessionRecord.privateKey as `0x${string}`,
-                    chain: 'arcTestnet',
-                });
-            }
-
-            // Check remaining Gateway balance
-            const balances = await gatewayClient.getBalances();
-            console.log(`[Session] 🔍 DEBUG Gateway Balances:`, balances.gateway);
+            // DO NOT automatically withdraw funds. The user must manually cash-out via /cash-out.
+            // DO NOT clear the session record. It must persist so they can return later.
             
-            // Revert back to formattedAvailable for withdrawal until we understand why withdrawable is 0
-            const withdrawableFormatted = balances.gateway.formattedAvailable;
-            const withdrawable = Number(withdrawableFormatted);
-
-            console.log(`[Session] 💰 Remaining Gateway withdrawable balance: ${withdrawableFormatted} USDC`);
-
-            if (withdrawable > 0.001) {
-                // Subtract Gateway withdrawal fee (~0.5%) to avoid "Insufficient balance" error
-                const withdrawAmount = (withdrawable * 0.99).toFixed(6);
-
-                // Withdraw remaining Gateway balance back to user's original wallet
-                console.log(`[Session] 🧹 Withdrawing ${withdrawAmount} USDC (of ${withdrawableFormatted} withdrawable) back to ${sessionRecord.returnAddress}...`);
-
-                const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
-                    recipient: sessionRecord.returnAddress as `0x${string}`,
-                });
-
-                console.log(`[Session] ✅ Refund complete!`);
-                console.log(`[Session]    Amount: ${withdrawResult.formattedAmount} USDC`);
-                console.log(`[Session]    Tx: ${withdrawResult.mintTxHash}`);
-            } else {
-                console.log(`[Session] ℹ️ Gateway balance too low to refund.`);
-            }
+            this.gatewayClients.delete(userId);
+            console.log(`[Session] ⏸️ Billing stopped for ${userId}. Funds remain in Gateway.`);
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             console.error(`[Session] ❌ Failed to process session close for ${userId}: ${err.message}`);
         } finally {
-            walletService.clearSession(userId);
             this.settlementLocks.delete(userId);
-            this.gatewayClients.delete(userId);
-            console.log(`[Session] 🧹 Cleared ephemeral keys, clients and locks from memory for ${userId}`);
         }
     }
 }
