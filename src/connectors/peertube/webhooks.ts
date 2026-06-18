@@ -6,6 +6,14 @@ const router = express.Router();
 
 const usedNonces = new Map<string, number>();
 
+// Cleanup expired nonces in the background (every 1 minute)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, t] of usedNonces.entries()) {
+        if (now - t > 60000) usedNonces.delete(key);
+    }
+}, 60000);
+
 /**
  * Validates the HMAC SHA-256 signature from PeerTube
  * Requires access to req.rawBody which must be populated by a middleware earlier in the chain.
@@ -79,11 +87,6 @@ router.post('/webhook', (req, res) => {
         return res.status(401).json({ error: 'Unauthorized: Missing or duplicated nonce' });
     }
     usedNonces.set(nonce, now);
-
-    // Cleanup expired nonces inline
-    for (const [key, t] of usedNonces.entries()) {
-        if (now - t > 60000) usedNonces.delete(key);
-    }
 
     // Determine the dynamic rate
     const MIN_RATE = 0.000001;
