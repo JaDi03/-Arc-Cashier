@@ -1,6 +1,6 @@
 # Building a Connector
 
-This guide walks you through adding support for a new streaming platform to Arc Cashier. A connector is a lightweight adapter (~100 lines) that translates your platform's presence events into Arc Cashier's billing engine.
+This guide walks you through adding support for a new streaming platform to Tessera. A connector is a lightweight adapter (~100 lines) that translates your platform's presence events into Tessera's billing engine.
 
 ## Prerequisites
 
@@ -74,7 +74,7 @@ const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> 
 
 ## Step 4: Enable in Config
 
-Add your connector to `src/cashier.config.ts`:
+Add your connector to `src/tessera.config.ts`:
 
 ```typescript
 connectors: [
@@ -89,7 +89,7 @@ connectors: [
 ## Step 5: Test
 
 1. Start your platform
-2. Start Arc Cashier: `npx ts-node src/index.ts`
+2. Start Tessera: `npx ts-node src/index.ts`
 3. Trigger a "viewer joined" event from your platform
 4. Verify `[Session] 🟢 Session started` appears in the terminal
 5. Trigger a "viewer left" event
@@ -97,10 +97,10 @@ connectors: [
 
 ## Step 6: Multi-Tenant Architecture Rules
 
-To ensure Arc-Cashier can run multiple connectors simultaneously (e.g., Owncast and PeerTube on the same server) without routing collisions, you **MUST** adhere to these two architectural rules:
+To ensure Tessera can run multiple connectors simultaneously (e.g., Owncast and PeerTube on the same server) without routing collisions, you **MUST** adhere to these two architectural rules:
 
 1. **Asset Routing Convention:** Any frontend assets (like `paywall.js` or `paywall.css`) must be served under a route named exactly `/[your-platform-name]-assets`. The core reverse proxies automatically ignore any routes matching `/*-assets/` to prevent swallowing requests meant for other connectors.
-2. **Reverse Proxy Limitations:** While Arc-Cashier can run 10 connectors simultaneously, **only one** connector can mount a global catch-all reverse proxy (`app.use('/')`) per instance. If your platform requires a root proxy (like Owncast), users cannot enable another platform that *also* requires a root proxy on the same Arc-Cashier port.
+2. **Reverse Proxy Limitations:** While Tessera can run 10 connectors simultaneously, **only one** connector can mount a global catch-all reverse proxy (`app.use('/')`) per instance. If your platform requires a root proxy (like Owncast), users cannot enable another platform that *also* requires a root proxy on the same Tessera port.
 
 ## Reference: Owncast Connector
 

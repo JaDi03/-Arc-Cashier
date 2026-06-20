@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createServer } from './server';
-import config from './cashier.config';
+import config from './tessera.config';
 
 const PORT = Number(process.env.PORT || config.port || 3000);
 
@@ -9,7 +9,7 @@ async function main() {
         const app = await createServer(config.connectors);
 
         app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Arc Cashier running on http://localhost:${PORT}`);
+            console.log(`🚀 Tessera running on http://localhost:${PORT}`);
             console.log(`📋 Active connectors: ${config.connectors.map(c => c.name).join(', ')}`);
         });
     } catch (error) {

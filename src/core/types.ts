@@ -4,7 +4,7 @@ import type { Express } from 'express';
  * Connector Interface
  * 
  * Every platform connector (Owncast, PeerTube, Jellyfin, etc.) must implement
- * this interface. The engine loads connectors from `cashier.config.ts` and calls
+ * this interface. The engine loads connectors from `tessera.config.ts` and calls
  * `register()` to mount them onto the Express app.
  * 
  * A connector is responsible for:
@@ -22,7 +22,7 @@ export interface Connector {
      * onto the Express application.
      * 
      * @param app - The Express application instance
-     * @param config - The connector-specific configuration from cashier.config.ts
+     * @param config - The connector-specific configuration from tessera.config.ts
      */
     register(app: Express, config: ConnectorConfig): void;
 }
@@ -42,7 +42,7 @@ export interface ConnectorConfig {
 }
 
 /**
- * Top-level configuration for the Arc Cashier engine.
+ * Top-level configuration for the Tessera engine.
  */
 export interface CashierConfig {
     /** Port the sidecar listens on (default: 3000) */

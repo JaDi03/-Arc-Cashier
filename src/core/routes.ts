@@ -105,7 +105,7 @@ coreRouter.post('/recover-session', sessionLimiter, async (req: Request, res: Re
     try {
         const isValid = await verifyMessage({ 
             address: returnAddress, 
-            message: 'Login to Arc-Cashier', 
+            message: 'Login to Tessera', 
             signature 
         });
 

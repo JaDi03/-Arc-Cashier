@@ -1,7 +1,7 @@
 import type { CashierConfig } from './core/types';
 
 /**
- * Arc Cashier Configuration
+ * Tessera Configuration
  * 
  * Enable or disable connectors by adding/removing them from the list.
  * Only connectors listed here will be loaded at startup.

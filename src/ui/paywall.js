@@ -1,5 +1,5 @@
 // arc-paywall.js - Universal Paywall Engine (platform-agnostic)
-// Injected or embedded by any Arc Cashier connector (Owncast, PeerTube, etc.)
+// Injected or embedded by any Tessera connector (Owncast, PeerTube, etc.)
 
 import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 
@@ -115,7 +115,7 @@ function renderPaywallOverlay() {
     overlay.innerHTML = `
         <div id="arc-paywall-modal">
             <div id="arc-paywall-header">
-                <div id="arc-paywall-logo">⚡ Arc Cashier</div>
+                <div id="arc-paywall-logo">⚡ Tessera</div>
                 <h2>Premium Stream</h2>
                 <p>Pay only for the seconds you watch. No subscriptions.</p>
             </div>
@@ -326,7 +326,7 @@ async function handleEmailLogin() {
         }
 
     } catch (error) {
-        console.error('[Arc Cashier] Login error:', error);
+        console.error('[Tessera] Login error:', error);
         btn.disabled = false;
         btn.innerHTML = '<span class="arc-btn-icon">🔐</span> Sign in with PIN';
         setLoginStatus('Error: ' + (error.message || 'Unknown error. Please retry.'), true);
@@ -378,7 +378,7 @@ async function checkArcBalance(address) {
         // Check if balance >= 0.01 native USDC (10^16 wei)
         return balance >= 10000000000000000n;
     } catch (e) {
-        console.warn('[Arc Cashier] Balance check failed:', e);
+        console.warn('[Tessera] Balance check failed:', e);
         return false;
     }
 }
@@ -472,7 +472,7 @@ async function handleUnlock() {
                 const balData = await balRes.json();
                 if (Number(balData.gatewayAvailable) > 0.01) {
                     skipDeposit = true;
-                    console.log('[Arc Cashier] Gateway already funded. Skipping deposit.');
+                    console.log('[Tessera] Gateway already funded. Skipping deposit.');
                 }
             }
         } catch (_) { /* proceed to deposit */ }
@@ -551,7 +551,7 @@ async function handleUnlock() {
         startSessionTimer();
 
     } catch (error) {
-        console.error('[Arc Cashier] Unlock error:', error);
+        console.error('[Tessera] Unlock error:', error);
         btn.disabled = false;
         btn.innerHTML = '🔓 Unlock Video';
         setFundStatus('Error: ' + (error.message || 'Please retry.'), true);
@@ -718,13 +718,13 @@ async function executeCctpBridge(chain) {
             startBalancePolling();
         } else {
             const err = await finalizeRes.json().catch(() => ({}));
-            console.error('[Arc Cashier] cctp-finalize error:', err);
+            console.error('[Tessera] cctp-finalize error:', err);
             setFundStatus('Bridge submitted but minting failed. Please retry or use the faucet.', true);
             startBalancePolling(); // Still poll — might have succeeded
         }
 
     } catch (error) {
-        console.error('[Arc Cashier] CCTP bridge error:', error);
+        console.error('[Tessera] CCTP bridge error:', error);
         setCctpProgress('Error: ' + (error.message || 'Bridge failed. Please retry.'));
         // Reset to select step
         document.getElementById('arc-cctp-step-select').style.display = 'block';
@@ -919,7 +919,7 @@ async function handleTopUp() {
         btn.disabled = false;
         document.getElementById('arc-sm-warning').classList.add('arc-hidden');
     } catch (error) {
-        console.error('[Arc Cashier] Top-up failed', error);
+        console.error('[Tessera] Top-up failed', error);
         btn.innerText = 'Error (Retry)';
         btn.disabled = false;
     }
