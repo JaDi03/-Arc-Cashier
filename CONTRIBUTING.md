@@ -1,6 +1,6 @@
-# Contributing to Arc Cashier
+# Contributing to Tessera
 
-Thank you for your interest in contributing to Arc Cashier! This document outlines the process for contributing to the project.
+Thank you for your interest in contributing to Tessera! This document outlines the process for contributing to the project.
 
 ## Code of Conduct
 
@@ -28,7 +28,7 @@ If you find a bug, please open an issue in the GitHub repository. Include:
 
 ## Proposing New Connectors
 
-Arc Cashier is designed to be easily extensible. If you want to add support for a new self-hosted platform (e.g., PeerTube, Jellyfin):
+Tessera is designed to be easily extensible. If you want to add support for a new self-hosted platform (e.g., PeerTube, Jellyfin):
 
 1. Create a new folder under `src/connectors/<your-platform>`.
 2. Implement the `Connector` interface defined in `src/core/types.ts`.

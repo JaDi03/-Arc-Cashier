@@ -93,8 +93,8 @@ sequenceDiagram
 
 | Platform | Integration Type | Notes |
 |---|---|---|
-| **Owncast** | Built-in connector | Tessera acts as a reverse proxy. Set your Owncast URL in `cashier.config.ts`. No extra plugins needed. |
-| **PeerTube** | Plugin + connector | PeerTube requires a companion plugin to emit webhooks. **[Install the PeerTube Plugin →](https://github.com/JaDi03/peertube-plugin-arc-cashier)** |
+| **Owncast** | Built-in connector | Tessera acts as a reverse proxy. Set your Owncast URL in `tessera.config.ts`. No extra plugins needed. |
+| **PeerTube** | Plugin + connector | PeerTube requires a companion plugin to emit webhooks. **[Install the PeerTube Plugin →](https://github.com/JaDi03/peertube-plugin-tessera)** |
 
 *Want to add Jellyfin, Ghost, Immich, or your own app? See [Building a Connector](#building-a-connector).*
 
@@ -129,8 +129,8 @@ The proxy silently handles off-chain EIP-3009 authorizations every second and ba
 ### Install & Run
 
 ```bash
-git clone https://github.com/JaDi03/-Arc-Cashier.git
-cd arc-cashier
+git clone https://github.com/JaDi03/-Tessera.git
+cd tessera
 nvm use          # Reads .nvmrc, switches to Node v22
 npm install
 cp .env.example .env
@@ -139,7 +139,7 @@ cp .env.example .env
 Edit `.env` with your Circle API key, App ID, and seller private key. Then configure which connector to activate:
 
 ```bash
-# src/cashier.config.ts
+# src/tessera.config.ts
 connectors: [
     {
         name: 'owncast',
@@ -195,7 +195,7 @@ Or use the included `Dockerfile` to deploy to any Docker-compatible host.
 │   │   ├── paywall.js               # Client-side state machine
 │   │   └── paywall.css
 │   │
-│   ├── cashier.config.ts            # Which connectors to load at startup
+│   ├── tessera.config.ts            # Which connectors to load at startup
 │   ├── server.ts                    # Dynamic connector loader
 │   └── index.ts                     # Entry point
 │

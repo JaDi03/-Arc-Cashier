@@ -2,11 +2,11 @@
 
 ## Production & Architecture (V1)
 
-Arc Cashier V1 is designed to be a robust, developer-friendly MVP. To ensure stability and ease of deployment, the following architectural decisions and limitations are present in this version:
+Tessera V1 is designed to be a robust, developer-friendly MVP. To ensure stability and ease of deployment, the following architectural decisions and limitations are present in this version:
 
 ### Architecture: Universal Deposits (CCTP) & Arc Settlement
 
-While Arc Cashier requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Polygon, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
+While Tessera requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Polygon, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
 
 ```mermaid
 flowchart LR
@@ -43,7 +43,7 @@ flowchart LR
 
 **Why must the settlement engine run exclusively on Arc?**
 
-Arc Cashier is designed for **high-frequency, per-second micro-billing**. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. 
+Tessera is designed for **high-frequency, per-second micro-billing**. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. 
 
 By leveraging the **Arc Network** combined with the **x402 protocol**:
 
@@ -54,7 +54,7 @@ By leveraging the **Arc Network** combined with the **x402 protocol**:
 
 ### 💸 Transparent Fee Structure
 
-Arc Cashier minimizes fees, but it is not entirely free. Here is exactly where network and protocol fees apply:
+Tessera minimizes fees, but it is not entirely free. Here is exactly where network and protocol fees apply:
 
 1. **Initial Bridge / CCTP (On-chain):** The viewer pays standard gas fees on their origin network (e.g., Base or Ethereum) to bridge and fund their ephemeral wallet.
 2. **Gateway Deposit (On-chain):** The initial deposit into the Circle Gateway smart contract requires a negligible Arc Network gas fee.
