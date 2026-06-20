@@ -31,15 +31,18 @@ export function setupOwncastProxy(app: express.Express, upstreamUrl: string = 'h
             return true;
         },
         on: {
-            proxyRes: responseInterceptor(async (responseBuffer, proxyRes) => {
-                if (proxyRes.headers['content-type'] && proxyRes.headers['content-type'].includes('text/html')) {
+            proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
+                const contentType = proxyRes.headers['content-type'];
+                if (contentType && contentType.includes('text/html')) {
                     const html = responseBuffer.toString('utf8');
                     const $ = cheerio.load(html);
 
                     const cacheBuster = Date.now();
-                    $('body').append(`<script src="/owncast-assets/paywall.js?v=${cacheBuster}"></script>`);
+                    $('body').append(`<script src="/owncast-assets/paywall.bundle.js?v=${cacheBuster}"></script>`);
 
-                    return $.html();
+                    const modifiedHtml = $.html();
+                    res.setHeader('Content-Length', Buffer.byteLength(modifiedHtml));
+                    return modifiedHtml;
                 }
                 return responseBuffer;
             }),

@@ -4,8 +4,29 @@ import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
 import { creatorService } from './creators';
+import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import { isAddress, isHex, verifyMessage } from 'viem';
+import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
+
+// Arc Testnet chain definition (viem does not bundle it yet, define inline)
+const arcTestnetChain = {
+    id: 5042002,
+    name: 'Arc Testnet',
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+    rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } },
+} as const;
+
+// Arc Testnet CCTP contracts (verified from docs.arc.network official docs)
+const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`;
+
+// Iris attestation API (testnet)
+const IRIS_API_BASE = 'https://iris-api-sandbox.circle.com/v2/messages';
+
+const circleClient = initiateUserControlledWalletsClient({
+    apiKey: process.env.CIRCLE_API_KEY || ''
+});
 
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -110,11 +131,282 @@ coreRouter.post('/recover-session', sessionLimiter, async (req: Request, res: Re
     }
 });
 
+// --- BUYER SIDE (Web2): Initialize Circle User + Session Token ---
+// Creates the user in Circle if not exists, then returns a 60-min session token.
+coreRouter.post('/circle/get-token', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        // createUser is idempotent — safe to call even if the user already exists.
+        await circleClient.createUser({ userId }).catch(() => {
+            // Silently ignore if user already exists (Circle returns 409 Conflict)
+        });
+
+        const response = await circleClient.createUserToken({ userId });
+
+        return res.json({
+            userToken: response.data?.userToken,
+            encryptionKey: response.data?.encryptionKey,
+            appId: process.env.CIRCLE_APP_ID
+        });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Failed to generate Circle token:`, error?.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to generate Circle session token' });
+    }
+});
+
+// --- BUYER SIDE (Web2): Get or Create Circle SCA Wallet ---
+// Returns the walletId and address of the user's SCA on Arc Testnet.
+// Also bootstraps wallet creation (returns challengeId if first-time user).
+coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId, userToken } = req.body;
+
+    if (!userId || !userToken) {
+        return res.status(400).json({ error: 'Missing userId or userToken' });
+    }
+
+    try {
+        // List existing wallets for this user on Arc Testnet
+        // ARC-TESTNET is the verified blockchain ID string per Circle UCW docs (domain 26)
+        const walletsRes = await circleClient.listWallets({
+            userToken,
+            blockchain: 'ARC-TESTNET' as any,
+        });
+
+        const existingWallets = walletsRes.data?.wallets || [];
+        const arcWallet = existingWallets.find((w: any) => w.state === 'LIVE');
+
+        if (arcWallet) {
+            console.log(`[Core] 👛 Existing SCA wallet found for ${userId}: ${arcWallet.address}`);
+            return res.json({
+                status: 'existing',
+                walletId: arcWallet.id,
+                walletAddress: arcWallet.address
+            });
+        }
+
+        let challengeId;
+        try {
+            const createRes = await circleClient.createWallet({
+                userToken,
+                idempotencyKey: crypto.randomUUID(),
+                blockchains: ['ARC-TESTNET' as any],
+                accountType: 'SCA',
+            });
+            challengeId = createRes.data?.challengeId;
+        } catch (err: any) {
+            if (err?.message?.includes('PIN')) {
+                console.log(`[Core] 🔑 User needs PIN setup. Issuing createUserPinWithWallets challenge.`);
+                const pinRes = await circleClient.createUserPinWithWallets({
+                    userToken,
+                    blockchains: ['ARC-TESTNET' as any],
+                    accountType: 'SCA',
+                });
+                challengeId = pinRes.data?.challengeId;
+            } else {
+                throw err;
+            }
+        }
+
+        console.log(`[Core] 🆕 Wallet creation challenge issued for ${userId}`);
+        return res.json({
+            status: 'needs_creation',
+            challengeId
+        });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Failed to get/create wallet:`, error?.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to get or create Circle wallet', debugError: error.message, debugData: error?.response?.data });
+    }
+});
+
+// --- BUYER SIDE (Web2): Prepare Gateway Deposit Challenge ---
+// Creates a USDC transfer UserOperation from the SCA to the GatewayClient
+// and returns a challengeId for the user to sign via the Circle SDK.
+coreRouter.post('/circle/prepare-deposit', sessionLimiter, async (req: Request, res: Response) => {
+    const { userToken, walletId, depositAmount, ephemeralPk } = req.body;
+
+    if (!userToken || !walletId || !depositAmount || !ephemeralPk) {
+        return res.status(400).json({ error: 'Missing userToken, walletId, depositAmount, or ephemeralPk' });
+    }
+
+    try {
+        // Derive the ephemeral wallet address from the private key
+        const account = privateKeyToAccount(ephemeralPk as `0x${string}`);
+        const ephemeralWalletAddress = account.address;
+
+        // Fetch token balance to get the correct tokenId (Circle API requires tokenId even for native tokens)
+        const balancesRes = await circleClient.getWalletTokenBalance({
+            walletId,
+            userToken
+        });
+        
+        // Find the token holding the funds (should be Native token or USDC)
+        const tokens = balancesRes.data?.tokenBalances || [];
+        const fundedToken = tokens.find((t: any) => parseFloat(t.amount) >= parseFloat(depositAmount)) || tokens[0];
+        
+        if (!fundedToken) {
+            return res.status(400).json({ error: 'Wallet has no tokens' });
+        }
+
+        const transferRes = await circleClient.createTransaction({
+            userToken,
+            walletId,
+            tokenId: fundedToken.token.id,
+            idempotencyKey: crypto.randomUUID(),
+            destinationAddress: ephemeralWalletAddress,
+            amounts: [depositAmount],
+            fee: { type: 'level', config: { feeLevel: 'HIGH' } }
+        });
+
+        console.log(`[Core] 💳 Deposit challenge created for wallet ${walletId}`);
+        return res.json({
+            challengeId: transferRes.data?.challengeId
+        });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Failed to prepare deposit:`, error?.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to prepare deposit challenge' });
+    }
+});
+
+
+// --- BUYER SIDE (Web2): Poll Challenge Status ---
+coreRouter.post('/circle/poll-challenge', sessionLimiter, async (req: Request, res: Response) => {
+    const { userToken, challengeId } = req.body;
+    
+    if (!userToken || !challengeId) {
+        return res.status(400).json({ error: 'Missing userToken or challengeId' });
+    }
+
+    try {
+        const TERMINAL = new Set(['COMPLETE', 'FAILED', 'EXPIRED']);
+        const response = await circleClient.getUserChallenge({ userToken, challengeId });
+        const status = response.data?.challenge?.status;
+        
+        if (status && TERMINAL.has(status)) {
+            return res.json({ 
+                status, 
+                walletAddress: (response.data?.challenge as any)?.walletAddress,
+                txHash: (response.data?.challenge as any)?.txHash,
+            });
+        }
+        
+        return res.json({ status: status || 'PENDING' });
+    } catch (error: any) {
+        console.error(`[Core] ❌ Failed to poll challenge:`, error?.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed to poll challenge' });
+    }
+});
+
+// --- BUYER SIDE (Web2): Finalize CCTP Bridge ---
+// Called by the frontend after the user burns USDC on the source chain.
+// This endpoint polls the Iris attestation API and, once the attestation is ready,
+// calls receiveMessage() on Arc to mint USDC to the user's Arc wallet.
+// The SELLER_PRIVATE_KEY pays the Arc gas fee (USDC), removing the need for
+// the user to have any prior balance on Arc.
+coreRouter.post('/circle/cctp-finalize', sessionLimiter, async (req: Request, res: Response) => {
+    const { sourceDomain, transactionHash, recipientAddress } = req.body;
+
+    if (!sourceDomain && sourceDomain !== 0) {
+        return res.status(400).json({ error: 'Missing sourceDomain' });
+    }
+    if (!transactionHash || !recipientAddress) {
+        return res.status(400).json({ error: 'Missing transactionHash or recipientAddress' });
+    }
+    if (!isAddress(recipientAddress)) {
+        return res.status(400).json({ error: 'Invalid recipientAddress' });
+    }
+
+    const sellerKey = process.env.SELLER_PRIVATE_KEY;
+    if (!sellerKey) {
+        return res.status(500).json({ error: 'Backend wallet not configured (SELLER_PRIVATE_KEY missing)' });
+    }
+
+    try {
+        // Step 1: Poll Iris API until attestation is complete (max 5 min)
+        console.log(`[CCTP] ⏳ Polling Iris for attestation. Source domain: ${sourceDomain}, Tx: ${transactionHash}`);
+        const irisUrl = `${IRIS_API_BASE}/${sourceDomain}?transactionHash=${transactionHash}`;
+        let attestation: { message: string; attestation: string } | null = null;
+
+        for (let attempt = 0; attempt < 60; attempt++) { // 60 * 5s = 5 min max
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            try {
+                const irisRes = await fetch(irisUrl);
+                if (!irisRes.ok) {
+                    console.log(`[CCTP] Iris returned ${irisRes.status}, retrying...`);
+                    continue;
+                }
+                const irisData = await irisRes.json() as { messages?: Array<{ status: string; message: string; attestation: string }> };
+                const msg = irisData.messages?.[0];
+                if (msg?.status === 'complete') {
+                    attestation = { message: msg.message, attestation: msg.attestation };
+                    console.log(`[CCTP] ✅ Attestation ready after ${attempt + 1} attempts.`);
+                    break;
+                }
+                console.log(`[CCTP] Attempt ${attempt + 1}: status = ${msg?.status ?? 'not found'}`);
+            } catch (fetchErr) {
+                console.warn(`[CCTP] Iris fetch error (attempt ${attempt + 1}):`, fetchErr);
+            }
+        }
+
+        if (!attestation) {
+            return res.status(504).json({ error: 'Attestation timed out. Please retry in a few minutes.' });
+        }
+
+        // Step 2: Call receiveMessage() on Arc Testnet using the seller's key for gas
+        console.log(`[CCTP] 🪙 Minting USDC on Arc Testnet for ${recipientAddress}...`);
+        const account = privateKeyToAccount(sellerKey as `0x${string}`);
+        const arcWalletClient = createWalletClient({
+            account,
+            chain: arcTestnetChain,
+            transport: http(),
+        });
+        const arcPublicClient = createPublicClient({
+            chain: arcTestnetChain,
+            transport: http(),
+        });
+
+        const mintTxHash = await arcWalletClient.sendTransaction({
+            to: ARC_MESSAGE_TRANSMITTER,
+            data: encodeFunctionData({
+                abi: [{
+                    type: 'function',
+                    name: 'receiveMessage',
+                    stateMutability: 'nonpayable',
+                    inputs: [
+                        { name: 'message', type: 'bytes' },
+                        { name: 'attestation', type: 'bytes' },
+                    ],
+                    outputs: [],
+                }],
+                functionName: 'receiveMessage',
+                args: [
+                    attestation.message as `0x${string}`,
+                    attestation.attestation as `0x${string}`,
+                ],
+            }),
+        });
+
+        console.log(`[CCTP] ⏳ Waiting for mint tx confirmation...`);
+        await arcPublicClient.waitForTransactionReceipt({ hash: mintTxHash });
+        console.log(`[CCTP] ✅ USDC minted on Arc! Tx: ${mintTxHash}`);
+
+        return res.json({ status: 'complete', mintTxHash });
+    } catch (error: any) {
+        console.error(`[CCTP] ❌ Finalize failed:`, error?.message || error);
+        return res.status(500).json({ error: 'CCTP finalization failed: ' + (error?.message || 'unknown error') });
+    }
+});
+
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
 coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId, privateKey, returnAddress, isCCTP } = req.body;
+    const { userId, privateKey, returnAddress } = req.body;
 
     if (!userId || !privateKey || !returnAddress) {
+        console.error(`[Core] ❌ /register-session missing fields. userId: ${userId}, privateKey: ${privateKey}, returnAddress: ${returnAddress}`);
         return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
     }
 
@@ -127,7 +419,12 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
     }
 
     if (!sessionService.hasActiveSession(userId)) {
-        return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Demo] 🧪 Auto-joining session for ${userId} to bypass webhook block in dev mode.`);
+            sessionService.recordJoin(userId, 0.0001);
+        } else {
+            return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
+        }
     }
 
     const stringifyBigInt = (_key: string, value: unknown) =>
@@ -140,13 +437,25 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             chain: 'arcTestnet',
         });
 
-        // 2. Check current balances
+        // 2. Check current balances (with retry since blockchain indexers may lag)
         let balances = await gatewayClient.getBalances();
-        console.log(`\n[Core] 💰 Ephemeral wallet balance: ${balances.wallet.formatted} USDC`);
-        console.log(`[Core] 💰 Gateway balance: ${balances.gateway.formattedAvailable} USDC`);
+        console.log(`\n[Core] 💰 Initial Ephemeral wallet balance: ${balances.wallet.formatted} USDC`);
 
         let gatewayBalanceNum = Number(balances.gateway.formattedAvailable);
         let walletUsdc = Number(balances.wallet.formatted);
+        const minWalletBalance = Number(process.env.MIN_WALLET_BALANCE || '0.01');
+
+        if (gatewayBalanceNum <= 0.01 && walletUsdc < minWalletBalance) {
+            console.log(`[Core] ⏳ Waiting for ephemeral wallet to receive funds...`);
+            let attempts = 0;
+            while (attempts < 15 && walletUsdc < minWalletBalance) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                balances = await gatewayClient.getBalances();
+                walletUsdc = Number(balances.wallet.formatted);
+                attempts++;
+            }
+            console.log(`[Core] 💰 Final Ephemeral wallet balance: ${walletUsdc} USDC`);
+        }
 
         // If the user already has enough balance in the Gateway, skip the deposit phase!
         let skippedDeposit = false;
@@ -157,23 +466,6 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             console.log(`[Core] ⏩ User already has ${gatewayBalanceNum} USDC in Gateway. Skipping deposit phase.`);
             skippedDeposit = true;
         } else {
-            // CCTP Polling Logic
-            if (walletUsdc < 0.01 && isCCTP) {
-                console.log(`[Core] ⏳ CCTP Deposit detected. Waiting up to 3 minutes for Circle Forwarding Service to mint USDC...`);
-                let cctpAttempts = 0;
-                while (cctpAttempts < 90) { // 90 * 2s = 180s = 3 mins
-                    balances = await gatewayClient.getBalances();
-                    walletUsdc = Number(balances.wallet.formatted);
-                    if (walletUsdc >= 0.01) {
-                        console.log(`[Core] ✅ CCTP funds arrived! Wallet balance: ${walletUsdc} USDC`);
-                        break;
-                    }
-                    cctpAttempts++;
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-            }
-
-            const minWalletBalance = Number(process.env.MIN_WALLET_BALANCE || '0.01');
             if (walletUsdc < minWalletBalance) {
                 return res.status(400).json({ error: 'Ephemeral wallet has insufficient USDC balance.' });
             }
