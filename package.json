@@ -7,6 +7,7 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "build": "tsc",
+    "build:ui": "node scripts/build-ui.js",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -25,6 +26,8 @@
   "license": "Apache-2.0",
   "type": "commonjs",
   "dependencies": {
+    "@circle-fin/user-controlled-wallets": "^10.6.0",
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@circle-fin/x402-batching": "^3.0.4",
     "@x402/core": "^2.14.0",
     "@x402/evm": "^2.14.0",
@@ -38,6 +41,8 @@
     "viem": "^2.52.0"
   },
   "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@eslint/js": "^10.0.1",
     "@types/cheerio": "^0.22.35",
     "@types/cors": "^2.8.19",
@@ -47,6 +52,8 @@
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",
+    "browserify": "^17.0.1",
+    "esbuild": "^0.28.1",
     "eslint": "^10.4.1",
     "globals": "^17.6.0",
     "ts-node": "^10.9.2",

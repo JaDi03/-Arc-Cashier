@@ -1,0 +1,669 @@
+/* ═══════════════════════════════════════════════════
+   Arc Cashier — Paywall Styles
+   Universal paywall for Owncast, PeerTube and beyond
+   ═══════════════════════════════════════════════════ */
+
+/* ── Overlay ─────────────────────────────────────── */
+
+#arc-paywall-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: white;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+
+body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
+    filter: blur(14px) grayscale(40%);
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ── Modal ───────────────────────────────────────── */
+
+#arc-paywall-modal {
+    background: linear-gradient(150deg, #12122a 0%, #1a1f3a 100%);
+    border: 1px solid rgba(79, 172, 254, 0.18);
+    border-radius: 20px;
+    width: 420px;
+    max-width: 96vw;
+    box-shadow:
+        0 30px 60px -15px rgba(0, 0, 0, 0.6),
+        0 0 50px rgba(0, 112, 243, 0.15),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow: hidden;
+}
+
+#arc-paywall-header {
+    padding: 28px 32px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: linear-gradient(180deg, rgba(79,172,254,0.06) 0%, transparent 100%);
+}
+
+#arc-paywall-logo {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(79,172,254,0.7);
+    margin-bottom: 10px;
+}
+
+#arc-paywall-modal h2 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #4facfe, #00f2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#arc-paywall-modal p {
+    color: #94a3b8;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+#arc-paywall-body {
+    padding: 24px 32px 28px;
+}
+
+/* ── Pricing box ─────────────────────────────────── */
+
+.arc-pricing-box {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.arc-pricing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+
+.arc-pricing-row:last-of-type { margin-bottom: 0; }
+
+.arc-accent { color: #00f2fe; font-weight: 600; }
+
+.arc-pricing-note {
+    font-size: 11px !important;
+    color: #64748b !important;
+    margin-top: 8px !important;
+    margin-bottom: 0 !important;
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+
+.arc-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(90deg, #0070f3, #00b4d8);
+    color: white;
+    border: none;
+    padding: 13px 20px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    box-shadow: 0 4px 16px rgba(0, 112, 243, 0.35);
+    text-decoration: none;
+}
+
+.arc-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 112, 243, 0.4);
+}
+
+.arc-btn:disabled,
+.arc-btn-disabled {
+    background: #2d3748 !important;
+    color: #718096 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.arc-btn-primary { /* same as .arc-btn, alias for clarity */ }
+
+.arc-btn-icon { font-size: 17px; }
+
+.arc-btn-danger {
+    background: linear-gradient(90deg, #dc2626, #b91c1c) !important;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35) !important;
+}
+
+.arc-btn-danger:hover:not(:disabled) {
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4) !important;
+}
+
+/* Pulse once on enable */
+@keyframes arc-pulse-once {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(0,180,216,0.25); }
+    100% { transform: scale(1); }
+}
+.arc-pulse-once { animation: arc-pulse-once 0.5s ease; }
+
+/* ── Status text ─────────────────────────────────── */
+
+.arc-status-text {
+    font-size: 12px;
+    color: #63b3ed;
+    margin-top: 10px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.arc-status-error { color: #fc8181 !important; }
+
+/* ── Wallet address box ───────────────────────────── */
+
+.arc-info-box {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+}
+
+.arc-info-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #4facfe;
+    margin-bottom: 5px;
+}
+
+.arc-address-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.arc-address-text {
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    color: #e2e8f0;
+    word-break: break-all;
+}
+
+.arc-copy-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.arc-copy-btn:hover { background: rgba(255,255,255,0.08); }
+
+/* ── Fund options ────────────────────────────────── */
+
+.arc-fund-label {
+    font-size: 12px !important;
+    color: #64748b !important;
+    margin-bottom: 10px !important;
+    text-align: left;
+}
+
+.arc-fund-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.arc-fund-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 13px 15px;
+    cursor: pointer;
+    text-align: left;
+    color: white;
+    text-decoration: none;
+    transition: background 0.18s, border-color 0.18s, transform 0.18s;
+    width: 100%;
+}
+
+.arc-fund-card:hover {
+    background: rgba(79,172,254,0.1);
+    border-color: rgba(79,172,254,0.3);
+    transform: translateX(2px);
+}
+
+.arc-fund-icon { font-size: 22px; flex-shrink: 0; }
+
+.arc-fund-card div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.arc-fund-card strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.arc-fund-card span:not(.arc-chevron) {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.arc-chevron {
+    font-size: 18px;
+    color: #4facfe;
+    opacity: 0.7;
+}
+
+/* ── Waiting for balance ─────────────────────────── */
+
+.arc-waiting-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(79,172,254,0.07);
+    border: 1px solid rgba(79,172,254,0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #63b3ed;
+}
+
+/* ── Spinners ────────────────────────────────────── */
+
+.arc-spinner {
+    border: 3px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    border-top: 3px solid #00f2fe;
+    width: 20px; height: 20px;
+    animation: arc-spin 0.9s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.arc-spinner-sm {
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    border-top: 2px solid #00f2fe;
+    width: 14px; height: 14px;
+    animation: arc-spin 0.9s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+@keyframes arc-spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ── CCTP Modal ──────────────────────────────────── */
+
+.arc-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(6px);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: white;
+}
+
+.arc-modal-box {
+    background: linear-gradient(150deg, #0f0f28 0%, #171f38 100%);
+    border: 1px solid rgba(79,172,254,0.2);
+    border-radius: 18px;
+    width: 400px;
+    max-width: 94vw;
+    box-shadow: 0 30px 60px -15px rgba(0,0,0,0.7);
+    overflow: hidden;
+}
+
+.arc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.arc-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #4facfe, #00f2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.arc-modal-close {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.arc-modal-close:hover { color: white; background: rgba(255,255,255,0.07); }
+
+.arc-modal-body { padding: 18px 22px 22px; }
+
+.arc-modal-label {
+    font-size: 12px !important;
+    color: #64748b !important;
+    margin: 0 0 10px !important;
+    text-align: left;
+}
+
+/* ── CCTP Network list ───────────────────────────── */
+
+.arc-network-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.arc-network-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+    width: 100%;
+}
+
+.arc-network-btn:hover {
+    background: rgba(79,172,254,0.08);
+    border-color: rgba(79,172,254,0.25);
+}
+
+.arc-network-btn-selected {
+    background: rgba(79,172,254,0.14) !important;
+    border-color: #4facfe !important;
+    color: #fff !important;
+}
+
+/* ── Amount input ────────────────────────────────── */
+
+.arc-amount-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.arc-amount-row label {
+    font-size: 12px;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.arc-amount-input-wrap {
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.arc-amount-input {
+    background: none;
+    border: none;
+    outline: none;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 10px;
+    width: 70px;
+    text-align: right;
+}
+
+.arc-amount-suffix {
+    font-size: 12px;
+    color: #64748b;
+    padding-right: 10px;
+}
+
+/* ── Supported info button ───────────────────────── */
+
+.arc-supported-info {
+    position: relative;
+    margin-top: 8px;
+}
+
+.arc-info-icon {
+    font-size: 11px;
+    color: #4facfe;
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+}
+
+.arc-info-icon:hover { opacity: 1; }
+
+.arc-info-popup {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: #1e2a45;
+    border: 1px solid rgba(79,172,254,0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #e2e8f0;
+    width: 220px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 10;
+}
+
+.arc-info-popup strong { display: block; margin-bottom: 6px; color: #4facfe; }
+
+.arc-info-popup ul {
+    margin: 0 0 8px 0;
+    padding-left: 14px;
+    color: #94a3b8;
+    line-height: 1.7;
+}
+
+.arc-info-popup p {
+    margin: 0 !important;
+    font-size: 10px !important;
+    color: #64748b !important;
+}
+
+/* ── CCTP Progress steps ─────────────────────────── */
+
+.arc-progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.arc-progress-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.arc-step-num {
+    width: 20px; height: 20px;
+    background: rgba(79,172,254,0.15);
+    border: 1px solid rgba(79,172,254,0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #4facfe;
+    flex-shrink: 0;
+}
+
+.arc-step-status { margin-left: auto; font-size: 14px; }
+
+.arc-cctp-note {
+    font-size: 11px !important;
+    color: #475569 !important;
+    margin-top: 12px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.5;
+}
+
+/* ── Hidden / visible ────────────────────────────── */
+
+.arc-hidden {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+/* ── Session Manager widget ──────────────────────── */
+
+#arc-session-manager {
+    position: fixed;
+    top: 20px; right: 20px;
+    z-index: 999;
+    background: linear-gradient(145deg, rgba(18,18,42,0.96), rgba(22,31,56,0.96));
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(79,172,254,0.15);
+    border-radius: 16px;
+    padding: 18px 20px;
+    width: 275px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.55), 0 0 20px rgba(0,112,243,0.12);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: white;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.arc-sm-minimized { height: 48px !important; overflow: hidden; }
+
+#arc-sm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: grab;
+    margin-bottom: 14px;
+}
+
+#arc-sm-header:active { cursor: grabbing; }
+
+#arc-session-manager h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.arc-pulse-dot {
+    width: 9px; height: 9px;
+    background: #22c55e;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(34,197,94,0.7);
+    animation: arc-pulse 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes arc-pulse {
+    to { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+}
+
+#arc-sm-minimize-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 5px;
+    transition: color 0.15s;
+}
+
+#arc-sm-minimize-btn:hover { color: #e2e8f0; }
+
+.arc-sm-stats {
+    background: rgba(0,0,0,0.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+
+.arc-sm-stats div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.arc-sm-stats div:last-child {
+    margin-bottom: 0;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding-top: 6px;
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.arc-sm-stats span:last-child { color: #e2e8f0; }
