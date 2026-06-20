@@ -419,12 +419,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
     }
 
     if (!sessionService.hasActiveSession(userId)) {
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`[Demo] 🧪 Auto-joining session for ${userId} to bypass webhook block in dev mode.`);
-            sessionService.recordJoin(userId, 0.0001);
-        } else {
-            return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
-        }
+        return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
     }
 
     const stringifyBigInt = (_key: string, value: unknown) =>
