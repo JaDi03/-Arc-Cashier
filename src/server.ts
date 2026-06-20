@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import coreRouter from './core/routes';
 import { sessionService } from './core/session';
 import type { Connector, ConnectorConfig } from './core/types';
@@ -38,7 +39,15 @@ export async function createServer(connectors: ConnectorConfig[]) {
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);
 
-    // 2. Dynamically load and register connectors from config
+    // 2. Standalone demo page — test the paywall without any connector
+    // Accessible at: http://localhost:PORT/demo
+    app.use('/demo-assets', express.static(path.join(__dirname, 'ui')));
+    app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'ui', 'favicon.ico')));
+    app.get('/demo', (req, res) => {
+        res.redirect('/demo-assets/test.html');
+    });
+
+    // 3. Dynamically load and register connectors from config
     for (const config of connectors) {
         const loader = CONNECTOR_REGISTRY[config.name];
         if (!loader) {

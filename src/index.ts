@@ -1,9 +1,6 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import { createServer } from './server';
 import config from './cashier.config';
-
-// Initialize environment variables
-dotenv.config();
 
 const PORT = Number(process.env.PORT || config.port || 3000);
 
