@@ -70,7 +70,19 @@ function configureProject(platformName, defaultUrl) {
     try {
         if (!fs.existsSync(envPath)) {
             if (fs.existsSync(envExamplePath)) {
-                fs.copyFileSync(envExamplePath, envPath);
+                let envContent = fs.readFileSync(envExamplePath, 'utf-8');
+                
+                // If platform is peertube, generate a webhook secret automatically
+                if (platformName === 'peertube') {
+                    const crypto = require('crypto');
+                    const secret = crypto.randomBytes(32).toString('hex');
+                    envContent = envContent.replace(
+                        /# PEERTUBE_WEBHOOK_SECRET=your_generated_secret_here/g,
+                        `PEERTUBE_WEBHOOK_SECRET=${secret}`
+                    );
+                }
+
+                fs.writeFileSync(envPath, envContent);
                 console.log(`✅ Generated .env file securely from .env.example.`);
             } else {
                 console.warn(`⚠️  .env.example not found. Skipping .env generation.`);
@@ -82,10 +94,10 @@ function configureProject(platformName, defaultUrl) {
         console.error(`❌ Failed to copy .env file:`, error.message);
     }
 
-    finishSetup();
+    finishSetup(platformName);
 }
 
-function finishSetup() {
+function finishSetup(platformName) {
     console.log(`
 =========================================
  🎉 SETUP COMPLETE! 🎉
@@ -98,8 +110,13 @@ Please manually open the '.env' file in your code editor and configure:
  - CIRCLE_APP_ID
  - SELLER_PRIVATE_KEY
  - SELLER_ADDRESS
+`);
+    if (platformName === 'peertube') {
+        console.log(`✅ PEERTUBE_WEBHOOK_SECRET was automatically generated in your .env file.`);
+        console.log(`Copy this secret into the PeerTube Plugin Settings so they can communicate securely.\n`);
+    }
 
-Once your .env is configured, start the sidecar with:
+    console.log(`Once your .env is configured, start the sidecar with:
   npm run dev
 `);
     rl.close();
