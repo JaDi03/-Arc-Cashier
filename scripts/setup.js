@@ -21,13 +21,20 @@ function askPlatform() {
     rl.question('\nEnter 1 or 2: ', (answer) => {
         const choice = answer.trim();
         if (choice === '1') {
-            configureProject('owncast', 'http://127.0.0.1:8080');
+            askUpstreamUrl('owncast', 'http://127.0.0.1:8080');
         } else if (choice === '2') {
-            configureProject('peertube', 'http://localhost:9000');
+            askUpstreamUrl('peertube', 'http://localhost:9000');
         } else {
             console.log('Invalid selection. Please enter 1 or 2.');
             askPlatform();
         }
+    });
+}
+
+function askUpstreamUrl(platformName, defaultUrl) {
+    rl.question(`\nEnter the upstream URL for ${platformName} (press Enter for default: ${defaultUrl}): `, (answer) => {
+        const upstreamUrl = answer.trim() || defaultUrl;
+        configureProject(platformName, upstreamUrl);
     });
 }
 
