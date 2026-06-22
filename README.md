@@ -122,40 +122,54 @@ The proxy silently handles off-chain EIP-3009 authorizations every second and ba
 
 ### Prerequisites
 - Node.js v22+
-- A supported platform running locally (Owncast on `:8080`, PeerTube on `:9000`, etc.)
-- Circle API credentials ([Create an account](https://console.circle.com))
-- Arc Testnet USDC for testing ([Circle Faucet](https://faucet.circle.com))
+- A running instance of [Owncast](https://owncast.online/) or [PeerTube](https://joinpeertube.org/) *(local or remote)*
+- Circle API credentials — [Create a free account](https://console.circle.com)
+- Arc Testnet USDC for testing — [Circle Faucet](https://faucet.circle.com)
 
-### Install & Run
+### Install & Configure
 
+**1. Clone the repository**
 ```bash
-git clone https://github.com/JaDi03/-Tessera.git
+git clone https://github.com/JaDi03/tessera.git
 cd tessera
-nvm use          # Reads .nvmrc, switches to Node v22
-npm install
-cp .env.example .env
 ```
 
-Edit `.env` with your Circle API key, App ID, and seller private key. Then configure which connector to activate:
-
+**2. Install dependencies**
 ```bash
-# src/tessera.config.ts
-connectors: [
-    {
-        name: 'owncast',
-        upstreamUrl: 'http://127.0.0.1:8080',
-        ratePerSecond: 0.0001, // $0.0001 USDC/sec ≈ $0.36/hour
-    }
-]
+npm install
 ```
 
-Start the dev server:
+**3. Run the interactive setup wizard**
+```bash
+npm run setup
+```
 
+The setup wizard will guide you through:
+- ✅ Selecting your streaming platform (Owncast or PeerTube)
+- ✅ Automatically configuring `src/tessera.config.ts` with the correct connector and upstream URL
+- ✅ Generating a local `.env` file from `.env.example`
+
+> **Security note:** The setup wizard intentionally does **not** ask for your API keys or private keys in the terminal. After it completes, open the generated `.env` file in your code editor and fill in your credentials manually.
+
+**4. Add your credentials**
+
+Open `.env` in your editor and configure the following values:
+
+```env
+CIRCLE_API_KEY=       # Your Circle API key from console.circle.com
+CIRCLE_APP_ID=        # Your Circle App ID
+SELLER_PRIVATE_KEY=   # Your seller wallet private key (Arc Testnet)
+SELLER_ADDRESS=       # Your seller wallet address
+```
+
+**5. Start Tessera**
 ```bash
 npm run dev
 ```
 
-Tessera will start on `http://localhost:3000` and proxy all traffic to your upstream platform.
+Tessera will start on `http://localhost:3000` and begin proxying all traffic through the payment layer to your upstream platform.
+
+---
 
 ### Production Deployment
 
@@ -165,6 +179,7 @@ npm start       # Runs the compiled output
 ```
 
 Or use the included `Dockerfile` to deploy to any Docker-compatible host.
+
 
 ---
 
