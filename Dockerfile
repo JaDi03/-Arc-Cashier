@@ -5,6 +5,8 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
+RUN npm run build:ui
+RUN cp -r src/ui dist/ui
 
 # Stage 2: Production
 FROM node:22-alpine
