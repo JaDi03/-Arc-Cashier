@@ -418,9 +418,8 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         return res.status(400).json({ error: 'Invalid returnAddress' });
     }
 
-    if (!sessionService.hasActiveSession(userId)) {
-        return res.status(400).json({ error: 'Blocked: The platform has not yet confirmed that you are in the stream.' });
-    }
+    // Removed strict hasActiveSession check to allow wallet registration BEFORE the video starts playing.
+    // The user will only be billed once they actually play the video and join activeSessions.
 
     const stringifyBigInt = (_key: string, value: unknown) =>
         typeof value === 'bigint' ? value.toString() : value;
