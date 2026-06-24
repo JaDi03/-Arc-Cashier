@@ -6,7 +6,7 @@ import { walletService } from './wallet';
  * Uses Circle Gateway for real settlement and refunds.
  */
 export class SessionService {
-    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number, creatorAddress?: string }>();
+    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number, creatorAddress?: string, videoId?: string }>();
     private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
@@ -38,6 +38,9 @@ export class SessionService {
                     if (sessionData?.creatorAddress) {
                         headers['x-seller-address'] = sessionData.creatorAddress;
                     }
+                    if (sessionData?.videoId) {
+                        headers['x-video-id'] = sessionData.videoId;
+                    }
 
                     const PORT = process.env.PORT || 3000;
                     const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -57,9 +60,9 @@ export class SessionService {
         }, this.PAYMENT_INTERVAL_MS);
     }
 
-    public recordJoin(userId: string, ratePerSecond: number = 0.0001, creatorAddress?: string): void {
-        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond, creatorAddress });
-        console.log(`[Session] 🟢 Session started for user: ${userId} at rate $${ratePerSecond}/s (Creator: ${creatorAddress || 'Default Admin'})`);
+    public recordJoin(userId: string, videoId?: string, ratePerSecond: number = 0.0001, creatorAddress?: string): void {
+        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond, creatorAddress, videoId });
+        console.log(`[Session] 🟢 Session started for user: ${userId} on video: ${videoId || 'unknown'} at rate $${ratePerSecond}/s (Creator: ${creatorAddress || 'Default Admin'})`);
     }
 
     public hasActiveSession(userId: string): boolean {

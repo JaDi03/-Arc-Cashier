@@ -112,7 +112,7 @@ router.post('/webhook', (req, res) => {
         // #region agent log
         try { fs.appendFileSync(path.join(process.cwd(), 'debug-2866b9.log'), JSON.stringify({sessionId:'2866b9',location:'webhooks.ts:viewer_joined',message:'backend billing started',data:{userId,videoId,activeRate},timestamp:Date.now(),hypothesisId:'D'})+'\n'); } catch (err) { console.error('Agent log failed:', err); }
         // #endregion
-        sessionService.recordJoin(userId, activeRate);
+        sessionService.recordJoin(userId, videoId, activeRate);
     } else if (event === 'viewer_left') {
         // #region agent log
         try { fs.appendFileSync(path.join(process.cwd(), 'debug-2866b9.log'), JSON.stringify({sessionId:'2866b9',location:'webhooks.ts:viewer_left',message:'backend billing stopped',data:{userId,videoId},timestamp:Date.now(),hypothesisId:'D'})+'\n'); } catch (err) { console.error('Agent log failed:', err); }
