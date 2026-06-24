@@ -1,8 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import { sessionService } from '../../core/session';
+import { creatorService } from '../../core/creators';
+import { isValidEvmAddress } from '../../core/gateway-creator';
 
 const router = express.Router();
 
@@ -72,7 +72,8 @@ router.post('/webhook', (req, res) => {
         return res.status(400).json({ error: 'Invalid JSON payload' });
     }
 
-    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce } = payload;
+    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce, creatorAddress, creatorWallet } = payload;
+    const resolvedCreatorAddress = (creatorAddress || creatorWallet || '').trim();
 
     if (!event || !userId) {
         return res.status(400).json({ error: 'Missing required fields: event, userId' });
@@ -107,12 +108,24 @@ router.post('/webhook', (req, res) => {
         console.log(`[PeerTube] ℹ️ Video ${videoId} from ${instanceUrl} joined without explicit rate. Using default $0.0001/s.`);
     }
 
+    let payoutAddress: string | undefined;
+    if (resolvedCreatorAddress && isValidEvmAddress(resolvedCreatorAddress)) {
+        const validAddress = resolvedCreatorAddress;
+        payoutAddress = validAddress;
+        const existing = creatorService.getCreatorByAddress(validAddress);
+        if (!existing) {
+            const creatorId = videoId ? `peertube:${videoId}` : `wallet:${validAddress.toLowerCase()}`;
+            creatorService.registerCreator(creatorId, validAddress, 0.10);
+            console.log(`[PeerTube] 🧑‍🎨 Registered creator payout address ${validAddress}`);
+        }
+    } else if (resolvedCreatorAddress) {
+        console.warn(`[PeerTube] ⚠️ Invalid creator wallet in webhook: ${resolvedCreatorAddress}`);
+    }
+
     // 3. Process Events (Following BUILDING_A_CONNECTOR.md)
     if (event === 'viewer_joined') {
-        // #endregion
-        sessionService.recordJoin(userId, videoId, activeRate);
+        sessionService.recordJoin(userId, videoId, activeRate, payoutAddress);
     } else if (event === 'viewer_left') {
-        // #endregion
         sessionService.recordPartAndSettle(userId).catch(console.error);
     } else {
         console.warn(`[PeerTube] ⚠️ Unknown event received: ${event}`);

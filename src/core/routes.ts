@@ -4,9 +4,19 @@ import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
 import { creatorService } from './creators';
+import {
+    buildGatewayMintTransaction,
+    createCreatorBurnIntent,
+    getCreatorGatewayBalance,
+    isValidEvmAddress,
+    submitCreatorWithdraw,
+    BURN_INTENT_EIP712_DOMAIN,
+    BURN_INTENT_EIP712_TYPES,
+    type CreatorBurnIntent,
+} from './gateway-creator';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData } from 'viem';
+import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, pad } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
 
@@ -682,6 +692,124 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[Core] ❌ Failed to process top-up for ${userId}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- CREATOR SIDE: Per-creator Gateway balance & MetaMask withdraw ---
+coreRouter.get('/creator/balance', async (req: Request, res: Response) => {
+    const address = (req.query.address as string || '').trim();
+    if (!address || !isValidEvmAddress(address)) {
+        return res.status(400).json({ error: 'Missing or invalid address' });
+    }
+
+    try {
+        const balances = await getCreatorGatewayBalance(address as `0x${string}`);
+        return res.json({
+            status: 'success',
+            address,
+            gatewayAvailable: balances.formattedAvailable,
+            gatewayWithdrawable: balances.formattedWithdrawable,
+            gatewayTotal: balances.formattedTotal,
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Creator balance fetch failed for ${address}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+coreRouter.post('/creator/prepare-withdraw', async (req: Request, res: Response) => {
+    const address = (req.body?.address as string || '').trim();
+    if (!address || !isValidEvmAddress(address)) {
+        return res.status(400).json({ error: 'Missing or invalid address' });
+    }
+
+    try {
+        const balances = await getCreatorGatewayBalance(address as `0x${string}`);
+        const withdrawable = Number(balances.formattedAvailable);
+        if (withdrawable <= 0.001) {
+            return res.json({
+                status: 'no_funds',
+                gatewayAvailable: balances.formattedAvailable,
+                message: 'Balance too low to withdraw.',
+            });
+        }
+
+        const withdrawAmount = (withdrawable * 0.99).toFixed(6);
+        const { burnIntent, formattedAmount } = createCreatorBurnIntent(
+            address as `0x${string}`,
+            withdrawAmount,
+        );
+
+        return res.json({
+            status: 'ready',
+            address,
+            amount: formattedAmount,
+            burnIntent: JSON.parse(JSON.stringify(burnIntent, (_k, v) =>
+                typeof v === 'bigint' ? v.toString() : v
+            )),
+            typedData: {
+                domain: BURN_INTENT_EIP712_DOMAIN,
+                types: BURN_INTENT_EIP712_TYPES,
+                primaryType: 'BurnIntent',
+                message: JSON.parse(JSON.stringify(burnIntent, (_k, v) =>
+                    typeof v === 'bigint' ? v.toString() : v
+                )),
+            },
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Creator prepare-withdraw failed for ${address}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+coreRouter.post('/creator/complete-withdraw', async (req: Request, res: Response) => {
+    const address = (req.body?.address as string || '').trim();
+    const signature = req.body?.signature as string;
+    const burnIntent = req.body?.burnIntent as CreatorBurnIntent;
+
+    if (!address || !isValidEvmAddress(address)) {
+        return res.status(400).json({ error: 'Missing or invalid address' });
+    }
+    if (!signature || !burnIntent?.spec) {
+        return res.status(400).json({ error: 'Missing burnIntent or signature' });
+    }
+
+    const normalizeHex = (value: string) => value.toLowerCase();
+    const depositor = normalizeHex(String(burnIntent.spec.sourceDepositor));
+    const signer = normalizeHex(String(burnIntent.spec.sourceSigner));
+    const expected = normalizeHex(pad(address as `0x${string}`, { size: 32 }));
+
+    if (depositor !== expected || signer !== expected) {
+        return res.status(400).json({ error: 'Burn intent does not match creator address' });
+    }
+
+    try {
+        const normalizedIntent: CreatorBurnIntent = {
+            maxBlockHeight: BigInt(burnIntent.maxBlockHeight),
+            maxFee: BigInt(burnIntent.maxFee),
+            spec: {
+                ...burnIntent.spec,
+                value: BigInt(burnIntent.spec.value),
+            },
+        };
+
+        const attestationResult = await submitCreatorWithdraw(normalizedIntent, signature as `0x${string}`);
+        const txRequest = buildGatewayMintTransaction(
+            attestationResult.attestation,
+            attestationResult.operatorSignature,
+        );
+
+        return res.json({
+            status: 'ready_to_mint',
+            transferId: attestationResult.transferId,
+            txRequest,
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Creator complete-withdraw failed for ${address}:`, err.message);
         return res.status(500).json({ error: err.message });
     }
 });
