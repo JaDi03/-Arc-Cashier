@@ -825,48 +825,14 @@ function renderSessionManager() {
     document.getElementById('arc-sm-end-btn').addEventListener('click', window.arcEndSession);
 }
 
-// ─── Global Media Tracking ────────────────────────────────────────────────────
-let playingMediaCount = 0;
-
-// Expose manual control for dedicated plugins (like PeerTube) to override blind global tracking
-if (window.arcManualMediaControl === undefined) {
-    window.arcManualMediaControl = false;
-}
-window.arcSetMediaPlaying = function(isPlaying) {
-    playingMediaCount = isPlaying ? 1 : 0;
-};
-
-document.addEventListener('play', (e) => {
-    if (window.arcManualMediaControl) return;
-    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
-        playingMediaCount++;
-    }
-}, true);
-document.addEventListener('pause', (e) => {
-    if (window.arcManualMediaControl) return;
-    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
-        playingMediaCount = Math.max(0, playingMediaCount - 1);
-    }
-}, true);
-document.addEventListener('ended', (e) => {
-    if (window.arcManualMediaControl) return;
-    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
-        playingMediaCount = Math.max(0, playingMediaCount - 1);
-    }
-}, true);
-
 function startSessionTimer() {
-    if (window.sessionTimer) clearInterval(window.sessionTimer);
     let seconds = 0;
     window.sessionTimer = setInterval(async () => {
-        const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
-        if (shouldTick) {
-            seconds++;
-            const timeEl = document.getElementById('arc-sm-time');
-            const costEl = document.getElementById('arc-sm-cost');
-            if (timeEl) timeEl.innerText = seconds + 's';
-            if (costEl) costEl.innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
-        }
+        seconds++;
+        const timeEl = document.getElementById('arc-sm-time');
+        const costEl = document.getElementById('arc-sm-cost');
+        if (timeEl) timeEl.innerText = seconds + 's';
+        if (costEl) costEl.innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
 
         if (seconds % 5 === 0) {
             try {
