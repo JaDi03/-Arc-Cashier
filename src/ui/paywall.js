@@ -825,14 +825,63 @@ function renderSessionManager() {
     document.getElementById('arc-sm-end-btn').addEventListener('click', window.arcEndSession);
 }
 
+// ─── Global Media Tracking ────────────────────────────────────────────────────
+let playingMediaCount = 0;
+
+// Expose manual control for dedicated plugins (like PeerTube) to override blind global tracking
+if (window.arcManualMediaControl === undefined) {
+    window.arcManualMediaControl = false;
+}
+window.arcSetMediaPlaying = function(isPlaying) {
+    // #region agent log
+    console.log('[AGENT_LOG] paywall.js:arcSetMediaPlaying', { sessionId: '2866b9', message: 'manual media control set', data: { isPlaying, prevCount: playingMediaCount, arcManualMediaControl: window.arcManualMediaControl }, timestamp: Date.now(), hypothesisId: 'A' });
+    // #endregion
+    playingMediaCount = isPlaying ? 1 : 0;
+};
+
+document.addEventListener('play', (e) => {
+    if (window.arcManualMediaControl) return;
+    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+        playingMediaCount++;
+        // #region agent log
+        console.log('[AGENT_LOG] paywall.js:global-play', { sessionId: '2866b9', message: 'global play event', data: { playingMediaCount, tag: e.target.tagName, className: e.target.className || '', paused: e.target.paused }, timestamp: Date.now(), hypothesisId: 'A,F' });
+        // #endregion
+    }
+}, true);
+document.addEventListener('pause', (e) => {
+    if (window.arcManualMediaControl) return;
+    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+        playingMediaCount = Math.max(0, playingMediaCount - 1);
+        // #region agent log
+        console.log('[AGENT_LOG] paywall.js:global-pause', { sessionId: '2866b9', message: 'global pause event', data: { playingMediaCount, tag: e.target.tagName, className: e.target.className || '' }, timestamp: Date.now(), hypothesisId: 'A,F' });
+        // #endregion
+    }
+}, true);
+document.addEventListener('ended', (e) => {
+    if (window.arcManualMediaControl) return;
+    if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+        playingMediaCount = Math.max(0, playingMediaCount - 1);
+    }
+}, true);
+
 function startSessionTimer() {
+    if (window.sessionTimer) clearInterval(window.sessionTimer);
     let seconds = 0;
+    // #region agent log
+    console.log('[AGENT_LOG] paywall.js:startSessionTimer', { sessionId: '2866b9', message: 'session timer started on unlock', data: { playingMediaCount, arcManualMediaControl: window.arcManualMediaControl, arcLocked: document.body.classList.contains('arc-locked') }, timestamp: Date.now(), hypothesisId: 'E' });
+    // #endregion
     window.sessionTimer = setInterval(async () => {
-        seconds++;
-        const timeEl = document.getElementById('arc-sm-time');
-        const costEl = document.getElementById('arc-sm-cost');
-        if (timeEl) timeEl.innerText = seconds + 's';
-        if (costEl) costEl.innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
+        const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
+        // #region agent log
+        if (seconds % 3 === 0) console.log('[AGENT_LOG] paywall.js:sessionTimer-tick', { sessionId: '2866b9', message: 'timer tick state', data: { seconds, shouldTick, playingMediaCount, arcManualMediaControl: window.arcManualMediaControl }, timestamp: Date.now(), hypothesisId: 'B,E' });
+        // #endregion
+        if (shouldTick) {
+            seconds++;
+            const timeEl = document.getElementById('arc-sm-time');
+            const costEl = document.getElementById('arc-sm-cost');
+            if (timeEl) timeEl.innerText = seconds + 's';
+            if (costEl) costEl.innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
+        }
 
         if (seconds % 5 === 0) {
             try {
