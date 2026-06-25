@@ -8,7 +8,13 @@ export interface SessionRecord {
     sourceChain?: string;
 }
 
-const DB_PATH = path.resolve(process.cwd(), 'sessions.json');
+const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DB_PATH = path.join(DATA_DIR, 'sessions.json');
+
+// Ensure data directory exists (important on first run with a fresh volume)
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 /**
  * Wallet Abstraction Service

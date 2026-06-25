@@ -7,7 +7,13 @@ export interface CreatorProfile {
     platformFee: number; // e.g., 0.10 for 10%
 }
 
-const DB_PATH = path.resolve(process.cwd(), 'creators.json');
+const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DB_PATH = path.join(DATA_DIR, 'creators.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 /**
  * Creator Service

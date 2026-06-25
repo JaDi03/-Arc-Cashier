@@ -14,5 +14,8 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
 RUN npm install --omit=dev
+# Create persistent data directory (mounted as a volume to survive rebuilds)
+RUN mkdir -p /app/data
+VOLUME ["/app/data"]
 EXPOSE 3000
 CMD ["npm", "start"]
