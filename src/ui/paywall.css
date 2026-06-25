@@ -581,7 +581,7 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 
 #arc-session-manager {
     position: fixed;
-    top: 20px; right: 20px;
+    bottom: 20px; right: 20px;
     z-index: 999;
     background: linear-gradient(145deg, rgba(18,18,42,0.96), rgba(22,31,56,0.96));
     backdrop-filter: blur(18px) saturate(160%);

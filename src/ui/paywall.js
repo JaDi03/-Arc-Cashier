@@ -115,7 +115,7 @@ function renderPaywallOverlay() {
     overlay.innerHTML = `
         <div id="arc-paywall-modal">
             <div id="arc-paywall-header">
-                <div id="arc-paywall-logo">⚡ Tessera</div>
+                <div id="arc-paywall-logo">TESSERA</div>
                 <h2>Premium Stream</h2>
                 <p>Pay only for the seconds you watch. No subscriptions.</p>
             </div>
@@ -124,13 +124,13 @@ function renderPaywallOverlay() {
                     <div class="arc-pricing-box">
                         <div class="arc-pricing-row">
                             <span>Rate</span>
-                            <span class="arc-accent">$0.0001 USDC / sec</span>
+                            <span class="arc-accent" id="arc-display-rate">From $0.0001 USDC / sec</span>
                         </div>
                         <div class="arc-pricing-row">
                             <span>Min. deposit</span>
                             <span class="arc-accent">1.00 USDC</span>
                         </div>
-                        <p class="arc-pricing-note">Unused funds stay in your wallet.</p>
+                        <p class="arc-pricing-note">What you don't use is returned to your wallet.</p>
                     </div>
                     <button id="arc-login-btn" class="arc-btn arc-btn-primary">
                         <span class="arc-btn-icon">🔐</span>
@@ -144,7 +144,12 @@ function renderPaywallOverlay() {
                         <span class="arc-info-label">Your Arc Wallet</span>
                         <div class="arc-address-row">
                             <span id="arc-wallet-display" class="arc-address-text"></span>
-                            <button id="arc-copy-btn" class="arc-copy-btn" title="Copy address">📋</button>
+                            <button id="arc-copy-btn" class="arc-copy-btn" title="Copy address">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
@@ -152,7 +157,6 @@ function renderPaywallOverlay() {
 
                     <div class="arc-fund-options">
                         <button id="arc-bridge-btn" class="arc-fund-card">
-                            <span class="arc-fund-icon">🌉</span>
                             <div>
                                 <strong>Bridge from another chain</strong>
                                 <span>Ethereum, Base, Arbitrum</span>
@@ -161,7 +165,6 @@ function renderPaywallOverlay() {
                         </button>
 
                         <a href="https://faucet.circle.com" target="_blank" rel="noopener" class="arc-fund-card">
-                            <span class="arc-fund-icon">🚰</span>
                             <div>
                                 <strong>Get test USDC (Faucet)</strong>
                                 <span>faucet.circle.com</span>
@@ -789,8 +792,8 @@ function renderSessionManager() {
                 <button id="arc-sm-topup-btn" class="arc-btn" style="padding:5px 10px;font-size:11px;margin:0 auto;display:inline-block;">Top Up +30 Mins</button>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">
-                <button id="arc-sm-leave-btn" class="arc-btn" style="flex:1;background:#4a5568;font-size:11px;padding:8px 4px;">⏸ Just Leave</button>
-                <button id="arc-sm-end-btn" class="arc-btn arc-btn-danger" style="flex:2;font-size:11px;padding:8px 4px;">💸 Cash Out &amp; Exit</button>
+                <button id="arc-sm-leave-btn" class="arc-btn" style="flex:1;background:#4a5568;font-size:11px;padding:8px 4px;">Just Leave</button>
+                <button id="arc-sm-end-btn" class="arc-btn arc-btn-danger" style="flex:2;font-size:11px;padding:8px 4px;">Cash Out &amp; Exit</button>
             </div>
             <p style="margin:6px 0 0;font-size:10px;color:#718096;text-align:center;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
         </div>
@@ -836,6 +839,15 @@ window.arcSetMediaPlaying = function(isPlaying) {
     playingMediaCount = isPlaying ? 1 : 0;
 };
 
+// Allow plugin to update rate when switching between videos with different prices
+window.arcSetRate = function(ratePerSec) {
+    if (ratePerSec && Number(ratePerSec) > 0) {
+        currentRatePerSecond = Number(ratePerSec);
+        const el = document.getElementById('arc-display-rate');
+        if (el) el.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+    }
+};
+
 document.addEventListener('play', (e) => {
     if (window.arcManualMediaControl) return;
     if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
@@ -855,6 +867,9 @@ document.addEventListener('ended', (e) => {
     }
 }, true);
 
+// Current rate per second — updated dynamically from each video's ping response
+let currentRatePerSecond = 0.0001;
+
 function startSessionTimer() {
     if (window.sessionTimer) clearInterval(window.sessionTimer);
     let seconds = 0;
@@ -865,7 +880,7 @@ function startSessionTimer() {
             const timeEl = document.getElementById('arc-sm-time');
             const costEl = document.getElementById('arc-sm-cost');
             if (timeEl) timeEl.innerText = seconds + 's';
-            if (costEl) costEl.innerText = '$' + (seconds * 0.0001).toFixed(4) + ' USDC';
+            if (costEl) costEl.innerText = '$' + (seconds * currentRatePerSecond).toFixed(4) + ' USDC';
         }
 
         if (seconds % 5 === 0) {
@@ -883,7 +898,7 @@ function startSessionTimer() {
                         const withdrawable = Number(data.gatewayWithdrawable);
                         const balEl = document.getElementById('arc-sm-balance');
                         if (balEl) balEl.innerText = '$' + withdrawable.toFixed(4) + ' USDC';
-                        const secondsLeft = withdrawable / 0.0001;
+                        const secondsLeft = withdrawable / currentRatePerSecond;
                         const warningDiv = document.getElementById('arc-sm-warning');
                         if (warningDiv) {
                             if (secondsLeft <= 300 && secondsLeft > 0) {
