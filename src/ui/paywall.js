@@ -789,7 +789,16 @@ function renderSessionManager() {
             </div>
             <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.2);border:1px solid orange;padding:10px;margin-top:10px;margin-bottom:10px;border-radius:4px;text-align:center;">
                 <p style="margin:0 0 5px;color:orange;font-size:12px;font-weight:bold;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
-                <button id="arc-sm-topup-btn" class="arc-btn" style="padding:5px 10px;font-size:11px;margin:0 auto;display:inline-block;">Top Up +30 Mins</button>
+                <div id="arc-sm-topup-form" style="display:none;margin:6px 0;">
+                    <div style="display:flex;gap:6px;align-items:center;justify-content:center;">
+                        <span style="color:#e2e8f0;font-size:12px;">$</span>
+                        <input id="arc-sm-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount (USDC)"
+                            style="width:110px;padding:4px 8px;border-radius:4px;border:1px solid #4a5568;background:#2d3748;color:#e2e8f0;font-size:12px;" />
+                        <button id="arc-sm-topup-confirm-btn" class="arc-btn" style="padding:4px 10px;font-size:11px;">Confirm</button>
+                        <button id="arc-sm-topup-cancel-btn" class="arc-btn" style="padding:4px 10px;font-size:11px;background:#4a5568;">✕</button>
+                    </div>
+                </div>
+                <button id="arc-sm-topup-btn" class="arc-btn" style="padding:5px 10px;font-size:11px;margin:0 auto;display:inline-block;">Top Up</button>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">
                 <button id="arc-sm-leave-btn" class="arc-btn" style="flex:1;background:#4a5568;font-size:11px;padding:8px 4px;">Just Leave</button>
@@ -823,7 +832,29 @@ function renderSessionManager() {
         document.getElementById('arc-sm-minimize-btn').innerText =
             sm.classList.contains('arc-sm-minimized') ? '+' : '−';
     });
-    document.getElementById('arc-sm-topup-btn').addEventListener('click', handleTopUp);
+
+    // Top Up: toggle the amount input form
+    document.getElementById('arc-sm-topup-btn').addEventListener('click', () => {
+        document.getElementById('arc-sm-topup-form').style.display = 'block';
+        document.getElementById('arc-sm-topup-btn').style.display = 'none';
+        document.getElementById('arc-sm-topup-input').focus();
+    });
+    document.getElementById('arc-sm-topup-cancel-btn').addEventListener('click', () => {
+        document.getElementById('arc-sm-topup-form').style.display = 'none';
+        document.getElementById('arc-sm-topup-btn').style.display = 'inline-block';
+        document.getElementById('arc-sm-topup-btn').innerText = 'Top Up';
+        document.getElementById('arc-sm-topup-btn').disabled = false;
+    });
+    document.getElementById('arc-sm-topup-confirm-btn').addEventListener('click', () => {
+        const input = document.getElementById('arc-sm-topup-input');
+        const amount = parseFloat(input.value);
+        if (!amount || amount < 0.01) {
+            input.style.borderColor = 'red';
+            return;
+        }
+        input.style.borderColor = '';
+        handleTopUp(amount);
+    });
     document.getElementById('arc-sm-leave-btn').addEventListener('click', window.arcLeaveSession);
     document.getElementById('arc-sm-end-btn').addEventListener('click', window.arcEndSession);
 }
@@ -958,12 +989,40 @@ function startSessionTimer() {
 
 // ─── Top-Up ───────────────────────────────────────────────────────────────────
 
-async function handleTopUp() {
+async function handleTopUp(depositAmount) {
     const btn = document.getElementById('arc-sm-topup-btn');
-    btn.disabled = true;
-    btn.innerText = 'Processing…';
+    const confirmBtn = document.getElementById('arc-sm-topup-confirm-btn');
+    const cancelBtn = document.getElementById('arc-sm-topup-cancel-btn');
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.innerText = 'Processing…'; }
+    if (cancelBtn) cancelBtn.disabled = true;
+
+    const resetForm = (label = 'Top Up') => {
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerText = 'Confirm'; }
+        if (cancelBtn) cancelBtn.disabled = false;
+        const form = document.getElementById('arc-sm-topup-form');
+        if (form) form.style.display = 'none';
+        if (btn) { btn.style.display = 'inline-block'; btn.innerText = label; btn.disabled = false; }
+    };
 
     try {
+        // Step 0: Flush any funds already sitting in the ephemeral wallet
+        // (handles Circle SDK false-positive errors from previous top-up attempts)
+        const flushRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: viewerState.userId }),
+        });
+        if (flushRes.ok) {
+            const flushData = await flushRes.json();
+            if (flushData.deposited && Number(flushData.deposited) > 0) {
+                console.log(`[Tessera] Flushed ${flushData.deposited} USDC from ephemeral wallet to Gateway.`);
+                resetForm('Top Up');
+                document.getElementById('arc-sm-warning').classList.add('arc-hidden');
+                return; // Funds recovered — no Circle SDK interaction needed
+            }
+        }
+
+        // Step 1: Refresh Circle user token
         const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/get-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -977,42 +1036,50 @@ async function handleTopUp() {
             encryptionKey: tokenData.encryptionKey,
         });
 
-        // Calculate 30 minutes worth at the current video's rate (not hardcoded 0.0001)
-        const topUpAmount = (currentRatePerSecond * 30 * 60).toFixed(6);
-
-        const depositRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
+        // Step 2: Create the transfer from the SCA wallet to the ephemeral wallet
+        const prepRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 userToken: tokenData.userToken,
                 walletId: viewerState.walletId,
-                depositAmount: topUpAmount,
+                depositAmount: depositAmount.toFixed(6),
                 ephemeralPk: viewerState.ephemeralPk,
             }),
         });
-        if (!depositRes.ok) throw new Error('Failed to prepare top-up');
-        const depositData = await depositRes.json();
+        if (!prepRes.ok) throw new Error('Failed to prepare top-up');
+        const prepData = await prepRes.json();
 
-        await new Promise((resolve, reject) => {
-            arcSdk.execute(depositData.challengeId, (error, result) => {
-                if (error) reject(new Error('Top-up cancelled'));
-                else resolve(result);
+        // Step 3: Execute — Circle SDK shows the approval popup
+        // We do NOT reject on SDK callback error: the transaction may have succeeded
+        // on-chain even if the callback fires with an error (Circle SDK quirk).
+        // topup-session in Step 4 will confirm whether funds arrived.
+        let sdkSucceeded = false;
+        await new Promise((resolve) => {
+            arcSdk.execute(prepData.challengeId, (error, result) => {
+                if (!error) sdkSucceeded = true;
+                resolve(); // Always continue — verify via topup-session
             });
         });
 
-        await fetch(ARC_API_BASE + '/api/core/topup-session', {
+        // Step 4: Deposit ephemeral wallet balance into Gateway
+        const topupRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: viewerState.userId }),
         });
 
-        btn.innerText = 'Top Up +30 Mins';
-        btn.disabled = false;
+        if (!topupRes.ok) {
+            // topup-session 400 means no funds arrived in ephemeral wallet
+            // (user likely cancelled the Circle SDK popup)
+            throw new Error('Top-up cancelled or no funds received');
+        }
+
+        resetForm('Top Up');
         document.getElementById('arc-sm-warning').classList.add('arc-hidden');
     } catch (error) {
         console.error('[Tessera] Top-up failed', error);
-        btn.innerText = 'Error (Retry)';
-        btn.disabled = false;
+        resetForm('Error (Retry)');
     }
 }
 
