@@ -977,7 +977,8 @@ async function handleTopUp() {
             encryptionKey: tokenData.encryptionKey,
         });
 
-        const topUpAmount = (0.0001 * 30 * 60).toFixed(6); // 0.18 USDC = 30 min
+        // Calculate 30 minutes worth at the current video's rate (not hardcoded 0.0001)
+        const topUpAmount = (currentRatePerSecond * 30 * 60).toFixed(6);
 
         const depositRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
             method: 'POST',
@@ -986,6 +987,7 @@ async function handleTopUp() {
                 userToken: tokenData.userToken,
                 walletId: viewerState.walletId,
                 depositAmount: topUpAmount,
+                ephemeralPk: viewerState.ephemeralPk,
             }),
         });
         if (!depositRes.ok) throw new Error('Failed to prepare top-up');
