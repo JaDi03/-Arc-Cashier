@@ -783,9 +783,9 @@ function renderSessionManager() {
         </div>
         <div id="arc-sm-content">
             <div class="arc-sm-stats">
-                <div><span>Time:</span> <span id="arc-sm-time">0s</span></div>
-                <div><span>Cost:</span> <span id="arc-sm-cost">$0.0000 USDC</span></div>
-                <div><span>Balance:</span> <span id="arc-sm-balance">$1.0000 USDC</span></div>
+                <div><span>Rate:</span>       <span id="arc-sm-rate">$0.0001 USDC / sec</span></div>
+                <div><span>Video cost:</span> <span id="arc-sm-video-cost">$0.0000 USDC</span></div>
+                <div><span>Balance:</span>    <span id="arc-sm-balance">— USDC</span></div>
             </div>
             <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.2);border:1px solid orange;padding:10px;margin-top:10px;margin-bottom:10px;border-radius:4px;text-align:center;">
                 <p style="margin:0 0 5px;color:orange;font-size:12px;font-weight:bold;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
@@ -843,9 +843,37 @@ window.arcSetMediaPlaying = function(isPlaying) {
 window.arcSetRate = function(ratePerSec) {
     if (ratePerSec && Number(ratePerSec) > 0) {
         currentRatePerSecond = Number(ratePerSec);
+        // Paywall overlay rate display
         const el = document.getElementById('arc-display-rate');
         if (el) el.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+        // Session manager rate display
+        const rateEl = document.getElementById('arc-sm-rate');
+        if (rateEl) rateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
     }
+};
+
+// Called by the PeerTube plugin (client.ts) when the user navigates to a new video.
+// Resets the per-video cost counter and updates the displayed rate without
+// touching the global session or the gateway balance.
+window.arcResetVideoSession = function(newRate) {
+    // Reset per-video counter
+    secondsThisVideo = 0;
+
+    // Update rate if provided
+    if (newRate && Number(newRate) > 0) {
+        currentRatePerSecond = Number(newRate);
+    }
+
+    // Refresh session manager UI
+    const rateEl = document.getElementById('arc-sm-rate');
+    if (rateEl) rateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+
+    const videoCostEl = document.getElementById('arc-sm-video-cost');
+    if (videoCostEl) videoCostEl.textContent = '$0.0000 USDC';
+
+    // Also keep paywall overlay in sync
+    const displayRate = document.getElementById('arc-display-rate');
+    if (displayRate) displayRate.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
 };
 
 document.addEventListener('play', (e) => {
@@ -869,21 +897,33 @@ document.addEventListener('ended', (e) => {
 
 // Current rate per second — updated dynamically from each video's ping response
 let currentRatePerSecond = 0.0001;
+// Per-video cost counter — lives at module scope so arcResetVideoSession() can reset it
+let secondsThisVideo = 0;
 
 function startSessionTimer() {
     if (window.sessionTimer) clearInterval(window.sessionTimer);
-    let seconds = 0;
+    // Reset per-video counter for this new session unlock
+    secondsThisVideo = 0;
+    // Local tick counter for the 5-second backend sync interval
+    // (ticks every 1s regardless of play state, so the sync is time-based)
+    let tickCount = 0;
+
+    // Show initial rate in the session manager immediately
+    const initialRateEl = document.getElementById('arc-sm-rate');
+    if (initialRateEl) initialRateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+
     window.sessionTimer = setInterval(async () => {
+        tickCount++;
         const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
         if (shouldTick) {
-            seconds++;
-            const timeEl = document.getElementById('arc-sm-time');
-            const costEl = document.getElementById('arc-sm-cost');
-            if (timeEl) timeEl.innerText = seconds + 's';
-            if (costEl) costEl.innerText = '$' + (seconds * currentRatePerSecond).toFixed(4) + ' USDC';
+            secondsThisVideo++;
+            const videoCostEl = document.getElementById('arc-sm-video-cost');
+            if (videoCostEl) {
+                videoCostEl.textContent = '$' + (secondsThisVideo * currentRatePerSecond).toFixed(4) + ' USDC';
+            }
         }
 
-        if (seconds % 5 === 0) {
+        if (tickCount % 5 === 0) {
             try {
                 const statusRes = await fetch(ARC_API_BASE + '/api/core/session-status?userId=' + viewerState.userId);
                 if (statusRes.status === 404) {
@@ -897,14 +937,14 @@ function startSessionTimer() {
                         const data = await balanceRes.json();
                         const withdrawable = Number(data.gatewayWithdrawable);
                         const balEl = document.getElementById('arc-sm-balance');
-                        if (balEl) balEl.innerText = '$' + withdrawable.toFixed(4) + ' USDC';
+                        if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
                         const secondsLeft = withdrawable / currentRatePerSecond;
                         const warningDiv = document.getElementById('arc-sm-warning');
                         if (warningDiv) {
                             if (secondsLeft <= 300 && secondsLeft > 0) {
                                 warningDiv.classList.remove('arc-hidden');
                                 const tl = document.getElementById('arc-sm-time-left');
-                                if (tl) tl.innerText = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
+                                if (tl) tl.textContent = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
                             } else {
                                 warningDiv.classList.add('arc-hidden');
                             }
