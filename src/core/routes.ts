@@ -6,6 +6,7 @@ import { sessionService } from './session';
 import { creatorService } from './creators';
 import {
     buildGatewayMintTransaction,
+    computeCreatorWithdrawAmount,
     createCreatorBurnIntent,
     getCreatorGatewayBalance,
     isValidEvmAddress,
@@ -16,7 +17,7 @@ import {
 } from './gateway-creator';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, pad } from 'viem';
+import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, pad, formatUnits, parseUnits } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
 
@@ -727,16 +728,18 @@ coreRouter.post('/creator/prepare-withdraw', async (req: Request, res: Response)
 
     try {
         const balances = await getCreatorGatewayBalance(address as `0x${string}`);
-        const withdrawable = Number(balances.formattedAvailable);
-        if (withdrawable <= 0.001) {
+        const withdrawMicro = computeCreatorWithdrawAmount(balances.availableMicro);
+
+        if (withdrawMicro <= parseUnits('0.001', 6)) {
             return res.json({
                 status: 'no_funds',
                 gatewayAvailable: balances.formattedAvailable,
+                gatewayWithdrawable: balances.formattedWithdrawable,
                 message: 'Balance too low to withdraw.',
             });
         }
 
-        const withdrawAmount = (withdrawable * 0.99).toFixed(6);
+        const withdrawAmount = formatUnits(withdrawMicro, 6);
         const { burnIntent, formattedAmount } = createCreatorBurnIntent(
             address as `0x${string}`,
             withdrawAmount,
@@ -797,9 +800,11 @@ coreRouter.post('/creator/complete-withdraw', async (req: Request, res: Response
         };
 
         const attestationResult = await submitCreatorWithdraw(normalizedIntent, signature as `0x${string}`);
+
         const txRequest = buildGatewayMintTransaction(
             attestationResult.attestation,
             attestationResult.operatorSignature,
+            address as `0x${string}`
         );
 
         return res.json({

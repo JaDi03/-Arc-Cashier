@@ -62,9 +62,18 @@ export const BURN_INTENT_EIP712_DOMAIN = {
 } as const;
 
 export interface CreatorGatewayBalance {
+    availableMicro: bigint;
     formattedAvailable: string;
     formattedWithdrawable: string;
     formattedTotal: string;
+}
+
+/** Gateway transfer requires value + fee <= balance; fee is typically ~0.0035 USDC on Arc testnet. */
+export const CREATOR_GATEWAY_FEE_BUFFER = parseUnits('0.005', 6);
+
+export function computeCreatorWithdrawAmount(availableMicro: bigint): bigint {
+    if (availableMicro <= CREATOR_GATEWAY_FEE_BUFFER) return 0n;
+    return availableMicro - CREATOR_GATEWAY_FEE_BUFFER;
 }
 
 export interface CreatorBurnIntent {
@@ -121,6 +130,7 @@ export async function getCreatorGatewayBalance(address: Address): Promise<Creato
 
     if (!data.balances?.length) {
         return {
+            availableMicro: 0n,
             formattedAvailable: '0',
             formattedWithdrawable: '0',
             formattedTotal: '0',
@@ -130,10 +140,12 @@ export async function getCreatorGatewayBalance(address: Address): Promise<Creato
     const balanceData = data.balances[0];
     const available = parseUnits(balanceData.balance ?? '0', 6);
     const withdrawing = parseUnits(balanceData.withdrawing ?? '0', 6);
+    const withdrawableMicro = computeCreatorWithdrawAmount(available);
 
     return {
+        availableMicro: available,
         formattedAvailable: formatUnits(available, 6),
-        formattedWithdrawable: formatUnits(parseUnits(balanceData.withdrawable ?? balanceData.balance ?? '0', 6), 6),
+        formattedWithdrawable: formatUnits(withdrawableMicro, 6),
         formattedTotal: formatUnits(available + withdrawing, 6),
     };
 }
@@ -201,7 +213,7 @@ export async function submitCreatorWithdraw(
     };
 }
 
-export function buildGatewayMintTransaction(attestation: Hex, operatorSignature: Hex) {
+export function buildGatewayMintTransaction(attestation: Hex, operatorSignature: Hex, from: Address) {
     const data = encodeFunctionData({
         abi: GATEWAY_MINTER_ABI,
         functionName: 'gatewayMint',
@@ -209,6 +221,7 @@ export function buildGatewayMintTransaction(attestation: Hex, operatorSignature:
     });
 
     return {
+        from,
         chainId: `0x${ARC_CHAIN_ID.toString(16)}`,
         to: GATEWAY_MINTER,
         data,
