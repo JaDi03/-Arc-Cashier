@@ -108,6 +108,10 @@ export class SessionService {
             this.settlementLocks.delete(userId);
         }
     }
+    /** Returns the GatewayClient for a user if they have an active session, or null. */
+    public getGatewayClientForUser(userId: string): GatewayClient | null {
+        return this.gatewayClients.get(userId) || null;
+    }
 }
 
 export const sessionService = new SessionService();

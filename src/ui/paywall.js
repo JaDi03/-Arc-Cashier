@@ -1175,14 +1175,208 @@ function setFundStatus(msg, isError = false) {
     el.className = 'arc-status-text' + (isError ? ' arc-status-error' : '');
 }
 
-// ─── Bootstrap & SPA API ────────────────────────────────────────────────────────
+// ─── Tip Button (Free Videos) ─────────────────────────────────────────────────
+//
+// Renders a floating tip button and a wallet status/balance widget.
+// Handles onboarding (Circle login + wallet setup) if the user has no session.
 
-window.ArcCashier = {
-    init: initPaywall
+// Fetches the viewer's current Gateway balance. Returns number or null on failure.
+async function fetchTipBalance() {
+    const userId = viewerState.userId;
+    if (!userId) return null;
+    try {
+        const res = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + userId);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return Number(data.gatewayWithdrawable) || 0;
+    } catch (_) { return null; }
+}
+
+// Triggers the full Circle wallet onboarding overlay so the user can
+// connect/create their wallet and fund it before tipping.
+function openTipOnboarding() {
+    if (window.ArcCashier && typeof window.ArcCashier.initPaywall === 'function') {
+        window.ArcCashier.initPaywall();
+    } else {
+        document.body.classList.add('arc-locked');
+    }
+}
+
+window.arcShowTipButton = function(creatorWallet, tipAmount) {
+    // Remove any existing tip button
+    const existing = document.getElementById('arc-tip-btn-container');
+    if (existing) existing.remove();
+
+    const amount = parseFloat(tipAmount) || 0.10;
+    let tipCount = 0;
+
+    const container = document.createElement('div');
+    container.id = 'arc-tip-btn-container';
+    container.style.cssText = [
+        'position:fixed',
+        'bottom:20px',
+        'right:20px',
+        'z-index:9999',
+        'display:flex',
+        'flex-direction:column',
+        'align-items:flex-end',
+        'gap:6px',
+    ].join(';');
+
+    // ── Wallet status / balance indicator ─────────────────────────────────
+    const statusBox = document.createElement('div');
+    statusBox.id = 'arc-tip-status';
+    statusBox.style.cssText = [
+        'font-size:11px',
+        'color:#a0aec0',
+        'text-align:right',
+        'padding:4px 10px',
+        'background:rgba(17,24,39,0.85)',
+        'border:1px solid rgba(99,179,237,0.2)',
+        'border-radius:10px',
+        'backdrop-filter:blur(4px)',
+        'display:none',
+    ].join(';');
+
+    const refreshStatus = async () => {
+        if (!viewerState.userId) {
+            statusBox.style.display = 'block';
+            statusBox.style.color = '#718096';
+            statusBox.textContent = '🔗 Connect wallet to tip';
+            return;
+        }
+        statusBox.style.display = 'block';
+        statusBox.style.color = '#a0aec0';
+        statusBox.textContent = '⏳ Checking balance…';
+        const balance = await fetchTipBalance();
+        if (balance === null) {
+            statusBox.style.color = '#718096';
+            statusBox.textContent = '🔗 Connect wallet to tip';
+        } else {
+            statusBox.style.color = balance > 0 ? '#68d391' : '#f6ad55';
+            statusBox.textContent = `💳 Balance: $${balance.toFixed(4)} USDC`;
+        }
+    };
+
+    // ── Tip counter ───────────────────────────────────────────────────────
+    const counter = document.createElement('div');
+    counter.id = 'arc-tip-counter';
+    counter.style.cssText = 'display:none;font-size:11px;color:#f5576c;text-align:right;font-weight:bold;';
+
+    // ── Tip button ────────────────────────────────────────────────────────
+    const btn = document.createElement('button');
+    btn.id = 'arc-tip-btn';
+    btn.className = 'arc-btn';
+    btn.style.cssText = 'padding:8px 16px;font-size:13px;background:linear-gradient(135deg,#f093fb,#f5576c);border:none;border-radius:20px;cursor:pointer;box-shadow:0 4px 15px rgba(240,93,251,0.4);transition:transform 0.1s;';
+    btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
+    btn.title = 'Send a tip to the creator';
+
+    btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.05)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+
+    container.appendChild(statusBox);
+    container.appendChild(counter);
+    container.appendChild(btn);
+    document.body.appendChild(container);
+
+    // Populate status widget on load
+    void refreshStatus();
+
+    // ── Click handler ─────────────────────────────────────────────────────
+    btn.addEventListener('click', async () => {
+        // No userId → trigger full wallet onboarding
+        if (!viewerState.userId) {
+            openTipOnboarding();
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Sending\u2026';
+
+        try {
+            const res = await fetch(ARC_API_BASE + '/api/core/tip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: viewerState.userId,
+                    creatorWallet: creatorWallet,
+                    amount: amount.toFixed(6),
+                }),
+            });
+
+            if (res.ok) {
+                tipCount++;
+                const total = (amount * tipCount).toFixed(2);
+                counter.style.display = 'block';
+                counter.textContent = `\u2764\uFE0F \xD7${tipCount} = $${total} sent`;
+                btn.textContent = `\u2764\uFE0F +$${amount.toFixed(2)} more`;
+                void refreshStatus();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                console.error('[Tessera] Tip failed:', err);
+
+                if (res.status === 404) {
+                    // No registered session: user must connect wallet & fund first
+                    btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
+                    statusBox.style.display = 'block';
+                    statusBox.style.color = '#718096';
+                    statusBox.textContent = '🔗 Connect wallet to tip';
+                    openTipOnboarding();
+                } else if (res.status === 402) {
+                    // Insufficient gateway balance
+                    btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
+                    statusBox.style.display = 'block';
+                    statusBox.style.color = '#f6ad55';
+                    statusBox.textContent = '\u26A0\uFE0F Insufficient balance \u2014 top up';
+                    openTipOnboarding();
+                } else {
+                    btn.textContent = 'Error \u2014 retry';
+                }
+            }
+        } catch (e) {
+            console.error('[Tessera] Tip request error:', e);
+            btn.textContent = 'Error \u2014 retry';
+        } finally {
+            btn.disabled = false;
+        }
+    });
 };
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPaywall);
-} else {
-    initPaywall();
+
+// ─── Tip Mode (Free Videos) ──────────────────────────────────────────────────
+//
+// Called by the PeerTube plugin when the current video is in 'free' mode.
+// Does NOT lock the video. Only renders the session manager (hidden) and
+// shows the tip button so the viewer can optionally support the creator.
+
+function initTipMode(creatorWallet, tipAmount) {
+    injectDependencies();
+    // Guarantee video is never locked in tip mode
+    document.body.classList.remove('arc-locked');
+    // Render hidden session manager so arcLeaveSession / arcEndSession work
+    // if the user already has an active pay-per-second session elsewhere.
+    renderSessionManager();
+    // Show the floating tip button
+    if (typeof window.arcShowTipButton === 'function') {
+        window.arcShowTipButton(creatorWallet, tipAmount);
+    }
 }
+
+// ─── Bootstrap & SPA API ─────────────────────────────────────────────────────
+//
+// paywall.js does NOT auto-initialize on load.
+// The PeerTube plugin (client.ts) reads the video's tessera-mode from the
+// backend FIRST, then calls the appropriate method:
+//
+//   window.ArcCashier.initPaywall()              → pay-per-second (blocks video)
+//   window.ArcCashier.initTipMode(wallet, amount) → free video (tip button only)
+//
+// This prevents free videos from being incorrectly blocked before the ping
+// response arrives, which was the root cause of the reported bug.
+
+window.ArcCashier = {
+    initPaywall,
+    initTipMode,
+    // Legacy alias kept for backwards compatibility with any external callers
+    init: initPaywall,
+};

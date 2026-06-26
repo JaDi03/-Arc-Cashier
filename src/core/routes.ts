@@ -844,6 +844,12 @@ coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
 });
 
 coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
+    // Protect with webhook secret so only the PeerTube plugin can call this
+    const secret = process.env.PEERTUBE_WEBHOOK_SECRET;
+    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     try {
         const sellerKey = process.env.SELLER_PRIVATE_KEY;
         if (!sellerKey) {
@@ -875,6 +881,87 @@ coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
         console.error(`[Core] ❌ Seller withdrawal failed:`, err.message);
         return res.status(500).json({ error: err.message });
     }
+});
+
+// --- Admin: Get seller Arc Gateway balance ---
+coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
+    const secret = process.env.PEERTUBE_WEBHOOK_SECRET;
+    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const sellerKey = process.env.SELLER_PRIVATE_KEY;
+        if (!sellerKey) {
+            return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
+        }
+
+        const sellerClient = new GatewayClient({
+            chain: 'arcTestnet',
+            privateKey: sellerKey as `0x${string}`,
+        });
+
+        const balances = await sellerClient.getBalances();
+        return res.json({
+            available: balances.gateway.formattedAvailable,
+            total: balances.gateway.formattedTotal,
+        });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Tip: Off-chain payment from viewer's Arc Gateway to creator (100% — no platform split) ---
+coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId, creatorWallet, amount } = req.body;
+
+    if (!userId || !creatorWallet || !amount) {
+        return res.status(400).json({ error: 'Missing userId, creatorWallet, or amount' });
+    }
+
+    try {
+        const gatewayClient = sessionService.getGatewayClientForUser(userId);
+        if (!gatewayClient) {
+            return res.status(404).json({ error: 'No active session found for this user.' });
+        }
+
+        const PORT = process.env.PORT || 3000;
+        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+
+        // Pay via the /tip-access endpoint — routes 100% to creator, no platform split
+        await gatewayClient.pay<{ success: boolean }>(
+            `${sidecarUrl}/api/core/tip-access`,
+            { headers: { 'x-tip-amount': amount, 'x-seller-address': creatorWallet } }
+        );
+
+        console.log(`[Core] ❤️ Tip of ${amount} USDC sent from ${userId} to ${creatorWallet}`);
+        return res.json({ status: 'success', amount, creatorWallet });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (err.message.includes('402') || err.message.toLowerCase().includes('insufficient')) {
+            return res.status(402).json({ error: 'Insufficient gateway balance. Please top up.' });
+        }
+        console.error(`[Core] ❌ Tip failed:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Tip-Access: x402 gate that routes 100% to creator (no time-slice split) ---
+coreRouter.get('/tip-access', (req: Request, res: Response, next: NextFunction) => {
+    const creatorAddress = req.headers['x-seller-address'] as string || SELLER_ADDRESS;
+    const tipAmount = req.headers['x-tip-amount'] as string || '0.10';
+
+    const tipGateway = createGatewayMiddleware({
+        sellerAddress: creatorAddress,  // 100% to creator — no random split
+        facilitatorUrl: 'https://gateway-api-testnet.circle.com',
+        networks: ['eip155:5042002'],
+    });
+
+    const priceMiddleware = tipGateway.require(`$${parseFloat(tipAmount).toFixed(4)}`);
+    priceMiddleware(req as any, res as any, next);
+}, (req: Request, res: Response) => {
+    res.json({ success: true });
 });
 
 export default coreRouter;
