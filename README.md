@@ -164,8 +164,9 @@ npm install
 # 3. Run the interactive setup wizard
 npm run setup
 
-# 4. Add your credentials to .env, then start
-npm run dev
+# 4. Add your credentials to .env, compile, and start
+npm run build
+npm run start
 ```
 
 Tessera starts on `http://localhost:3000` and proxies all traffic through the payment layer to your upstream platform.

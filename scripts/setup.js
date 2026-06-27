@@ -116,8 +116,9 @@ Please manually open the '.env' file in your code editor and configure:
         console.log(`Copy this secret into the PeerTube Plugin Settings so they can communicate securely.\n`);
     }
 
-    console.log(`Once your .env is configured, start the sidecar with:
-  npm run dev
+    console.log(`Once your .env is configured, compile and start the sidecar with:
+  npm run build
+  npm run start
 `);
     rl.close();
 }
