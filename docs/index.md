@@ -90,6 +90,7 @@ sequenceDiagram
     participant Tessera as Tessera (Proxy)
     participant Platform as Self-Hosted Platform
     participant Gateway as Circle Gateway
+    actor Creator as Creator Wallet
 
     %% 1. Initial Load & HTML Injection
     Viewer->>Tessera: GET / (visits stream)
@@ -120,6 +121,7 @@ sequenceDiagram
     Viewer->>Browser: Clicks "End Session"
     Browser->>Tessera: POST /api/core/end-session
     Tessera->>Gateway: GatewayClient.withdraw() — batch settles & refunds
+    Gateway-->>Creator: Transfers USDC earnings
     Gateway-->>Tessera: Withdrawal confirmed
     Tessera-->>Browser: 200 OK — unused balance returned
 ```
@@ -130,15 +132,7 @@ sequenceDiagram
 2. **Viewer funds a session** → A Circle Smart Contract Account (SCA) is created on Arc Testnet. The viewer deposits USDC into the Circle Gateway. This is the only on-chain transaction
 3. **Session registers** → The client posts the ephemeral session key to Tessera. The GatewayClient makes a single x402 authorization call to unlock access
 4. **Billing runs off-chain** → Every second, an EIP-3009 signature authorizes a micro-payment. No gas. No blockchain transaction per tick
-5. **Viewer leaves** → The client calls `/end-session`. The Gateway batches all pending authorizations, settles on Arc Testnet, and refunds the unused balance to the viewer's wallet
-
----
-
-## Demo
-
-![Demo](../media/cashier.mp4)
-
-> **Live Demo (Viewer Flow)** — A viewer connects their wallet, deposits USDC, watches a stream for a few seconds, and ends the session. The paywall automatically allows access after funding and refunds unused balance on exit.
+5. **Viewer leaves** → The client calls `/end-session`. The Gateway batches all pending authorizations, settles on Arc Testnet, transfers earnings to the Creator, and refunds the unused balance to the viewer's wallet
 
 ---
 
