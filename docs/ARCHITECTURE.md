@@ -47,7 +47,7 @@ Tessera is designed for **high-frequency, per-second micro-billing**. Implementi
 
 By leveraging the **Arc Network** combined with the **x402 protocol**:
 
-- **Native USDC Gas**: Forget about needing ETH, MATIC, or any volatile token just to pay for transactions. Arc uses USDC natively for gas, meaning zero friction for users and creators.
+- **Native USDC Gas**: Forget about needing to hold a separate, volatile native token just to pay for transactions. Arc uses USDC natively for gas, meaning zero friction for users and creators.
 - **Predictable, Ultra-Low Costs**: Arc is specifically designed for stablecoin-native applications, targeting an average transaction fee of **~$0.01 USDC**.
 - **Gasless Streaming**: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.
 - **Batched Settlement**: The Circle Gateway aggregates thousands of these micro-signatures and settles the final balances efficiently on the Arc Network.
