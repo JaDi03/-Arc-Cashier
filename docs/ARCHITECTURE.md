@@ -47,19 +47,10 @@ Tessera is designed for **high-frequency, per-second micro-billing**. Implementi
 
 By leveraging the **Arc Network** combined with the **x402 protocol**:
 
-- **Seamless Onboarding**: Viewers deposit USDC from their preferred chain. CCTP securely routes the funds to the Gateway smart contract behind the scenes.
+- **Predictable, Ultra-Low Costs**: Arc is specifically designed for stablecoin-native applications, targeting an average transaction fee of **~$0.01 USDC**.
 - **Gasless Streaming**: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.
 - **Batched Settlement**: The Circle Gateway aggregates thousands of these micro-signatures and settles the final balances efficiently on the Arc Network.
-- **Economic Viability**: Arc's ultra-low latency and negligible transaction costs ensure that network fees never consume the actual value of the stream. On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc makes the math work.
-
-### 💸 Transparent Fee Structure
-
-Tessera minimizes fees, but it is not entirely free. Here is exactly where network and protocol fees apply:
-
-1. **Initial Bridge / CCTP (On-chain):** The viewer pays standard gas fees on their origin network (e.g., Base or Ethereum) to bridge and fund their ephemeral wallet.
-2. **Gateway Deposit (On-chain):** The initial deposit into the Circle Gateway smart contract requires a negligible Arc Network gas fee.
-3. **Streaming (Off-chain):** **FREE.** The per-second signatures incur absolutely zero gas fees. This is the core x402 advantage.
-4. **Settlement & Withdrawal:** When the session ends, Circle Gateway charges a **~0.5% protocol fee** on the final withdrawn amount.
+- **Economic Viability**: On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc's ~$0.01 fees make the math work, ensuring that network costs never consume the actual value of the stream.
 
 ### Environment Configuration
 - **Dynamic Routing:** `PUBLIC_URL` is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded `localhost` limitations.

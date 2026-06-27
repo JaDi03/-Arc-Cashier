@@ -190,6 +190,19 @@ For detailed installation, configuration, and deployment guides, see the [full d
 
 ---
 
+## Why Arc Network?
+
+Tessera is designed for **high-frequency, per-second micro-billing**. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. 
+
+By leveraging the **Arc Network** combined with the **x402 protocol**:
+
+- **Predictable, Ultra-Low Costs**: Arc is specifically designed for stablecoin-native applications, targeting an average transaction fee of **~$0.01 USDC**.
+- **Gasless Streaming**: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.
+- **Batched Settlement**: The Circle Gateway aggregates thousands of these micro-signatures and settles the final balances efficiently on the Arc Network.
+- **Economic Viability**: On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc's ~$0.01 fees make the math work, ensuring that network costs never consume the actual value of the stream.
+
+---
+
 ## Architecture Summary
 
 Tessera uses a **sidecar pattern** to add payments without platform modifications. The architecture separates concerns into three layers:
