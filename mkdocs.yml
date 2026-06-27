@@ -1,0 +1,56 @@
+site_name: Tessera
+site_description: A payment sidecar that adds per-second nanopayments to any self-hosted platform.
+repo_url: https://github.com/JaDi03/tessera
+repo_name: JaDi03/tessera
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  palette:
+    # Default to slate (dark mode)
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    # Light mode option
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - content.code.copy
+    - content.code.select
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Prerequisites: getting-started/prerequisites.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+    - First Run: getting-started/first-run.md
+  - Tutorials:
+    - Circle API Key: tutorials/circle-api-key.md
+    - Circle App ID: tutorials/circle-app-id.md
+
+extra_css:
+  - stylesheets/extra.css

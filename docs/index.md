@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="200" height="200">
+<img src="assets/logo_yellow.svg" alt="Tessera Logo" width="200" height="200">
 
 # Tessera
 
@@ -126,7 +126,7 @@ sequenceDiagram
 
 ## Demo
 
-![Demo](media/cashier.mp4)
+![Demo](../media/cashier.mp4)
 
 > **Live Demo (Viewer Flow)** — A viewer connects their wallet, deposits USDC, watches a stream for a few seconds, and ends the session. The paywall automatically allows access after funding and refunds unused balance on exit.
 
