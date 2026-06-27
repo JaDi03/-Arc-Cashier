@@ -24,7 +24,7 @@ Point Tessera at your self-hosted platform and your users start paying in USDC �
 
 Tessera is a **payment sidecar**: a separate process that runs alongside your platform, intercepts the HTML response, injects the payment overlay, and handles the entire [Circle Gateway](https://developers.circle.com/gateway) lifecycle (deposit → authorize → batch settle → withdraw) — without touching your platform's source code.
 
-The platform emits the same `USER_JOINED` / `USER_PARTED` events it has always emitted. Tessera does the rest.
+The platform emits its native events as it always has. Whether that is a `USER_JOINED` webhook for a live stream, a scrobble event for a music track, or a shared-link resolution for a photo gallery, Tessera intercepts these signals and does the rest.
 
 ---
 
@@ -130,12 +130,18 @@ sequenceDiagram
 
 ---
 
-## Supported Platforms
+## Supported Platforms & Use Cases
 
 | Platform | Integration Type | Status |
 |---|---|---|
 | [Owncast](https://owncast.online/) | Built-in connector | Live |
 | [PeerTube](https://joinpeertube.org/) | Plugin + connector | Live |
+
+Tessera is designed to plug into the open-source creator stack where communities already live. Because it relies on standard event streams, it can be easily extended to support:
+
+- **Music Servers (Navidrome, Koel)**: Per-listen royalties triggered by scrobble events.
+- **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
+- **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article micro-subscriptions.
 
 Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/BUILDING_A_CONNECTOR.md) to get started.
 
