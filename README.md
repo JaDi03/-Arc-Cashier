@@ -44,7 +44,7 @@ The result is a sustainability crisis: instances shut down when admins can no lo
 
 ## The Solution
 
-Tessera is a **payment sidecar** — a separate process that sits between your users and your platform, adding a per-second payment layer without modifying any platform code.
+Tessera is a **payment sidecar**: a separate process that sits between your users and your platform, adding a flexible micro-payment layer (be it per-second, per-action, or direct tips) without modifying any platform code.
 
 ```mermaid
 flowchart LR
@@ -75,7 +75,7 @@ flowchart LR
 **Key Design Principles:**
 
 - **Zero platform modification** — Tessera acts as a reverse proxy; your platform's code remains untouched
-- **Pay only for what you consume** — Per-second billing means a viewer who watches 30 seconds pays for 30 seconds, not a monthly subscription
+- **Pay only for what you consume (or tip)**: Whether it is per-second billing for a stream, a micro-fee for an article, or a voluntary tip for a creator, the audience pays directly for value without rigid monthly subscriptions
 - **Gas-free streaming** — Off-chain EIP-3009 signatures every second; batch settlement only happens when the session ends
 - **Cross-chain deposits** — Viewers can fund from any supported chain via Circle CCTP; settlement happens on Arc Testnet
 
