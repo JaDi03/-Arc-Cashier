@@ -196,4 +196,4 @@ The economic model is simple: if a viewer watches a 10-minute stream at $0.01/mi
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE) for details.
+Apache-2.0 — see [LICENSE](https://github.com/JaDi03/tessera/blob/main/LICENSE) for details.

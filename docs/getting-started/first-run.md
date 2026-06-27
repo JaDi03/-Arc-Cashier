@@ -35,7 +35,6 @@ Instead of immediately seeing your platform's content, you should now be greeted
 
 ## What's Next?
 
-Congratulations! Your platform is now monetized by the second. 
+Congratulations! Your platform is now monetized. 
 
-- To understand how the money flows in the background, read the [Architecture Guide](../architecture/payment-flow.md).
-- To learn how to withdraw your earnings, see the [Admin Guide](../admin-guide/withdrawals.md).
+- To understand how the money flows in the background and how settlements work, read the [Architecture Guide](../ARCHITECTURE.md).
