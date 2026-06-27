@@ -26,9 +26,13 @@ Open `.env` in your text editor. Ensure the following critical variables are set
 
 ## 2. Sidecar Configuration (`tessera.config.ts`)
 
-The sidecar's routing logic is defined in `src/tessera.config.ts`. This file tells Tessera which port to listen on and what platforms it should proxy traffic to.
+> [!TIP]
+> **Automatically Configured!**
+> If you ran the `npm run setup` wizard, this file was already configured for you with your chosen platform and upstream URL. You only need to edit this file if you want to change your pricing rate, port, or add more platforms manually.
 
-Open `src/tessera.config.ts`. It looks like this:
+The sidecar's routing logic and pricing are defined in `src/tessera.config.ts`. This file tells Tessera which port to listen on, what platforms to proxy traffic to, and how much to charge viewers.
+
+Open `src/tessera.config.ts` to review or modify your settings. It looks like this:
 
 ```typescript
 import type { CashierConfig } from './core/types';
