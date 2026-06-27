@@ -6,7 +6,7 @@ Tessera V1 is designed to be a robust, developer-friendly MVP. To ensure stabili
 
 ### Architecture: Universal Deposits (CCTP) & Arc Settlement
 
-While Tessera requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Polygon, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
+While Tessera requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,6 @@ flowchart LR
     subgraph Origins ["🌐 Origin Networks"]
         direction TB
         ETH["Ethereum"]:::origin
-        POL["Polygon"]:::origin
         BAS["Base"]:::origin
     end
 
@@ -34,7 +33,6 @@ flowchart LR
     class ArcNet arc
 
     ETH -->|"USDC"| CCTP
-    POL -->|"USDC"| CCTP
     BAS -->|"USDC"| CCTP
     
     CCTP --->|"Route & Fund"| Gateway

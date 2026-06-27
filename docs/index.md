@@ -188,7 +188,7 @@ Tessera transforms how self-hosted platforms sustain themselves:
 
 - **Instance administrators** recover infrastructure costs directly from consumption, without relying on ads or donations
 - **Creators** receive direct, per-second support from their audience, with revenue splits handled automatically
-- **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, no platform fees beyond the ~0.5% Gateway withdrawal fee
+- **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, no platform fees.
 
 The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. The creator receives ~$0.095. The platform admin covers bandwidth costs. Everyone wins.
 
