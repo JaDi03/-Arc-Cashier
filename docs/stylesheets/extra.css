@@ -1,0 +1,49 @@
+:root {
+  /* Bright cyan for buttons and links */
+  --md-primary-fg-color: #00A3FF;
+  --md-accent-fg-color: #FFC107;
+}
+
+/* Colors specifically for dark mode (slate) */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #00A3FF; /* Bright cyan for buttons and links */
+  --md-default-bg-color: #181c35;
+  --md-sys-color-surface: #181c35;
+  --md-admonition-bg-color: #1a1e35;
+  
+  /* Ensure text is clearly visible */
+  --md-default-fg-color: #ffffff;
+  --md-default-fg-color--light: rgba(255, 255, 255, 0.7);
+  --md-default-fg-color--lightest: rgba(255, 255, 255, 0.3);
+  
+  /* Force links to be bright cyan */
+  --md-typeset-a-color: #00A3FF;
+}
+
+/* Header bar (top) remains the darkest blue */
+[data-md-color-scheme="slate"] .md-header {
+  background-color: #101426 !important;
+}
+
+[data-md-color-scheme="slate"] .md-tabs {
+  background-color: #101426 !important;
+}
+
+/* Background remains the lighter dark blue */
+[data-md-color-scheme="slate"] body, 
+[data-md-color-scheme="slate"] .md-main {
+  background-color: #181c35 !important;
+}
+
+/* Hide the automatic site title text without breaking the flexbox layout */
+.md-header__title {
+  color: transparent !important;
+  user-select: none;
+}
+
+/* Enlarge the custom logo so the letters are readable (since it's a wide 3:1 image) */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2.2rem !important;
+  width: auto !important;
+}
