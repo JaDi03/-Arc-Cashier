@@ -8,7 +8,7 @@
 
 [![Build Passing](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/JaDi03/tessera/actions)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](https://github.com/JaDi03/tessera/releases)
-[![License](https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge)](https://github.com/JaDi03/tessera/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Circle x402](https://img.shields.io/badge/Circle_x402-2B3139?style=for-the-badge&logo=web3dotjs&logoColor=white)](https://developers.circle.com/gateway/nanopayments)
