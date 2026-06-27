@@ -16,13 +16,13 @@ Open `.env` in your text editor. Ensure the following critical variables are set
 | :--- | :--- |
 | `CIRCLE_API_KEY` | Your backend key from the Circle Console. |
 | `CIRCLE_APP_ID` | Your frontend UI App ID from the Circle Console. |
-| `SELLER_ADDRESS` | The EVM-compatible address where your earnings will be sent. |
-| `SELLER_PRIVATE_KEY` | The private key to `SELLER_ADDRESS`. This is required to process withdrawals automatically via the `/seller/withdraw` endpoint. |
+| `SELLER_ADDRESS` | The default EVM address for earnings. **Note:** For multi-tenant platforms like PeerTube, this is ignored as the creator configures their wallet directly in the platform's UI. This acts as a fallback for single-tenant setups. |
+| `SELLER_PRIVATE_KEY` | A "Hot Wallet" private key used strictly to pay the gas fees for CCTP cross-chain deposits. If omitted, CCTP deposits will fail, but native payments still work. |
 
 > [!CAUTION]
 > **Security Warning**
 > 
-> Never commit your `.env` file to version control. Your `SELLER_PRIVATE_KEY` must remain strictly private. If anyone gains access to this key, they control your funds.
+> Never commit your `.env` file to version control. The `SELLER_PRIVATE_KEY` should only be a hot wallet for gas fees, do **not** use the private key of your main cold storage wallet.
 
 ## 2. Sidecar Configuration (`tessera.config.ts`)
 
