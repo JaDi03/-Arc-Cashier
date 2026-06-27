@@ -17,3 +17,6 @@ media/
 
 # Configuration state
 creators.json
+
+# MkDocs build output
+site/
