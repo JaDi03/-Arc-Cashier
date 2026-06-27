@@ -46,18 +46,30 @@ The result is a sustainability crisis: instances shut down when admins can no lo
 
 Tessera is a **payment sidecar** — a separate process that sits between your users and your platform, adding a per-second payment layer without modifying any platform code.
 
-```
-┌─────────────┐      ┌──────────────┐      ┌─────────────┐
-│   Viewer    │─────▶│   Tessera    │─────▶│  Platform   │
-│  (Browser)  │◀─────│  (Sidecar)   │◀─────│ (Owncast/   │
-└─────────────┘      └──────────────┘      │  PeerTube/  │
-       │                    │               │   etc.)     │
-       │                    ▼               └─────────────┘
-       │           ┌──────────────┐
-       │           │ Circle x402  │
-       └──────────▶│   Gateway    │
-                   │  (Settle)    │
-                   └──────────────┘
+```mermaid
+flowchart LR
+    subgraph Client
+        V((Viewer / Fan))
+    end
+
+    subgraph Server
+        T{Tessera Sidecar}
+        P[Self-Hosted Platform]
+    end
+
+    subgraph Financial Layer
+        C[Circle x402 Gateway]
+        W((Creator's Wallet))
+    end
+
+    V -- "1. Consumes Content" --> P
+    P -- "2. Emits Native Events" --> T
+    V -. "3. Approves Micropayments" .-> T
+    T -- "4. Batches & Settles" --> C
+    C -- "5. Final Payout (USDC)" --> W
+
+    style T fill:#ffb300,stroke:#333,stroke-width:2px,color:#000
+    style W fill:#6C63FF,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
 **Key Design Principles:**
