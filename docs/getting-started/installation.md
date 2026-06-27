@@ -19,15 +19,23 @@ Install the required NPM packages. We recommend using `npm`, though `yarn` or `p
 npm install
 ```
 
-## 3. Fast Setup
+## 3. Interactive Setup
 
-Tessera includes a fast setup script that will prepare your environment variables file. Run the setup script:
+Tessera includes an interactive setup wizard that configures the sidecar for your specific platform. Run the setup script:
 
 ```bash
 npm run setup
 ```
 
-This script will automatically copy the `.env.example` file and create a new `.env` file for you, ready to be filled with your private keys and configuration details. You can proceed to the [Configuration guide](configuration.md) to learn which keys you need to add.
+![Tessera Setup Wizard](../assets/run_setup.png)
+
+This wizard will automatically:
+1. Ask which platform you want to monetize (e.g., PeerTube, Owncast).
+2. Ask for the local upstream URL where your platform is running.
+3. Configure `src/tessera.config.ts` with those details.
+4. Generate a secure `.env` file (including webhook secrets if needed).
+
+You can then proceed to the [Configuration guide](configuration.md) to add your Circle API keys.
 
 ## 4. Build the Project
 
