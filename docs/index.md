@@ -153,29 +153,6 @@ Want to add your platform? Tessera connectors are ~100 lines of code. See [Build
 
 ---
 
-## Quick Start
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/JaDi03/tessera.git
-cd tessera
-
-# 2. Install dependencies
-npm install
-
-# 3. Run the interactive setup wizard
-npm run setup
-
-# 4. Add your credentials to .env, then start
-npm run dev
-```
-
-Tessera starts on `http://localhost:3000` and proxies all traffic through the payment layer to your upstream platform.
-
-For detailed installation, configuration, and deployment guides, see the [full documentation](https://github.com/JaDi03/tessera/tree/main/docs).
-
----
-
 ## Tech Stack
 
 | Technology | Purpose | Why It Matters |
@@ -214,14 +191,6 @@ Tessera transforms how self-hosted platforms sustain themselves:
 - **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, no platform fees beyond the ~0.5% Gateway withdrawal fee
 
 The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. The creator receives ~$0.095. The platform admin covers bandwidth costs. Everyone wins.
-
----
-
-## Documentation
-
-- [Architecture & Fees](https://github.com/JaDi03/tessera/blob/main/docs/ARCHITECTURE.md) — Detailed technical architecture, fee structure, and settlement flow
-- [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/BUILDING_A_CONNECTOR.md) — Add support for a new platform in ~100 lines of code
-- [Contributing Guide](CONTRIBUTING.md) — Development setup, code standards, and submission process
 
 ---
 
