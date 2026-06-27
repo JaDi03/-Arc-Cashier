@@ -1,8 +1,6 @@
-<div align="center">
+<div align="center" markdown="1">
 
-<img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="200" height="200">
-
-# Tessera
+<img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="400">
 
 **Payment Sidecar for Self-Hosted Platforms**
 
