@@ -1,8 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
 import { sessionService } from '../../core/session';
-import { creatorService } from '../../core/creators';
-import { isValidEvmAddress } from '../../core/gateway-creator';
+import { creatorService } from './creators';
+import { isValidEvmAddress } from './gateway-creator';
 
 const router = express.Router();
 
@@ -124,7 +124,31 @@ router.post('/webhook', (req, res) => {
 
     // 3. Process Events (Following BUILDING_A_CONNECTOR.md)
     if (event === 'viewer_joined') {
-        sessionService.recordJoin(userId, videoId, activeRate, payoutAddress);
+        // --- Platform Fee Split (PeerTube-specific) ---
+        // PeerTube has a distinct admin (instance host) and content creator.
+        // The admin charges a platformFee (e.g. 10%) for instance hosting costs.
+        //
+        // Simple approach: the connector decides the effective payoutAddress
+        // probabilistically here, at join time. The session stores the chosen
+        // address so the plugin passes the correct x-seller-address to /stream-access.
+        // The core never sees platformFee — it always pays 100% to x-seller-address.
+        let effectivePayoutAddress = payoutAddress;
+        if (payoutAddress) {
+            const profile = creatorService.getCreatorByAddress(payoutAddress);
+            const platformFee = profile?.platformFee ?? 0.10;
+            const platformAdminAddress = process.env.SELLER_ADDRESS;
+
+            if (platformAdminAddress && Math.random() < platformFee) {
+                // This tick: route to platform admin (instance hosting fee)
+                effectivePayoutAddress = platformAdminAddress;
+                console.log(`[PeerTube] 🎲 Fee split: routing to platform admin (fee: ${platformFee * 100}%)`);
+            } else {
+                // This tick: route to creator
+                console.log(`[PeerTube] 🎲 Fee split: routing to creator ${payoutAddress}`);
+            }
+        }
+
+        sessionService.recordJoin(userId, videoId, activeRate, effectivePayoutAddress);
     } else if (event === 'viewer_left') {
         sessionService.recordPartAndSettle(userId).catch(console.error);
     } else {

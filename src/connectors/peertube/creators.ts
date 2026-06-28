@@ -4,7 +4,7 @@ import * as path from 'path';
 export interface CreatorProfile {
     creatorId: string;
     payoutAddress: string;
-    platformFee: number; // e.g., 0.10 for 10%
+    platformFee: number; // e.g., 0.10 for 10% of each payment routed to the platform admin
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -16,9 +16,14 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 /**
- * Creator Service
- * Manages creator profiles and their respective platform fee rates.
- * In a real application, this would map to an SQL database containing user accounts.
+ * Creator Service (PeerTube connector)
+ *
+ * Manages per-creator profiles including their payout address and the
+ * platform fee rate configured by the PeerTube instance admin.
+ *
+ * platformFee is the fraction of each payment routed to the admin wallet
+ * (SELLER_ADDRESS) to cover instance hosting costs. This concept only exists
+ * in PeerTube — in Owncast the operator IS the creator, so no split is needed.
  */
 export class CreatorService {
     private creators = new Map<string, CreatorProfile>();
@@ -35,9 +40,9 @@ export class CreatorService {
                 for (const [key, value] of Object.entries(parsed)) {
                     this.creators.set(key, value as CreatorProfile);
                 }
-                console.log(`[Creators] 🧑‍🎨 Loaded ${this.creators.size} creator profiles.`);
+                console.log(`[PeerTube] 🧑‍🎨 Loaded ${this.creators.size} creator profiles.`);
             } catch (e) {
-                console.error('[Creators] Error loading creators DB:', e);
+                console.error('[PeerTube] Error loading creators DB:', e);
             }
         } else {
             // Seed a default mock creator for testing
@@ -50,7 +55,7 @@ export class CreatorService {
             const obj = Object.fromEntries(this.creators);
             fs.writeFileSync(DB_PATH, JSON.stringify(obj, null, 2));
         } catch (e) {
-            console.error('[Creators] Error saving creators DB:', e);
+            console.error('[PeerTube] Error saving creators DB:', e);
         }
     }
 
@@ -58,7 +63,7 @@ export class CreatorService {
         this.creators.set(creatorId, {
             creatorId,
             payoutAddress,
-            platformFee
+            platformFee,
         });
         this.saveDb();
     }

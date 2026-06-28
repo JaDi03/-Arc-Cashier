@@ -3,22 +3,10 @@ import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
-import { creatorService } from './creators';
-import {
-    buildGatewayMintTransaction,
-    computeCreatorWithdrawAmount,
-    createCreatorBurnIntent,
-    getCreatorGatewayBalance,
-    isValidEvmAddress,
-    submitCreatorWithdraw,
-    BURN_INTENT_EIP712_DOMAIN,
-    BURN_INTENT_EIP712_TYPES,
-    CREATOR_GATEWAY_FEE_BUFFER,
-    type CreatorBurnIntent,
-} from './gateway-creator';
+import { GATEWAY_FEE_BUFFER } from './gateway-utils';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, pad, formatUnits, parseUnits } from 'viem';
+import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, formatUnits, parseUnits } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
 
@@ -50,38 +38,31 @@ const sessionLimiter = rateLimit({
 
 const coreRouter = Router();
 
-// SELLER_ADDRESS acts as the Admin (Platform) wallet where fees are directed
-const SELLER_ADDRESS = process.env.SELLER_ADDRESS || '0x0000000000000000000000000000000000000001';
 const PORT = process.env.PORT || 3000;
 
-// This endpoint uses dynamic pricing and time-sliced routing for trustless revenue sharing.
+// Routes 100% of the payment to the address provided via x-seller-address.
+// Platform-specific routing logic (e.g. platform fee splits) is handled by the
+// connector layer BEFORE calling this endpoint. The core is platform-agnostic.
 coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunction) => {
     // 1. Identify the user
     const userId = req.headers['x-user-id'] as string;
-    
-    // 2. Resolve the requested Creator Address
-    const creatorAddress = req.headers['x-seller-address'] as string || SELLER_ADDRESS;
-    
-    // 3. Apply Trustless Time-Sliced Routing (Probabilistic Revenue Share)
-    const creator = creatorService.getCreatorByAddress(creatorAddress);
-    const platformFee = creator ? creator.platformFee : 0.10; // Default 10%
-    
-    let targetAddress = creatorAddress;
-    if (Math.random() < platformFee) {
-        targetAddress = SELLER_ADDRESS; // Route to Admin
-        console.log(`[x402] 🎲 Time-Slice: Routed to Platform Admin (Fee: ${platformFee*100}%)`);
-    } else {
-        // Route to Creator
+
+    // 2. The connector or client provides the destination address.
+    //    No routing decisions are made here — the core trusts the header.
+    const sellerAddress = req.headers['x-seller-address'] as string;
+
+    if (!sellerAddress) {
+        return res.status(400).json({ error: 'Missing x-seller-address header' });
     }
 
-    // 4. Create dynamic middleware for this specific request and recipient
+    // 3. Create dynamic middleware for this specific request and recipient
     const dynamicGateway = createGatewayMiddleware({
-        sellerAddress: targetAddress,
+        sellerAddress,
         facilitatorUrl: 'https://gateway-api-testnet.circle.com',
         networks: ['eip155:5042002'], // Arc Testnet
     });
-    
-    // 5. Resolve the dynamic rate
+
+    // 4. Resolve the dynamic rate from the active session
     let ratePerSecond = 0.0001; // default fallback
     if (userId) {
         const userRate = sessionService.getRateForUser(userId);
@@ -94,7 +75,7 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
 
     const priceString = `$${ratePerSecond.toFixed(4)}`;
 
-    // 6. Execute middleware
+    // 5. Execute middleware
     const priceMiddleware = dynamicGateway.require(priceString);
     priceMiddleware(req as any, res as any, next);
 }, (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
@@ -415,7 +396,7 @@ coreRouter.post('/circle/cctp-finalize', sessionLimiter, async (req: Request, re
 
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
 coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId, privateKey, returnAddress } = req.body;
+    const { userId, privateKey, returnAddress, sellerAddress } = req.body;
 
     if (!userId || !privateKey || !returnAddress) {
         console.error(`[Core] ❌ /register-session missing fields. userId: ${userId}, privateKey: ${privateKey}, returnAddress: ${returnAddress}`);
@@ -511,11 +492,16 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         }
 
         // 4. Pay for stream access via x402
+        //    sellerAddress is provided by the connector/plugin — the core does not assume who the seller is.
         console.log(`[Core] 🔓 Paying for stream access via x402...`);
         const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+        const resolvedSeller = sellerAddress || process.env.SELLER_ADDRESS || '';
+        if (!resolvedSeller) {
+            return res.status(400).json({ error: 'Missing sellerAddress in request body and SELLER_ADDRESS env var is not set.' });
+        }
         const payResult = await gatewayClient.pay<{ access: boolean }>(
             `${sidecarUrl}/api/core/stream-access`,
-            { headers: { 'x-user-id': userId } }
+            { headers: { 'x-user-id': userId, 'x-seller-address': resolvedSeller } }
         );
         console.log(`[Core] ✅ Stream access granted!`);
         console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
@@ -590,12 +576,12 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
 
         // Reserve a flat gas buffer (~0.005 USDC) for the Arc network withdrawal tx.
         // We do NOT take any percentage — the Gateway charges 0% commission.
-        if (availableMicro <= CREATOR_GATEWAY_FEE_BUFFER) {
+        if (availableMicro <= GATEWAY_FEE_BUFFER) {
             walletService.clearSession(userId);
             return res.json({ status: 'cashed_out', amount: '0', message: 'Balance too low to withdraw.' });
         }
 
-        const withdrawAmount = formatUnits(availableMicro - CREATOR_GATEWAY_FEE_BUFFER, 6);
+        const withdrawAmount = formatUnits(availableMicro - GATEWAY_FEE_BUFFER, 6);
         console.log(`[Core] 🧹 Cashing out ${withdrawAmount} USDC to ${sessionRecord.returnAddress}...`);
 
         const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
@@ -700,220 +686,9 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
     }
 });
 
-// --- CREATOR SIDE: Per-creator Gateway balance & MetaMask withdraw ---
-coreRouter.get('/creator/balance', async (req: Request, res: Response) => {
-    const address = (req.query.address as string || '').trim();
-    if (!address || !isValidEvmAddress(address)) {
-        return res.status(400).json({ error: 'Missing or invalid address' });
-    }
-
-    try {
-        const balances = await getCreatorGatewayBalance(address as `0x${string}`);
-        return res.json({
-            status: 'success',
-            address,
-            gatewayAvailable: balances.formattedAvailable,
-            gatewayWithdrawable: balances.formattedWithdrawable,
-            gatewayTotal: balances.formattedTotal,
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] ❌ Creator balance fetch failed for ${address}:`, err.message);
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-coreRouter.post('/creator/prepare-withdraw', async (req: Request, res: Response) => {
-    const address = (req.body?.address as string || '').trim();
-    if (!address || !isValidEvmAddress(address)) {
-        return res.status(400).json({ error: 'Missing or invalid address' });
-    }
-
-    try {
-        const balances = await getCreatorGatewayBalance(address as `0x${string}`);
-        const withdrawMicro = computeCreatorWithdrawAmount(balances.availableMicro);
-
-        if (withdrawMicro <= parseUnits('0.001', 6)) {
-            return res.json({
-                status: 'no_funds',
-                gatewayAvailable: balances.formattedAvailable,
-                gatewayWithdrawable: balances.formattedWithdrawable,
-                message: 'Balance too low to withdraw.',
-            });
-        }
-
-        const withdrawAmount = formatUnits(withdrawMicro, 6);
-        const { burnIntent, formattedAmount } = createCreatorBurnIntent(
-            address as `0x${string}`,
-            withdrawAmount,
-        );
-
-        return res.json({
-            status: 'ready',
-            address,
-            amount: formattedAmount,
-            burnIntent: JSON.parse(JSON.stringify(burnIntent, (_k, v) =>
-                typeof v === 'bigint' ? v.toString() : v
-            )),
-            typedData: {
-                domain: BURN_INTENT_EIP712_DOMAIN,
-                types: BURN_INTENT_EIP712_TYPES,
-                primaryType: 'BurnIntent',
-                message: JSON.parse(JSON.stringify(burnIntent, (_k, v) =>
-                    typeof v === 'bigint' ? v.toString() : v
-                )),
-            },
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] ❌ Creator prepare-withdraw failed for ${address}:`, err.message);
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-coreRouter.post('/creator/complete-withdraw', async (req: Request, res: Response) => {
-    const address = (req.body?.address as string || '').trim();
-    const signature = req.body?.signature as string;
-    const burnIntent = req.body?.burnIntent as CreatorBurnIntent;
-
-    if (!address || !isValidEvmAddress(address)) {
-        return res.status(400).json({ error: 'Missing or invalid address' });
-    }
-    if (!signature || !burnIntent?.spec) {
-        return res.status(400).json({ error: 'Missing burnIntent or signature' });
-    }
-
-    const normalizeHex = (value: string) => value.toLowerCase();
-    const depositor = normalizeHex(String(burnIntent.spec.sourceDepositor));
-    const signer = normalizeHex(String(burnIntent.spec.sourceSigner));
-    const expected = normalizeHex(pad(address as `0x${string}`, { size: 32 }));
-
-    if (depositor !== expected || signer !== expected) {
-        return res.status(400).json({ error: 'Burn intent does not match creator address' });
-    }
-
-    try {
-        const normalizedIntent: CreatorBurnIntent = {
-            maxBlockHeight: BigInt(burnIntent.maxBlockHeight),
-            maxFee: BigInt(burnIntent.maxFee),
-            spec: {
-                ...burnIntent.spec,
-                value: BigInt(burnIntent.spec.value),
-            },
-        };
-
-        const attestationResult = await submitCreatorWithdraw(normalizedIntent, signature as `0x${string}`);
-
-        const txRequest = buildGatewayMintTransaction(
-            attestationResult.attestation,
-            attestationResult.operatorSignature,
-            address as `0x${string}`
-        );
-
-        return res.json({
-            status: 'ready_to_mint',
-            transferId: attestationResult.transferId,
-            txRequest,
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] ❌ Creator complete-withdraw failed for ${address}:`, err.message);
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-// --- SELLER SIDE: Admin Routes ---
-coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
-    try {
-        const sellerKey = process.env.SELLER_PRIVATE_KEY;
-        if (!sellerKey) return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
-
-        const sellerClient = new GatewayClient({
-            chain: 'arcTestnet',
-            privateKey: sellerKey as `0x${string}`,
-        });
-
-        const balances = await sellerClient.getBalances();
-        return res.json({ 
-            status: 'success', 
-            gatewayBalance: balances.gateway.formattedAvailable,
-            gatewayWithdrawable: balances.gateway.formattedAvailable,
-            walletBalance: balances.wallet.formatted
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-coreRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
-    // Protect with webhook secret so only the PeerTube plugin can call this
-    const secret = process.env.PEERTUBE_WEBHOOK_SECRET;
-    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    try {
-        const sellerKey = process.env.SELLER_PRIVATE_KEY;
-        if (!sellerKey) {
-            return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
-        }
-
-        const sellerClient = new GatewayClient({
-            chain: 'arcTestnet',
-            privateKey: sellerKey as `0x${string}`,
-        });
-
-        const balances = await sellerClient.getBalances();
-        const withdrawable = Number(balances.gateway.formattedAvailable);
-        
-        if (withdrawable <= 0) {
-            return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
-        }
-
-        // Withdraw everything
-        const withdrawResult = await sellerClient.withdraw(balances.gateway.formattedAvailable);
-        
-        return res.json({
-            status: 'success',
-            withdrawnAmount: withdrawResult.formattedAmount,
-            txHash: withdrawResult.mintTxHash
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] ❌ Seller withdrawal failed:`, err.message);
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-// --- Admin: Get seller Arc Gateway balance ---
-coreRouter.get('/seller/balance', async (req: Request, res: Response) => {
-    const secret = process.env.PEERTUBE_WEBHOOK_SECRET;
-    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    try {
-        const sellerKey = process.env.SELLER_PRIVATE_KEY;
-        if (!sellerKey) {
-            return res.status(500).json({ error: 'SELLER_PRIVATE_KEY not configured.' });
-        }
-
-        const sellerClient = new GatewayClient({
-            chain: 'arcTestnet',
-            privateKey: sellerKey as `0x${string}`,
-        });
-
-        const balances = await sellerClient.getBalances();
-        return res.json({
-            available: balances.gateway.formattedAvailable,
-            total: balances.gateway.formattedTotal,
-        });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        return res.status(500).json({ error: err.message });
-    }
-});
+// NOTE: Creator withdrawal routes (/creator/*) and seller admin routes (/seller/*)
+// have been moved to the PeerTube connector: src/connectors/peertube/creator-routes.ts
+// They are served under /api/connectors/peertube/creator/* and /api/connectors/peertube/seller/*
 
 // --- Tip: Off-chain payment from viewer's Arc Gateway to creator (100% — no platform split) ---
 coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
@@ -929,7 +704,6 @@ coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'No active session found for this user.' });
         }
 
-        const PORT = process.env.PORT || 3000;
         const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
         // Pay via the /tip-access endpoint — routes 100% to creator, no platform split
@@ -950,9 +724,15 @@ coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
     }
 });
 
-// --- Tip-Access: x402 gate that routes 100% to creator (no time-slice split) ---
+
+
+
+// --- Tip-Access: x402 gate that routes 100% to the address in x-seller-address ---
 coreRouter.get('/tip-access', (req: Request, res: Response, next: NextFunction) => {
-    const creatorAddress = req.headers['x-seller-address'] as string || SELLER_ADDRESS;
+    const creatorAddress = req.headers['x-seller-address'] as string;
+    if (!creatorAddress) {
+        return res.status(400).json({ error: 'Missing x-seller-address header' });
+    }
     const tipAmount = req.headers['x-tip-amount'] as string || '0.10';
 
     const tipGateway = createGatewayMiddleware({

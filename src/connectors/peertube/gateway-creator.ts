@@ -10,6 +10,20 @@ import {
     type Hex,
 } from 'viem';
 
+/**
+ * PeerTube Creator Gateway Module
+ *
+ * Handles the Circle Gateway withdrawal flow for individual creators
+ * on a PeerTube instance. Uses BurnIntent + EIP-712 so the creator
+ * signs with their own MetaMask wallet — the sidecar never holds
+ * creator private keys.
+ *
+ * This module is PeerTube-specific: it implements the multi-creator
+ * model where each content creator has their own Gateway balance.
+ * In Owncast, the admin IS the creator and uses a different withdrawal
+ * path — this module does not apply there.
+ */
+
 const GATEWAY_API_TESTNET = 'https://gateway-api-testnet.circle.com/v1';
 const ARC_DOMAIN = 26;
 const ARC_CHAIN_ID = 5042002;
