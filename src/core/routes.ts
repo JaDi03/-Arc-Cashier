@@ -13,6 +13,7 @@ import {
     submitCreatorWithdraw,
     BURN_INTENT_EIP712_DOMAIN,
     BURN_INTENT_EIP712_TYPES,
+    CREATOR_GATEWAY_FEE_BUFFER,
     type CreatorBurnIntent,
 } from './gateway-creator';
 import crypto from 'crypto';
@@ -585,14 +586,16 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
         });
 
         const balances = await gatewayClient.getBalances();
-        const withdrawable = Number(balances.gateway.formattedAvailable);
+        const availableMicro = parseUnits(balances.gateway.formattedAvailable, 6);
 
-        if (withdrawable <= 0.001) {
+        // Reserve a flat gas buffer (~0.005 USDC) for the Arc network withdrawal tx.
+        // We do NOT take any percentage — the Gateway charges 0% commission.
+        if (availableMicro <= CREATOR_GATEWAY_FEE_BUFFER) {
             walletService.clearSession(userId);
             return res.json({ status: 'cashed_out', amount: '0', message: 'Balance too low to withdraw.' });
         }
 
-        const withdrawAmount = (withdrawable * 0.99).toFixed(6); // Subtract 1% for gateway withdrawal fee estimate
+        const withdrawAmount = formatUnits(availableMicro - CREATOR_GATEWAY_FEE_BUFFER, 6);
         console.log(`[Core] 🧹 Cashing out ${withdrawAmount} USDC to ${sessionRecord.returnAddress}...`);
 
         const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
