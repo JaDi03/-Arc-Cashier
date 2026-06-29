@@ -110,7 +110,20 @@ export class SessionService {
     }
     /** Returns the GatewayClient for a user if they have an active session, or null. */
     public getGatewayClientForUser(userId: string): GatewayClient | null {
-        return this.gatewayClients.get(userId) || null;
+        let client = this.gatewayClients.get(userId) || null;
+        if (!client) {
+            try {
+                const sessionRecord = walletService.getSessionRecord(userId);
+                client = new GatewayClient({
+                    privateKey: sessionRecord.privateKey as `0x${string}`,
+                    chain: 'arcTestnet',
+                });
+                this.gatewayClients.set(userId, client);
+            } catch (_) {
+                // Ignore and return null if no session record exists
+            }
+        }
+        return client;
     }
 }
 
