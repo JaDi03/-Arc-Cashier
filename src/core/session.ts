@@ -10,6 +10,7 @@ export class SessionService {
     private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
+    private isProcessingLoop = false;
     private readonly PAYMENT_INTERVAL_MS = 1000; // 1 second
 
     constructor() {
@@ -20,42 +21,57 @@ export class SessionService {
         if (this.paymentInterval) return;
         this.paymentInterval = setInterval(async () => {
             if (this.activeSessions.size === 0) return;
-            
-            console.log(`[Session] ⏱️ Running continuous payment loop for ${this.activeSessions.size} active sessions...`);
-            for (const [userId] of this.activeSessions) {
-                try {
-                    let gatewayClient = this.gatewayClients.get(userId);
-                    if (!gatewayClient) {
-                        const sessionRecord = walletService.getSessionRecord(userId);
-                        gatewayClient = new GatewayClient({
-                            privateKey: sessionRecord.privateKey as `0x${string}`,
-                            chain: 'arcTestnet',
-                        });
-                        this.gatewayClients.set(userId, gatewayClient);
-                    }
-                    const sessionData = this.activeSessions.get(userId);
-                    const headers: Record<string, string> = { 'x-user-id': userId };
-                    if (sessionData?.creatorAddress) {
-                        headers['x-seller-address'] = sessionData.creatorAddress;
-                    }
-                    if (sessionData?.videoId) {
-                        headers['x-video-id'] = sessionData.videoId;
-                    }
+            if (this.isProcessingLoop) {
+                console.warn('[Session] - Previous payment loop execution is still running. Skipping this tick to prevent overlap.');
+                return;
+            }
 
-                    const PORT = process.env.PORT || 3000;
-                    const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-                    const payResult = await gatewayClient.pay<{ access: boolean }>(
-                        `${sidecarUrl}/api/core/stream-access`,
-                        { headers }
-                    );
-                    console.log(`[Session] ✅ Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
-                } catch (error) {
-                    const err = error instanceof Error ? error : new Error(String(error));
-                    // Ignore errors silently for missing session records as they might have just disconnected
-                    if (!err.message.includes('No session key found')) {
-                        console.error(`[Session] ❌ Periodic payment failed for ${userId}: ${err.message}`);
-                    }
+            this.isProcessingLoop = true;
+            console.log(`[Session] - Running continuous payment loop for ${this.activeSessions.size} active sessions...`);
+            
+            try {
+                const userIds = Array.from(this.activeSessions.keys());
+                const chunkSize = 10;
+                for (let i = 0; i < userIds.length; i += chunkSize) {
+                    const chunk = userIds.slice(i, i + chunkSize);
+                    await Promise.allSettled(chunk.map(async (userId) => {
+                        try {
+                            let gatewayClient = this.gatewayClients.get(userId);
+                            if (!gatewayClient) {
+                                const sessionRecord = walletService.getSessionRecord(userId);
+                                gatewayClient = new GatewayClient({
+                                    privateKey: sessionRecord.privateKey as `0x${string}`,
+                                    chain: 'arcTestnet',
+                                });
+                                this.gatewayClients.set(userId, gatewayClient);
+                            }
+                            const sessionData = this.activeSessions.get(userId);
+                            const headers: Record<string, string> = { 'x-user-id': userId };
+                            if (sessionData?.creatorAddress) {
+                                headers['x-seller-address'] = sessionData.creatorAddress;
+                            }
+                            if (sessionData?.videoId) {
+                                headers['x-video-id'] = sessionData.videoId;
+                            }
+
+                            const PORT = process.env.PORT || 3000;
+                            const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+                            const payResult = await gatewayClient.pay<{ access: boolean }>(
+                                `${sidecarUrl}/api/core/stream-access`,
+                                { headers }
+                            );
+                            console.log(`[Session] - Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
+                        } catch (error) {
+                            const err = error instanceof Error ? error : new Error(String(error));
+                            // Ignore errors silently for missing session records as they might have just disconnected
+                            if (!err.message.includes('No session key found')) {
+                                console.error(`[Session] - Periodic payment failed for ${userId}: ${err.message}`);
+                            }
+                        }
+                    }));
                 }
+            } finally {
+                this.isProcessingLoop = false;
             }
         }, this.PAYMENT_INTERVAL_MS);
     }
