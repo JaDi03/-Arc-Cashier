@@ -1097,7 +1097,7 @@ async function handleTopUp(depositAmount) {
         const topupRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
+            body: JSON.stringify({ userId: viewerState.userId, expectFunds: true }),
         });
 
         if (!topupRes.ok) {

@@ -649,7 +649,7 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
 
 // --- CLIENT SIDE: Top-Up Session ---
 coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId } = req.body;
+    const { userId, expectFunds } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -662,9 +662,21 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
             chain: 'arcTestnet',
         });
         
-        const balances = await gatewayClient.getBalances();
-        const walletBalance = Number(balances.wallet.formatted);
+        let balances = await gatewayClient.getBalances();
+        let walletBalance = Number(balances.wallet.formatted);
         const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.01);
+
+        if (expectFunds && walletBalance <= RETAINED_GAS_AMOUNT) {
+            console.log(`[Core] ⏳ Waiting for top-up funds to arrive in ephemeral wallet...`);
+            let attempts = 0;
+            while (attempts < 15 && walletBalance <= RETAINED_GAS_AMOUNT) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                balances = await gatewayClient.getBalances();
+                walletBalance = Number(balances.wallet.formatted);
+                attempts++;
+            }
+            console.log(`[Core] 💰 Ephemeral wallet balance after wait: ${walletBalance} USDC`);
+        }
 
         // How much to deposit to gateway? Everything minus gas buffer
         const depositAmount = Math.max(0, walletBalance - RETAINED_GAS_AMOUNT);
