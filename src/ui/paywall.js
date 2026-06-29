@@ -569,6 +569,11 @@ async function handleUnlock() {
             if (sm) sm.classList.remove('arc-hidden');
             startSessionTimer();
         } else {
+            // Unhide the wallet widget for the tipping user so they can cash out
+            const sm = document.getElementById('arc-session-manager');
+            if (sm) sm.classList.remove('arc-hidden');
+            startSessionTimer();
+
             // Automatically trigger the tip button click
             const tipBtn = document.getElementById('arc-tip-btn');
             if (tipBtn) {
@@ -809,13 +814,13 @@ function renderSessionManager() {
     sm.className = 'arc-hidden';
     sm.innerHTML = `
         <div id="arc-sm-header">
-            <h3><span class="arc-pulse-dot"></span> Active Session</h3>
+            <h3><span class="arc-pulse-dot"></span> <span id="arc-sm-title">Active Session</span></h3>
             <button id="arc-sm-minimize-btn" title="Minimize">−</button>
         </div>
         <div id="arc-sm-content">
             <div class="arc-sm-stats">
-                <div><span>Rate:</span>       <span id="arc-sm-rate">$0.0001 USDC / sec</span></div>
-                <div><span>Video cost:</span> <span id="arc-sm-video-cost">$0.0000 USDC</span></div>
+                <div id="arc-sm-rate-row"><span>Rate:</span>       <span id="arc-sm-rate">$0.0001 USDC / sec</span></div>
+                <div id="arc-sm-cost-row"><span>Video cost:</span> <span id="arc-sm-video-cost">$0.0000 USDC</span></div>
                 <div><span>Balance:</span>    <span id="arc-sm-balance">— USDC</span></div>
             </div>
             <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.2);border:1px solid orange;padding:10px;margin-top:10px;margin-bottom:10px;border-radius:4px;text-align:center;">
@@ -835,10 +840,28 @@ function renderSessionManager() {
                 <button id="arc-sm-leave-btn" class="arc-btn" style="flex:1;background:#4a5568;font-size:11px;padding:8px 4px;">Just Leave</button>
                 <button id="arc-sm-end-btn" class="arc-btn arc-btn-danger" style="flex:2;font-size:11px;padding:8px 4px;">Cash Out &amp; Exit</button>
             </div>
-            <p style="margin:6px 0 0;font-size:10px;color:#718096;text-align:center;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
+            <p id="arc-sm-footer-text" style="margin:6px 0 0;font-size:10px;color:#718096;text-align:center;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
         </div>
     `;
     document.body.appendChild(sm);
+
+    // Apply isTipMode design adaptations immediately if active
+    if (isTipMode) {
+        const titleText = document.getElementById('arc-sm-title');
+        if (titleText) titleText.textContent = 'Tessera Wallet';
+
+        const rateRow = document.getElementById('arc-sm-rate-row');
+        if (rateRow) rateRow.style.display = 'none';
+
+        const costRow = document.getElementById('arc-sm-cost-row');
+        if (costRow) costRow.style.display = 'none';
+
+        const leaveBtn = document.getElementById('arc-sm-leave-btn');
+        if (leaveBtn) leaveBtn.style.display = 'none';
+
+        const footerText = document.getElementById('arc-sm-footer-text');
+        if (footerText) footerText.textContent = 'Cash Out withdraws funds to your wallet.';
+    }
 
     // Draggable
     let isDragging = false, startX, startY, initialX, initialY;
@@ -976,7 +999,7 @@ function startSessionTimer() {
 
     window.sessionTimer = setInterval(async () => {
         tickCount++;
-        const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
+        const shouldTick = !isTipMode && !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
         if (shouldTick) {
             secondsThisVideo++;
             const videoCostEl = document.getElementById('arc-sm-video-cost');
@@ -1000,13 +1023,18 @@ function startSessionTimer() {
                         const withdrawable = Number(data.gatewayWithdrawable);
                         const balEl = document.getElementById('arc-sm-balance');
                         if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
-                        const secondsLeft = withdrawable / currentRatePerSecond;
+                        
                         const warningDiv = document.getElementById('arc-sm-warning');
                         if (warningDiv) {
-                            if (secondsLeft <= 300 && secondsLeft > 0) {
-                                warningDiv.classList.remove('arc-hidden');
-                                const tl = document.getElementById('arc-sm-time-left');
-                                if (tl) tl.textContent = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
+                            if (!isTipMode) {
+                                const secondsLeft = withdrawable / currentRatePerSecond;
+                                if (secondsLeft <= 300 && secondsLeft > 0) {
+                                    warningDiv.classList.remove('arc-hidden');
+                                    const tl = document.getElementById('arc-sm-time-left');
+                                    if (tl) tl.textContent = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
+                                } else {
+                                    warningDiv.classList.add('arc-hidden');
+                                }
                             } else {
                                 warningDiv.classList.add('arc-hidden');
                             }
@@ -1417,9 +1445,14 @@ function initTipMode(creatorWallet, tipAmount) {
     // Remove any lingering paywall overlay from previous videos
     const overlay = document.getElementById('arc-paywall-overlay');
     if (overlay) overlay.remove();
-    // Render hidden session manager so arcLeaveSession / arcEndSession work
-    // if the user already has an active pay-per-second session elsewhere.
+    // Render session manager adaptively
     renderSessionManager();
+    // If the user already has an active session, show the wallet widget immediately
+    if (viewerState.ephemeralPk) {
+        const sm = document.getElementById('arc-session-manager');
+        if (sm) sm.classList.remove('arc-hidden');
+        startSessionTimer();
+    }
     // Show the floating tip button
     if (typeof window.arcShowTipButton === 'function') {
         window.arcShowTipButton(creatorWallet, tipAmount);
