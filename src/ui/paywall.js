@@ -129,13 +129,13 @@ function renderPaywallOverlay() {
     ` : `
                         <div class="arc-pricing-row">
                             <span>Rate</span>
-                            <span class="arc-accent" id="arc-display-rate">From $0.0001 USDC / sec</span>
+                            <span class="arc-accent" id="arc-display-rate">From $0.0001 USDC / sec (varies by video)</span>
                         </div>
                         <div class="arc-pricing-row">
                             <span>Min. deposit</span>
                             <span class="arc-accent">1.00 USDC</span>
                         </div>
-                        <p class="arc-pricing-note">What you don't use is returned to your wallet.</p>
+                        <p class="arc-pricing-note">Unused funds can be cashed out to your wallet at any time.</p>
     `;
     const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
     const unlockBtnText = isTipMode ? "🔓 Enable Tipping" : "🔓 Unlock Video";
@@ -181,7 +181,7 @@ function renderPaywallOverlay() {
                         <button id="arc-bridge-btn" class="arc-fund-card">
                             <div>
                                 <strong>Bridge from another chain</strong>
-                                <span>Ethereum, Base, Arbitrum</span>
+                                <span>Ethereum, Base, Arbitrum (testnets)</span>
                             </div>
                             <span class="arc-chevron">›</span>
                         </button>
@@ -918,7 +918,7 @@ window.arcSetRate = function(ratePerSec) {
         currentRatePerSecond = Number(ratePerSec);
         // Paywall overlay rate display
         const el = document.getElementById('arc-display-rate');
-        if (el) el.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+        if (el) el.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' USDC / sec (varies by video)';
         // Session manager rate display
         const rateEl = document.getElementById('arc-sm-rate');
         if (rateEl) rateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
@@ -946,7 +946,7 @@ window.arcResetVideoSession = function(newRate) {
 
     // Also keep paywall overlay in sync
     const displayRate = document.getElementById('arc-display-rate');
-    if (displayRate) displayRate.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
+    if (displayRate) displayRate.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' USDC / sec (varies by video)';
 };
 
 document.addEventListener('play', (e) => {
@@ -1299,7 +1299,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     container.innerHTML = `
         <div id="arc-tip-header" style="display:none;justify-content:space-between;align-items:center;margin-bottom:2px;">
             <h3 style="margin:0;font-size:13px;font-weight:600;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
-                <span class="arc-pulse-dot" style="background:#f5576c;box-shadow:0 0 0 0 rgba(245,87,108,0.7);width:8px;height:8px;"></span> Support Creator
+                <span class="arc-pulse-dot" style="background:#38ef7d;box-shadow:0 0 0 0 rgba(56,239,125,0.7);width:8px;height:8px;"></span> Support Creator
             </h3>
         </div>
         
@@ -1310,7 +1310,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             </div>
             <div id="arc-tip-sent-row" style="display:none;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;margin-top:6px;font-size:11px;color:#64748b;width:100%;">
                 <span>Tips Sent:</span>
-                <span id="arc-tip-sent-val" style="color:#f5576c;font-weight:600;">$0.00 USDC</span>
+                <span id="arc-tip-sent-val" style="color:#38ef7d;font-weight:600;">$0.00 USDC</span>
             </div>
         </div>
 
@@ -1318,23 +1318,13 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             🔗 Connect wallet to tip
         </div>
 
-        <div id="arc-tip-topup-form" style="display:none;background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.25);padding:8px;border-radius:8px;text-align:center;margin-top:2px;width:100%;box-sizing:border-box;">
-            <div style="display:flex;gap:6px;align-items:center;justify-content:center;width:100%;">
-                <span style="color:#e2e8f0;font-size:11px;">$</span>
-                <input id="arc-tip-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount"
-                    style="width:75px;padding:3px 6px;border-radius:4px;border:1px solid #4a5568;background:#2d3748;color:#e2e8f0;font-size:11px;outline:none;" />
-                <button id="arc-tip-topup-confirm-btn" class="arc-btn" style="padding:4px 8px;font-size:10px;width:auto;height:auto;display:inline-block;box-shadow:none;">Confirm</button>
-                <button id="arc-tip-topup-cancel-btn" class="arc-btn" style="padding:4px 8px;font-size:10px;background:#4a5568;width:auto;height:auto;display:inline-block;box-shadow:none;">✕</button>
-            </div>
-        </div>
-
         <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
-            <button id="arc-tip-btn" class="arc-btn" style="padding:8px 16px;font-size:12px;background:linear-gradient(135deg,#f093fb,#f5576c);border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(245,87,108,0.25);font-weight:600;width:100%;transition:transform 0.1s;margin:0;box-sizing:border-box;justify-content:center;">
+            <button id="arc-tip-btn" class="arc-btn" style="padding:8px 16px;font-size:12px;background:linear-gradient(135deg,#11998e,#38ef7d);border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(56,239,125,0.25);font-weight:600;width:100%;transition:transform 0.1s;margin:0;box-sizing:border-box;justify-content:center;">
                 ❤️ Support $${amount.toFixed(2)}
             </button>
             
             <div id="arc-tip-wallet-actions" style="display:none;gap:6px;width:100%;box-sizing:border-box;">
-                <button id="arc-tip-topup-btn" class="arc-btn" style="flex:1;padding:6px 2px;font-size:10px;background:#4a5568;border-radius:6px;height:auto;box-shadow:none;justify-content:center;">Top Up</button>
+                <button id="arc-tip-leave-btn" class="arc-btn" style="flex:1;padding:6px 2px;font-size:10px;background:#4a5568;border-radius:6px;height:auto;box-shadow:none;justify-content:center;">Just Leave</button>
                 <button id="arc-tip-end-btn" class="arc-btn arc-btn-danger" style="flex:1.5;padding:6px 2px;font-size:10px;border-radius:6px;height:auto;box-shadow:none;justify-content:center;">Cash Out &amp; Exit</button>
             </div>
         </div>
@@ -1351,11 +1341,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     const sentVal = document.getElementById('arc-tip-sent-val');
     const walletActions = document.getElementById('arc-tip-wallet-actions');
 
-    const topupForm = document.getElementById('arc-tip-topup-form');
-    const topupBtn = document.getElementById('arc-tip-topup-btn');
-    const topupInput = document.getElementById('arc-tip-topup-input');
-    const topupConfirmBtn = document.getElementById('arc-tip-topup-confirm-btn');
-    const topupCancelBtn = document.getElementById('arc-tip-topup-cancel-btn');
+    const leaveBtn = document.getElementById('arc-tip-leave-btn');
     const endBtn = document.getElementById('arc-tip-end-btn');
 
     btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.03)'; });
@@ -1398,109 +1384,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
         }
     }, 5000);
 
-    topupBtn.addEventListener('click', () => {
-        topupBtn.style.display = 'none';
-        topupForm.style.display = 'block';
-    });
-
-    topupCancelBtn.addEventListener('click', () => {
-        topupForm.style.display = 'none';
-        topupBtn.style.display = 'inline-block';
-    });
-
-    const handleTipTopUp = async (depositAmount) => {
-        topupConfirmBtn.disabled = true;
-        topupConfirmBtn.innerText = 'Processing…';
-        topupCancelBtn.disabled = true;
-
-        const resetForm = () => {
-            topupConfirmBtn.disabled = false;
-            topupConfirmBtn.innerText = 'Confirm';
-            topupCancelBtn.disabled = false;
-            topupForm.style.display = 'none';
-            topupBtn.style.display = 'inline-block';
-        };
-
-        try {
-            // Step 0: Flush any funds already sitting in the ephemeral wallet
-            const flushRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId }),
-            });
-            if (flushRes.ok) {
-                const flushData = await flushRes.json();
-                if (flushData.deposited && Number(flushData.deposited) > 0) {
-                    console.log(`[Tessera] Flushed ${flushData.deposited} USDC from ephemeral wallet to Gateway.`);
-                    resetForm();
-                    void refreshStatus();
-                    return;
-                }
-            }
-
-            // Step 1: Refresh Circle user token
-            const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/get-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId }),
-            });
-            if (!tokenRes.ok) throw new Error('Failed to refresh Circle session');
-            const tokenData = await tokenRes.json();
-
-            arcSdk.setAuthentication({
-                userToken: tokenData.userToken,
-                encryptionKey: tokenData.encryptionKey,
-            });
-
-            // Step 2: Create the transfer from the SCA wallet to the ephemeral wallet
-            const prepRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userToken: tokenData.userToken,
-                    walletId: viewerState.walletId,
-                    depositAmount: depositAmount.toFixed(6),
-                    ephemeralPk: viewerState.ephemeralPk,
-                }),
-            });
-            if (!prepRes.ok) throw new Error('Failed to prepare top-up');
-            const prepData = await prepRes.json();
-
-            // Step 3: Execute — Circle SDK shows approval popup
-            await new Promise((resolve) => {
-                arcSdk.execute(prepData.challengeId, () => {
-                    resolve();
-                });
-            });
-
-            // Step 4: Deposit ephemeral wallet balance into Gateway (wait for funds)
-            const topupRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId, expectFunds: true }),
-            });
-
-            if (!topupRes.ok) {
-                throw new Error('Top-up cancelled or no funds received');
-            }
-
-            resetForm();
-            void refreshStatus();
-        } catch (error) {
-            console.error('[Tessera] Tipping Top-up failed', error);
-            alert('Top-up failed: ' + (error.message || 'Please try again.'));
-            resetForm();
-        }
-    };
-
-    topupConfirmBtn.addEventListener('click', () => {
-        const val = parseFloat(topupInput.value);
-        if (!val || val < 0.01) {
-            alert('Please enter a valid amount (min 0.01 USDC).');
-            return;
-        }
-        void handleTipTopUp(val);
-    });
+    leaveBtn.addEventListener('click', window.arcLeaveSession);
 
     endBtn.addEventListener('click', async () => {
         if (!confirm('Are you sure you want to cash out and exit? This will return your remaining balance to your wallet.')) {
