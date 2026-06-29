@@ -458,7 +458,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             }
 
             // 3. Deposit to Gateway
-            const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.10');
+            const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.01');
             const depositAmount = Math.max(0, walletUsdc - retainedGasAmount).toFixed(2);
             console.log(`[Core] 💳 Depositing ${depositAmount} USDC to Circle Gateway...`);
 
@@ -649,7 +649,7 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
 
 // --- CLIENT SIDE: Top-Up Session ---
 coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId } = req.body;
+    const { userId, expectFunds } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -662,15 +662,24 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
             chain: 'arcTestnet',
         });
         
-        const balances = await gatewayClient.getBalances();
-        const walletBalance = Number(balances.wallet.formatted);
-        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.1);
+        let balances = await gatewayClient.getBalances();
+        let walletBalance = Number(balances.wallet.formatted);
+        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.01);
+
+        if (expectFunds && walletBalance <= RETAINED_GAS_AMOUNT) {
+            console.log(`[Core] ⏳ Waiting for top-up funds to arrive in ephemeral wallet...`);
+            let attempts = 0;
+            while (attempts < 15 && walletBalance <= RETAINED_GAS_AMOUNT) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                balances = await gatewayClient.getBalances();
+                walletBalance = Number(balances.wallet.formatted);
+                attempts++;
+            }
+            console.log(`[Core] 💰 Ephemeral wallet balance after wait: ${walletBalance} USDC`);
+        }
 
         // How much to deposit to gateway? Everything minus gas buffer
-        let depositAmount = walletBalance;
-        if (walletBalance > RETAINED_GAS_AMOUNT) {
-            depositAmount = walletBalance - RETAINED_GAS_AMOUNT;
-        }
+        const depositAmount = Math.max(0, walletBalance - RETAINED_GAS_AMOUNT);
 
         if (depositAmount > 0.001) {
             console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
