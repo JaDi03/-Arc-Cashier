@@ -69,10 +69,12 @@ let viewerState = {
     ephemeralPk: localStorage.getItem('arc_ephemeral_pk'),
 };
 let balancePollingInterval = null;
+let isTipMode = false;
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 
 function initPaywall() {
+    isTipMode = false;
     injectDependencies();
     document.body.classList.add('arc-locked');
     lockMedia();
@@ -110,18 +112,19 @@ function renderPaywallOverlay() {
     const existing = document.getElementById('arc-paywall-overlay');
     if (existing) existing.remove();
 
-    const overlay = document.createElement('div');
-    overlay.id = 'arc-paywall-overlay';
-    overlay.innerHTML = `
-        <div id="arc-paywall-modal">
-            <div id="arc-paywall-header">
-                <div id="arc-paywall-logo">TESSERA</div>
-                <h2>Premium Stream</h2>
-                <p>Pay only for the seconds you watch. No subscriptions.</p>
-            </div>
-            <div id="arc-paywall-body">
-                <div id="arc-phase-login" class="arc-phase arc-phase-active">
-                    <div class="arc-pricing-box">
+    const title = isTipMode ? "Support Creator" : "Premium Stream";
+    const subtitle = isTipMode ? "Set up your wallet to send tips." : "Pay only for the seconds you watch. No subscriptions.";
+    const pricingBox = isTipMode ? `
+                        <div class="arc-pricing-row">
+                            <span>Action</span>
+                            <span class="arc-accent">Support Creator</span>
+                        </div>
+                        <div class="arc-pricing-row">
+                            <span>Min. deposit</span>
+                            <span class="arc-accent">1.00 USDC</span>
+                        </div>
+                        <p class="arc-pricing-note">Deposit funds to tip. Unused funds can be withdrawn anytime.</p>
+    ` : `
                         <div class="arc-pricing-row">
                             <span>Rate</span>
                             <span class="arc-accent" id="arc-display-rate">From $0.0001 USDC / sec</span>
@@ -131,6 +134,23 @@ function renderPaywallOverlay() {
                             <span class="arc-accent">1.00 USDC</span>
                         </div>
                         <p class="arc-pricing-note">What you don't use is returned to your wallet.</p>
+    `;
+    const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
+    const unlockBtnText = isTipMode ? "🔓 Enable Tipping" : "🔓 Unlock Video";
+
+    const overlay = document.createElement('div');
+    overlay.id = 'arc-paywall-overlay';
+    overlay.innerHTML = `
+        <div id="arc-paywall-modal">
+            <div id="arc-paywall-header">
+                <div id="arc-paywall-logo">TESSERA</div>
+                <h2>${title}</h2>
+                <p>${subtitle}</p>
+            </div>
+            <div id="arc-paywall-body">
+                <div id="arc-phase-login" class="arc-phase arc-phase-active">
+                    <div class="arc-pricing-box">
+                        ${pricingBox}
                     </div>
                     <button id="arc-login-btn" class="arc-btn arc-btn-primary">
                         <span class="arc-btn-icon">🔐</span>
@@ -153,7 +173,7 @@ function renderPaywallOverlay() {
                         </div>
                     </div>
 
-                    <p class="arc-fund-label">Fund your wallet to watch:</p>
+                    <p class="arc-fund-label">${fundLabel}</p>
 
                     <div class="arc-fund-options">
                         <button id="arc-bridge-btn" class="arc-fund-card">
@@ -179,7 +199,7 @@ function renderPaywallOverlay() {
                     </div>
 
                     <button id="arc-unlock-btn" class="arc-btn arc-btn-primary arc-btn-disabled" disabled>
-                        🔓 Unlock Video
+                        ${unlockBtnText}
                     </button>
                     <p id="arc-fund-status" class="arc-status-text" style="display:none;"></p>
                 </div>
@@ -542,21 +562,32 @@ async function handleUnlock() {
             throw new Error(errJson.error || 'Backend failed to register session.');
         }
 
-        // ✅ Unlock stream
-        document.body.classList.remove('arc-locked');
+        // ✅ Unlock stream or Enable Tipping
+        if (!isTipMode) {
+            document.body.classList.remove('arc-locked');
+            const sm = document.getElementById('arc-session-manager');
+            if (sm) sm.classList.remove('arc-hidden');
+            startSessionTimer();
+        } else {
+            // Automatically trigger the tip button click
+            const tipBtn = document.getElementById('arc-tip-btn');
+            if (tipBtn) {
+                setTimeout(() => {
+                    tipBtn.click();
+                }, 100);
+            }
+        }
+
         const overlay = document.getElementById('arc-paywall-overlay');
         if (overlay) {
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
         }
-        const sm = document.getElementById('arc-session-manager');
-        if (sm) sm.classList.remove('arc-hidden');
-        startSessionTimer();
 
     } catch (error) {
         console.error('[Tessera] Unlock error:', error);
         btn.disabled = false;
-        btn.innerHTML = '🔓 Unlock Video';
+        btn.innerHTML = isTipMode ? '🔓 Enable Tipping' : '🔓 Unlock Video';
         setFundStatus('Error: ' + (error.message || 'Please retry.'), true);
     }
 }
@@ -1195,7 +1226,10 @@ async function fetchTipBalance() {
 // Triggers the full Circle wallet onboarding overlay so the user can
 // connect/create their wallet and fund it before tipping.
 function openTipOnboarding() {
-    if (window.ArcCashier && typeof window.ArcCashier.initPaywall === 'function') {
+    if (isTipMode) {
+        injectDependencies();
+        renderPaywallOverlay();
+    } else if (window.ArcCashier && typeof window.ArcCashier.initPaywall === 'function') {
         window.ArcCashier.initPaywall();
     } else {
         document.body.classList.add('arc-locked');
@@ -1293,52 +1327,78 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
         btn.disabled = true;
         btn.textContent = 'Sending\u2026';
 
-        try {
-            const res = await fetch(ARC_API_BASE + '/api/core/tip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: viewerState.userId,
-                    creatorWallet: creatorWallet,
-                    amount: amount.toFixed(6),
-                }),
-            });
+        const sendTip = async (attempt = 1) => {
+            try {
+                const res = await fetch(ARC_API_BASE + '/api/core/tip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: viewerState.userId,
+                        creatorWallet: creatorWallet,
+                        amount: amount.toFixed(6),
+                    }),
+                });
 
-            if (res.ok) {
-                tipCount++;
-                const total = (amount * tipCount).toFixed(2);
-                counter.style.display = 'block';
-                counter.textContent = `\u2764\uFE0F \xD7${tipCount} = $${total} sent`;
-                btn.textContent = `\u2764\uFE0F +$${amount.toFixed(2)} more`;
-                void refreshStatus();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                console.error('[Tessera] Tip failed:', err);
-
-                if (res.status === 404) {
-                    // No registered session: user must connect wallet & fund first
-                    btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
-                    statusBox.style.display = 'block';
-                    statusBox.style.color = '#718096';
-                    statusBox.textContent = '🔗 Connect wallet to tip';
-                    openTipOnboarding();
-                } else if (res.status === 402) {
-                    // Insufficient gateway balance
-                    btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
-                    statusBox.style.display = 'block';
-                    statusBox.style.color = '#f6ad55';
-                    statusBox.textContent = '\u26A0\uFE0F Insufficient balance \u2014 top up';
-                    openTipOnboarding();
+                if (res.ok) {
+                    tipCount++;
+                    const total = (amount * tipCount).toFixed(2);
+                    counter.style.display = 'block';
+                    counter.textContent = `\u2764\uFE0F \xD7${tipCount} = $${total} sent`;
+                    btn.textContent = `\u2764\uFE0F +$${amount.toFixed(2)} more`;
+                    void refreshStatus();
                 } else {
-                    btn.textContent = 'Error \u2014 retry';
+                    const err = await res.json().catch(() => ({}));
+                    console.error('[Tessera] Tip failed:', err);
+
+                    if (res.status === 404) {
+                        // If we have wallet keys, try to register the session silently once
+                        if (attempt === 1 && viewerState.walletAddress && viewerState.ephemeralPk) {
+                            console.log('[Tessera] Attempting silent session registration...');
+                            try {
+                                const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        userId: viewerState.userId,
+                                        privateKey: viewerState.ephemeralPk,
+                                        returnAddress: viewerState.walletAddress,
+                                    }),
+                                });
+                                if (regRes.ok) {
+                                    console.log('[Tessera] Silent session registration succeeded. Retrying tip.');
+                                    await sendTip(2);
+                                    return;
+                                }
+                            } catch (regErr) {
+                                console.error('[Tessera] Silent registration error:', regErr);
+                            }
+                        }
+
+                        // Otherwise, show onboarding
+                        btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
+                        statusBox.style.display = 'block';
+                        statusBox.style.color = '#718096';
+                        statusBox.textContent = '🔗 Connect wallet to tip';
+                        openTipOnboarding();
+                    } else if (res.status === 402) {
+                        // Insufficient gateway balance
+                        btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
+                        statusBox.style.display = 'block';
+                        statusBox.style.color = '#f6ad55';
+                        statusBox.textContent = '\u26A0\uFE0F Insufficient balance \u2014 top up';
+                        openTipOnboarding();
+                    } else {
+                        btn.textContent = 'Error \u2014 retry';
+                    }
                 }
+            } catch (e) {
+                console.error('[Tessera] Tip request error:', e);
+                btn.textContent = 'Error \u2014 retry';
             }
-        } catch (e) {
-            console.error('[Tessera] Tip request error:', e);
-            btn.textContent = 'Error \u2014 retry';
-        } finally {
-            btn.disabled = false;
-        }
+        };
+
+        await sendTip();
+        btn.disabled = false;
     });
 };
 
@@ -1350,9 +1410,13 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 // shows the tip button so the viewer can optionally support the creator.
 
 function initTipMode(creatorWallet, tipAmount) {
+    isTipMode = true;
     injectDependencies();
     // Guarantee video is never locked in tip mode
     document.body.classList.remove('arc-locked');
+    // Remove any lingering paywall overlay from previous videos
+    const overlay = document.getElementById('arc-paywall-overlay');
+    if (overlay) overlay.remove();
     // Render hidden session manager so arcLeaveSession / arcEndSession work
     // if the user already has an active pay-per-second session elsewhere.
     renderSessionManager();
