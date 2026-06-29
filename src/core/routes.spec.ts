@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 
 // Mock environmental variable
 process.env.SELLER_PRIVATE_KEY = '0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+process.env.MASTER_KEY = 'test-fallback-master-key-32-chars-long';
 
 describe('CCTP Async Endpoints', () => {
     let finalizeHandler: any;
