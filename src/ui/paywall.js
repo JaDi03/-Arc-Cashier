@@ -1210,6 +1210,9 @@ window.arcEndSession = async function() {
     xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
+            localStorage.removeItem('arc_cashier_user_id');
+            localStorage.removeItem('arc_circle_wallet_id');
+            localStorage.removeItem('arc_circle_wallet_address');
             viewerState.ephemeralPk = null;
             viewerState.userId = null;
             viewerState.walletId = null;
@@ -1418,8 +1421,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
         const balance = await fetchTipBalance();
         if (balance === null) {
-            viewerState.userId = null;
-            refreshStatus();
+            balanceVal.textContent = `$0.0000 USDC`;
         } else {
             balanceVal.textContent = `$${balance.toFixed(4)} USDC`;
         }
@@ -1461,6 +1463,9 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             if (res.ok) {
                 const walletAddress = viewerState.walletAddress || '';
                 localStorage.removeItem('arc_ephemeral_pk');
+                localStorage.removeItem('arc_cashier_user_id');
+                localStorage.removeItem('arc_circle_wallet_id');
+                localStorage.removeItem('arc_circle_wallet_address');
                 viewerState.ephemeralPk = null;
                 viewerState.userId = null;
                 viewerState.walletId = null;
