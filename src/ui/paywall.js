@@ -1214,9 +1214,8 @@ window.arcEndSession = async function() {
             localStorage.removeItem('arc_circle_wallet_id');
             localStorage.removeItem('arc_circle_wallet_address');
             viewerState.ephemeralPk = null;
-            viewerState.userId = null;
-            viewerState.walletId = null;
-            viewerState.walletAddress = null;
+            // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+            // These stay persistent for subsequent sessions or top-ups.
 
             // Lock screen
             document.body.classList.add('arc-locked');
@@ -1467,9 +1466,8 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
                 localStorage.removeItem('arc_circle_wallet_id');
                 localStorage.removeItem('arc_circle_wallet_address');
                 viewerState.ephemeralPk = null;
-                viewerState.userId = null;
-                viewerState.walletId = null;
-                viewerState.walletAddress = null;
+                // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+                // These stay persistent for subsequent sessions or top-ups.
 
                 // Render success screen inside the tipping widget card
                 container.innerHTML = `
