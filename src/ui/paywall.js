@@ -78,6 +78,18 @@ let tipAmountVal = null;
 function initPaywall() {
     isTipMode = false;
     injectDependencies();
+
+    // Clear tipping widget if it was open from previous video
+    const tipBtn = document.getElementById('arc-tip-btn-container');
+    if (tipBtn) tipBtn.remove();
+
+    // Clear any active balance polling intervals
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+    playingMediaCount = 0;
+
     document.body.classList.add('arc-locked');
     lockMedia();
     renderPaywallOverlay();
@@ -704,13 +716,17 @@ async function executeCctpBridge(chain) {
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         const fromAddress = accounts[0];
 
-        // ── Step 1: Approve USDC → TokenMessengerV2 ──────────────────────────
+        // ── Step 1: Approve USDC -> TokenMessengerV2 ──────────────────────────
         setStepStatus('arc-step-approve-status', 'pending');
         setCctpProgress('Approving USDC… Sign in MetaMask.');
 
+        const bridgeAmount = amountUnits;
+        const forwardingFee = BigInt(200000); // 0.20 USDC fee for Circle Forwarding Service
+        const totalAmount = bridgeAmount + forwardingFee;
+
         const approveData = '0x095ea7b3' +
             TOKEN_MESSENGER_V2.slice(2).padStart(64, '0') +
-            amountUnits.toString(16).padStart(64, '0');
+            totalAmount.toString(16).padStart(64, '0');
 
         const approveTx = await window.ethereum.request({
             method: 'eth_sendTransaction',
@@ -719,7 +735,7 @@ async function executeCctpBridge(chain) {
         await waitForTx(approveTx, chain.chainId);
         setStepStatus('arc-step-approve-status', 'done');
 
-        // ── Step 2: depositForBurn → burn USDC on source chain ───────────────
+        // ── Step 2: depositForBurnWithHook -> burn USDC with Forwarding hook ──
         setStepStatus('arc-step-burn-status', 'pending');
         setCctpProgress('Burning USDC on source chain… Sign in MetaMask.');
 
@@ -729,18 +745,29 @@ async function executeCctpBridge(chain) {
 
         // ARC_TESTNET_DOMAIN = 26
         const ARC_DOMAIN = 26;
-        const maxFee = BigInt(500); // 0.0005 USDC (500 subunits) — small CCTP fee
         const minFinalityThreshold = 1000; // enables Fast Transfer
 
-        // depositForBurn(amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)
-        const burnData = '0x44a45248' // depositForBurn selector for V2
-            + amountUnits.toString(16).padStart(64, '0')
+        // depositForBurnWithHook(uint256,uint32,bytes32,address,bytes32,uint256,uint32,bytes)
+        // selector: 0xe0a17441
+        // offset of hookData (8th parameter) = 256 bytes (8 slots * 32 bytes)
+        // length of hookData = 32 bytes
+        // hookData = 0x636374702d666f72776172640000000000000000000000000000000000000000
+        const selector = '0xe0a17441';
+        const offset = BigInt(256);
+        const hookDataLength = BigInt(32);
+        const hookDataValue = '636374702d666f72776172640000000000000000000000000000000000000000';
+
+        const burnData = selector
+            + totalAmount.toString(16).padStart(64, '0')
             + ARC_DOMAIN.toString(16).padStart(64, '0')
             + recipientBytes32.slice(2).padStart(64, '0')
             + chain.usdc.slice(2).padStart(64, '0')
             + '0'.padStart(64, '0') // destinationCaller = zero (any relayer)
-            + maxFee.toString(16).padStart(64, '0')
-            + minFinalityThreshold.toString(16).padStart(64, '0');
+            + forwardingFee.toString(16).padStart(64, '0')
+            + minFinalityThreshold.toString(16).padStart(64, '0')
+            + offset.toString(16).padStart(64, '0')
+            + hookDataLength.toString(16).padStart(64, '0')
+            + hookDataValue;
 
         const burnTx = await window.ethereum.request({
             method: 'eth_sendTransaction',
@@ -749,35 +776,25 @@ async function executeCctpBridge(chain) {
         await waitForTx(burnTx, chain.chainId);
         setStepStatus('arc-step-burn-status', 'done');
 
-        // ── Step 3: Delegate minting to backend ──────────────────────────────
+        // ── Step 3: Poll Circle Forwarding status on frontend ─────────────────
         setStepStatus('arc-step-mint-status', 'pending');
-        setCctpProgress('Minting on Arc… This takes ~1-2 minutes. You can close this modal.');
+        setCctpProgress('Minting on Arc via Circle Relayer… This takes ~1-2 minutes. You can close this modal.');
         closeCctpModal();
 
         // Show waiting indicator on funding panel
         document.getElementById('arc-waiting-balance').style.display = 'flex';
         if (balancePollingInterval) clearInterval(balancePollingInterval);
 
-        // Backend handles Iris polling + receiveMessage() on Arc (non-blocking for user)
-        const finalizeRes = await fetch(ARC_API_BASE + '/api/core/circle/cctp-finalize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sourceDomain: chain.domain,
-                transactionHash: burnTx,
-                recipientAddress: recipient,
-            }),
-        });
-
-        if (finalizeRes.ok) {
+        // Poll Iris API for forwardTxHash
+        try {
+            const forwardTxHash = await pollCctpForwarding(chain.domain, burnTx);
             setStepStatus('arc-step-mint-status', 'done');
-            // Balance polling will detect the new funds and enable unlock button
+            console.log(`[CCTP] Forwarded mint transaction detected on Arc: ${forwardTxHash}`);
             startBalancePolling();
-        } else {
-            const err = await finalizeRes.json().catch(() => ({}));
-            console.error('[Tessera] cctp-finalize error:', err);
-            setFundStatus('Bridge submitted but minting failed. Please retry or use the faucet.', true);
-            startBalancePolling(); // Still poll — might have succeeded
+        } catch (err) {
+            console.error('[Tessera] CCTP forwarding error:', err);
+            setFundStatus('Bridge submitted but confirmation timed out. Polling wallet balance...', true);
+            startBalancePolling(); // Still poll as the mint might succeed eventually
         }
 
     } catch (error) {
@@ -808,6 +825,26 @@ async function waitForTx(txHash, chainId) {
         }
     }
     throw new Error('Transaction confirmation timed out');
+}
+
+async function pollCctpForwarding(sourceDomain, txHash) {
+    const irisUrl = `https://iris-api-sandbox.circle.com/v2/messages/${sourceDomain}?transactionHash=${txHash}`;
+    for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 5000));
+        try {
+            const res = await fetch(irisUrl);
+            if (!res.ok) continue;
+
+            const data = await res.json();
+            const msg = data?.messages?.[0];
+            if (msg?.forwardTxHash) {
+                return msg.forwardTxHash;
+            }
+        } catch (e) {
+            console.warn(`[CCTP] Error polling Iris:`, e);
+        }
+    }
+    throw new Error('CCTP forwarding timed out');
 }
 
 function setStepStatus(stepId, status) {
@@ -1153,17 +1190,33 @@ window.arcLeaveSession = async function() {
         });
     } catch (_) { /* best effort */ }
 
-    const sm = document.getElementById('arc-session-manager');
-    if (sm) {
-        sm.innerHTML = `
-            <div style="padding:10px;">
-                <h3 style="color:#63b3ed;margin:0 0 8px 0;">⏸ Session Paused</h3>
-                <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe. Sign in again with the same email to resume.</p>
-                <p style="font-size:11px;color:#718096;margin:0;">Billing has stopped.</p>
-            </div>
-        `;
+    if (isTipMode) {
+        // Tipping mode: clear ephemeral session keys and reset the tipping widget UI
+        localStorage.removeItem('arc_ephemeral_pk');
+        viewerState.ephemeralPk = null;
+
+        // Reset tipping widget to onboarding/connect state
+        const container = document.getElementById('arc-tip-btn-container');
+        if (container) {
+            container.remove();
+            if (typeof window.arcShowTipButton === 'function') {
+                window.arcShowTipButton(tipCreatorWallet, tipAmountVal);
+            }
+        }
+    } else {
+        // Pay-per-second mode: lock video and show paused session message
+        const sm = document.getElementById('arc-session-manager');
+        if (sm) {
+            sm.innerHTML = `
+                <div style="padding:10px;">
+                    <h3 style="color:#63b3ed;margin:0 0 8px 0;">⏸ Session Paused</h3>
+                    <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe. Sign in again with the same email to resume.</p>
+                    <p style="font-size:11px;color:#718096;margin:0;">Billing has stopped.</p>
+                </div>
+            `;
+        }
+        document.body.classList.add('arc-locked');
     }
-    document.body.classList.add('arc-locked');
 };
 
 window.arcEndSession = async function() {
@@ -1185,13 +1238,9 @@ window.arcEndSession = async function() {
     xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
-            localStorage.removeItem('arc_cashier_user_id');
-            localStorage.removeItem('arc_circle_wallet_id');
-            localStorage.removeItem('arc_circle_wallet_address');
             viewerState.ephemeralPk = null;
-            viewerState.userId = null;
-            viewerState.walletId = null;
-            viewerState.walletAddress = null;
+            // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+            // These stay persistent for subsequent sessions or top-ups.
 
             // Lock screen
             document.body.classList.add('arc-locked');
@@ -1438,13 +1487,9 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             if (res.ok) {
                 const walletAddress = viewerState.walletAddress || '';
                 localStorage.removeItem('arc_ephemeral_pk');
-                localStorage.removeItem('arc_cashier_user_id');
-                localStorage.removeItem('arc_circle_wallet_id');
-                localStorage.removeItem('arc_circle_wallet_address');
                 viewerState.ephemeralPk = null;
-                viewerState.userId = null;
-                viewerState.walletId = null;
-                viewerState.walletAddress = null;
+                // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+                // These stay persistent for subsequent sessions or top-ups.
 
                 // Render success screen inside the tipping widget card
                 container.innerHTML = `
@@ -1564,6 +1609,24 @@ function initTipMode(creatorWallet, tipAmount) {
     tipCreatorWallet = creatorWallet;
     tipAmountVal = tipAmount;
     injectDependencies();
+
+    // Clear any active pay-per-second timers from previous premium videos
+    if (window.sessionTimer) {
+        clearInterval(window.sessionTimer);
+        window.sessionTimer = null;
+    }
+    if (window.arcPingInterval) {
+        clearInterval(window.arcPingInterval);
+        window.arcPingInterval = null;
+    }
+    playingMediaCount = 0;
+
+    // Clear any active balance polling intervals
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+
     // Guarantee video is never locked in tip mode
     document.body.classList.remove('arc-locked');
     // Remove any lingering paywall overlay from previous videos
