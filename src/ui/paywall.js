@@ -1538,9 +1538,8 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
                     </div>
                 `;
                 document.getElementById('arc-tip-success-close').addEventListener('click', () => {
-                    // Reset the tipping button state and immediately open the onboarding modal
+                    // Reset the tipping button state back to initial unconnected floating card
                     window.arcShowTipButton(creatorWallet, tipAmount);
-                    openTipOnboarding();
                 });
             } else {
                 throw new Error('Cash-out failed on server');
