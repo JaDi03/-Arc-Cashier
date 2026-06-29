@@ -667,10 +667,7 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
         const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.01);
 
         // How much to deposit to gateway? Everything minus gas buffer
-        let depositAmount = walletBalance;
-        if (walletBalance > RETAINED_GAS_AMOUNT) {
-            depositAmount = walletBalance - RETAINED_GAS_AMOUNT;
-        }
+        const depositAmount = Math.max(0, walletBalance - RETAINED_GAS_AMOUNT);
 
         if (depositAmount > 0.001) {
             console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
