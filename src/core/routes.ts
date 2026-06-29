@@ -458,7 +458,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             }
 
             // 3. Deposit to Gateway
-            const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.10');
+            const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.01');
             const depositAmount = Math.max(0, walletUsdc - retainedGasAmount).toFixed(2);
             console.log(`[Core] 💳 Depositing ${depositAmount} USDC to Circle Gateway...`);
 
@@ -664,13 +664,10 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
         
         const balances = await gatewayClient.getBalances();
         const walletBalance = Number(balances.wallet.formatted);
-        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.1);
+        const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.01);
 
         // How much to deposit to gateway? Everything minus gas buffer
-        let depositAmount = walletBalance;
-        if (walletBalance > RETAINED_GAS_AMOUNT) {
-            depositAmount = walletBalance - RETAINED_GAS_AMOUNT;
-        }
+        const depositAmount = Math.max(0, walletBalance - RETAINED_GAS_AMOUNT);
 
         if (depositAmount > 0.001) {
             console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
