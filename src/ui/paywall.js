@@ -472,19 +472,21 @@ function enableUnlockButton() {
     const btn = document.getElementById('arc-unlock-btn');
     btn.disabled = false;
     btn.classList.remove('arc-btn-disabled');
-    btn.innerHTML = '🔓 Unlock Video';
+    btn.innerHTML = isTipMode ? '🔓 Enable Tipping' : '🔓 Unlock Video';
     document.getElementById('arc-waiting-balance').style.display = 'none';
     // Small celebration pulse
     btn.classList.add('arc-pulse-once');
     setTimeout(() => btn.classList.remove('arc-pulse-once'), 600);
 }
 
-// ─── Phase 3: Unlock Video ────────────────────────────────────────────────────
+// ─── Phase 3: Unlock Video / Enable Tipping ───────────────────────────────────
 
 async function handleUnlock() {
     const btn = document.getElementById('arc-unlock-btn');
     btn.disabled = true;
-    btn.innerHTML = '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Unlocking…';
+    btn.innerHTML = isTipMode 
+        ? '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Enabling…'
+        : '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Unlocking…';
     setFundStatus('');
 
     try {
