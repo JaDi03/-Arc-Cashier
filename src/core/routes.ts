@@ -294,63 +294,78 @@ coreRouter.post('/circle/poll-challenge', sessionLimiter, async (req: Request, r
     }
 });
 
-// --- BUYER SIDE (Web2): Finalize CCTP Bridge ---
-// Called by the frontend after the user burns USDC on the source chain.
-// This endpoint polls the Iris attestation API and, once the attestation is ready,
-// calls receiveMessage() on Arc to mint USDC to the user's Arc wallet.
-// The SELLER_PRIVATE_KEY pays the Arc gas fee (USDC), removing the need for
-// the user to have any prior balance on Arc.
-coreRouter.post('/circle/cctp-finalize', sessionLimiter, async (req: Request, res: Response) => {
-    const { sourceDomain, transactionHash, recipientAddress } = req.body;
+// --- BUYER SIDE (Web2): Finalize CCTP Bridge (Asynchronous Job System) ---
+interface CctpJob {
+    id: string;
+    status: 'pending' | 'complete' | 'failed';
+    mintTxHash?: string;
+    error?: string;
+    createdAt: number;
+}
 
-    if (!sourceDomain && sourceDomain !== 0) {
-        return res.status(400).json({ error: 'Missing sourceDomain' });
-    }
-    if (!transactionHash || !recipientAddress) {
-        return res.status(400).json({ error: 'Missing transactionHash or recipientAddress' });
-    }
-    if (!isAddress(recipientAddress)) {
-        return res.status(400).json({ error: 'Invalid recipientAddress' });
-    }
+const cctpJobs = new Map<string, CctpJob>();
 
-    const sellerKey = process.env.SELLER_PRIVATE_KEY;
-    if (!sellerKey) {
-        return res.status(500).json({ error: 'Backend wallet not configured (SELLER_PRIVATE_KEY missing)' });
+function pruneCctpJobs() {
+    const now = Date.now();
+    const maxAge = 30 * 60 * 1000; // 30 minutes
+    for (const [id, job] of cctpJobs.entries()) {
+        if (now - job.createdAt > maxAge) {
+            cctpJobs.delete(id);
+        }
     }
+}
 
+async function executeCctpFinalizationInBackground(
+    jobId: string,
+    sourceDomain: number,
+    transactionHash: string,
+    recipientAddress: string,
+    sellerKey: string
+) {
     try {
-        // Step 1: Poll Iris API until attestation is complete (max 5 min)
-        console.log(`[CCTP] ⏳ Polling Iris for attestation. Source domain: ${sourceDomain}, Tx: ${transactionHash}`);
+        console.log(`[CCTP] - Background job ${jobId} started. Polling Iris for attestation. Source domain: ${sourceDomain}, Tx: ${transactionHash}`);
         const irisUrl = `${IRIS_API_BASE}/${sourceDomain}?transactionHash=${transactionHash}`;
         let attestation: { message: string; attestation: string } | null = null;
 
         for (let attempt = 0; attempt < 60; attempt++) { // 60 * 5s = 5 min max
             await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Exit early if the job was deleted from cache
+            if (!cctpJobs.has(jobId)) {
+                console.log(`[CCTP] - Background job ${jobId} was removed from memory. Stopping process.`);
+                return;
+            }
+
             try {
                 const irisRes = await fetch(irisUrl);
                 if (!irisRes.ok) {
-                    console.log(`[CCTP] Iris returned ${irisRes.status}, retrying...`);
+                    console.log(`[CCTP] - Iris returned ${irisRes.status}, retrying...`);
                     continue;
                 }
                 const irisData = await irisRes.json() as { messages?: Array<{ status: string; message: string; attestation: string }> };
                 const msg = irisData.messages?.[0];
                 if (msg?.status === 'complete') {
                     attestation = { message: msg.message, attestation: msg.attestation };
-                    console.log(`[CCTP] ✅ Attestation ready after ${attempt + 1} attempts.`);
+                    console.log(`[CCTP] - Job ${jobId}: Attestation ready after ${attempt + 1} attempts.`);
                     break;
                 }
-                console.log(`[CCTP] Attempt ${attempt + 1}: status = ${msg?.status ?? 'not found'}`);
+                console.log(`[CCTP] - Job ${jobId} Attempt ${attempt + 1}: status = ${msg?.status ?? 'not found'}`);
             } catch (fetchErr) {
-                console.warn(`[CCTP] Iris fetch error (attempt ${attempt + 1}):`, fetchErr);
+                console.warn(`[CCTP] - Job ${jobId} Iris fetch error (attempt ${attempt + 1}):`, fetchErr);
             }
         }
 
         if (!attestation) {
-            return res.status(504).json({ error: 'Attestation timed out. Please retry in a few minutes.' });
+            console.error(`[CCTP] - Job ${jobId} failed: Attestation timed out.`);
+            const job = cctpJobs.get(jobId);
+            if (job) {
+                job.status = 'failed';
+                job.error = 'Attestation timed out';
+            }
+            return;
         }
 
-        // Step 2: Call receiveMessage() on Arc Testnet using the seller's key for gas
-        console.log(`[CCTP] 🪙 Minting USDC on Arc Testnet for ${recipientAddress}...`);
+        console.log(`[CCTP] - Job ${jobId}: Minting USDC on Arc Testnet for ${recipientAddress}...`);
         const account = privateKeyToAccount(sellerKey as `0x${string}`);
         const arcWalletClient = createWalletClient({
             account,
@@ -383,15 +398,74 @@ coreRouter.post('/circle/cctp-finalize', sessionLimiter, async (req: Request, re
             }),
         });
 
-        console.log(`[CCTP] ⏳ Waiting for mint tx confirmation...`);
+        console.log(`[CCTP] - Job ${jobId}: Waiting for mint tx confirmation...`);
         await arcPublicClient.waitForTransactionReceipt({ hash: mintTxHash });
-        console.log(`[CCTP] ✅ USDC minted on Arc! Tx: ${mintTxHash}`);
+        console.log(`[CCTP] - Job ${jobId} completed successfully! USDC minted on Arc! Tx: ${mintTxHash}`);
 
-        return res.json({ status: 'complete', mintTxHash });
+        const job = cctpJobs.get(jobId);
+        if (job) {
+            job.status = 'complete';
+            job.mintTxHash = mintTxHash;
+        }
     } catch (error: any) {
-        console.error(`[CCTP] ❌ Finalize failed:`, error?.message || error);
-        return res.status(500).json({ error: 'CCTP finalization failed: ' + (error?.message || 'unknown error') });
+        console.error(`[CCTP] - Job ${jobId} execution failed:`, error?.message || error);
+        const job = cctpJobs.get(jobId);
+        if (job) {
+            job.status = 'failed';
+            job.error = error?.message || 'unknown error';
+        }
     }
+}
+
+// Triggers the background CCTP attestation check and Arc minting, returning a jobId immediately
+coreRouter.post('/circle/cctp-finalize', sessionLimiter, async (req: Request, res: Response) => {
+    const { sourceDomain, transactionHash, recipientAddress } = req.body;
+
+    if (!sourceDomain && sourceDomain !== 0) {
+        return res.status(400).json({ error: 'Missing sourceDomain' });
+    }
+    if (!transactionHash || !recipientAddress) {
+        return res.status(400).json({ error: 'Missing transactionHash or recipientAddress' });
+    }
+    if (!isAddress(recipientAddress)) {
+        return res.status(400).json({ error: 'Invalid recipientAddress' });
+    }
+
+    const sellerKey = process.env.SELLER_PRIVATE_KEY;
+    if (!sellerKey) {
+        return res.status(500).json({ error: 'Backend wallet not configured (SELLER_PRIVATE_KEY missing)' });
+    }
+
+    try {
+        pruneCctpJobs();
+        const jobId = crypto.randomUUID();
+        cctpJobs.set(jobId, {
+            id: jobId,
+            status: 'pending',
+            createdAt: Date.now()
+        });
+
+        // Trigger background polling and transaction submission
+        void executeCctpFinalizationInBackground(jobId, Number(sourceDomain), transactionHash, recipientAddress, sellerKey);
+
+        return res.status(202).json({ jobId, status: 'pending' });
+    } catch (error: any) {
+        console.error(`[CCTP] - Failed to trigger finalize job:`, error?.message || error);
+        return res.status(500).json({ error: 'Failed to initiate CCTP finalization' });
+    }
+});
+
+// Returns the status of a specific CCTP finalization job
+coreRouter.get('/circle/cctp-status/:jobId', sessionLimiter, (req: Request, res: Response) => {
+    const { jobId } = req.params;
+    if (typeof jobId !== 'string') {
+        return res.status(400).json({ error: 'Invalid jobId format' });
+    }
+    const job = cctpJobs.get(jobId);
+    if (!job) {
+        return res.status(404).json({ error: 'CCTP finalization job not found' });
+    }
+    return res.json(job);
 });
 
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
