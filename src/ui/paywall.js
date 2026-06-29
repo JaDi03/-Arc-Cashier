@@ -1414,6 +1414,9 @@ function initTipMode(creatorWallet, tipAmount) {
     injectDependencies();
     // Guarantee video is never locked in tip mode
     document.body.classList.remove('arc-locked');
+    // Remove any lingering paywall overlay from previous videos
+    const overlay = document.getElementById('arc-paywall-overlay');
+    if (overlay) overlay.remove();
     // Render hidden session manager so arcLeaveSession / arcEndSession work
     // if the user already has an active pay-per-second session elsewhere.
     renderSessionManager();

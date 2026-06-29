@@ -30,7 +30,7 @@ const circleClient = initiateUserControlledWalletsClient({
 
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // limit each IP to 20 requests per windowMs
+    max: 300, // limit each IP to 300 requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
