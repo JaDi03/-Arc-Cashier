@@ -205,6 +205,18 @@ function renderPaywallOverlay() {
                     </button>
                     <p id="arc-fund-status" class="arc-status-text" style="display:none;"></p>
                 </div>
+
+                <div id="arc-phase-success" class="arc-phase" style="display:none;">
+                    <div style="text-align:center;padding:10px 0;">
+                        <h3 style="color:#68d391;margin:0 0 12px 0;font-size:18px;">✅ Session Ended</h3>
+                        <p style="font-size:13px;color:#a0aec0;margin:0 0 20px 0;line-height:1.5;">Your refund was successfully processed to your wallet.</p>
+                        <a id="arc-success-scan-link" href="#" target="_blank"
+                           style="font-size:13px;color:#38ef7d;text-decoration:underline;font-weight:600;display:inline-block;margin-bottom:24px;">
+                            🧾 View Balance on Arcscan
+                        </a>
+                        <button id="arc-success-done-btn" class="arc-btn arc-btn-primary" style="width:100%;">Return to Home</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1198,18 +1210,32 @@ window.arcEndSession = async function() {
     xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
-            const sm = document.getElementById('arc-session-manager');
-            if (sm) {
-                sm.innerHTML = `
-                    <div style="padding:10px;">
-                        <h3 style="color:#68d391;margin:0 0 10px 0;">✅ Session Ended &amp; Cashed Out</h3>
-                        <p style="font-size:13px;color:#a0aec0;margin:0 0 10px 0;">Your refund was processed to your wallet.</p>
-                        <a href="https://testnet.arcscan.app/address/${walletAddress}" target="_blank"
-                           style="font-size:12px;color:#4facfe;text-decoration:underline;">
-                            🧾 View Balance on Arcscan
-                        </a>
-                    </div>
-                `;
+            viewerState.ephemeralPk = null;
+            viewerState.userId = null;
+            viewerState.walletId = null;
+            viewerState.walletAddress = null;
+
+            // Lock screen
+            document.body.classList.add('arc-locked');
+
+            // Force render overlay
+            renderPaywallOverlay();
+
+            // Transition to success phase on overlay
+            document.getElementById('arc-phase-login').style.display = 'none';
+            document.getElementById('arc-phase-fund').style.display = 'none';
+            const successPhase = document.getElementById('arc-phase-success');
+            if (successPhase) {
+                successPhase.style.display = 'block';
+                const link = document.getElementById('arc-success-scan-link');
+                if (link) link.href = `https://testnet.arcscan.app/address/${walletAddress}`;
+                const doneBtn = document.getElementById('arc-success-done-btn');
+                if (doneBtn) {
+                    doneBtn.onclick = () => {
+                        successPhase.style.display = 'none';
+                        document.getElementById('arc-phase-login').style.display = 'block';
+                    };
+                }
             }
         } else {
             if (endBtn) { endBtn.disabled = false; endBtn.innerText = 'Error: Retry'; }
@@ -1433,14 +1459,28 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             });
 
             if (res.ok) {
+                const walletAddress = viewerState.walletAddress || '';
                 localStorage.removeItem('arc_ephemeral_pk');
                 viewerState.ephemeralPk = null;
                 viewerState.userId = null;
                 viewerState.walletId = null;
                 viewerState.walletAddress = null;
 
-                refreshStatus();
-                alert('Session ended and funds successfully cashed out to your wallet!');
+                // Render success screen inside the tipping widget card
+                container.innerHTML = `
+                    <div style="padding:10px;text-align:center;font-family:'Inter',sans-serif;color:#f1f5f9;width:100%;box-sizing:border-box;">
+                        <h3 style="color:#68d391;margin:0 0 10px 0;font-size:13px;font-weight:600;">✅ Cashed Out</h3>
+                        <p style="font-size:11px;color:#a0aec0;margin:0 0 12px 0;line-height:1.4;">Your refund was successfully processed to your wallet.</p>
+                        <a href="https://testnet.arcscan.app/address/${walletAddress}" target="_blank"
+                           style="font-size:11px;color:#38ef7d;text-decoration:underline;font-weight:600;display:inline-block;margin-bottom:8px;">
+                            🧾 View on Arcscan
+                        </a>
+                        <button id="arc-tip-success-close" class="arc-btn" style="padding:4px 8px;font-size:10px;background:#4a5568;width:100%;margin-top:6px;box-shadow:none;justify-content:center;">Close</button>
+                    </div>
+                `;
+                document.getElementById('arc-tip-success-close').addEventListener('click', () => {
+                    container.remove();
+                });
             } else {
                 throw new Error('Cash-out failed on server');
             }
