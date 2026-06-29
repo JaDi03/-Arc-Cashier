@@ -6,6 +6,10 @@ import { isValidEvmAddress } from './gateway-creator';
 
 const router = express.Router();
 
+// NOTE - In-memory nonce tracking is sufficient for single-instance setups (representing the majority of deployments).
+// If scaling to a distributed, multi-container architecture behind a load balancer, this usedNonces map should be migrated
+// to a shared, high-speed cache with expiration (e.g., Redis with a TTL of 60 seconds) to prevent cross-instance replay attacks.
+// We keep it in-memory for now to maintain zero-dependency setup and ease of installation.
 const usedNonces = new Map<string, number>();
 
 // Cleanup expired nonces in the background (every 1 minute)

@@ -73,14 +73,21 @@ function configureProject(platformName, defaultUrl) {
                 let envContent = fs.readFileSync(envExamplePath, 'utf-8');
                 
                 // If platform is peertube, generate a webhook secret automatically
+                const crypto = require('crypto');
                 if (platformName === 'peertube') {
-                    const crypto = require('crypto');
                     const secret = crypto.randomBytes(32).toString('hex');
                     envContent = envContent.replace(
                         /# PEERTUBE_WEBHOOK_SECRET=your_generated_secret_here/g,
                         `PEERTUBE_WEBHOOK_SECRET=${secret}`
                     );
                 }
+
+                // Generate a secure random MASTER_KEY automatically for session encryption at rest
+                const masterKey = crypto.randomBytes(32).toString('hex');
+                envContent = envContent.replace(
+                    /MASTER_KEY=your_secure_master_key_here/g,
+                    `MASTER_KEY=${masterKey}`
+                );
 
                 fs.writeFileSync(envPath, envContent);
                 console.log(`✅ Generated .env file securely from .env.example.`);
@@ -111,6 +118,7 @@ Please manually open the '.env' file in your code editor and configure:
  - SELLER_PRIVATE_KEY
  - SELLER_ADDRESS
 `);
+    console.log(`✅ MASTER_KEY was automatically generated in your .env file to encrypt session keys at rest.`);
     if (platformName === 'peertube') {
         console.log(`✅ PEERTUBE_WEBHOOK_SECRET was automatically generated in your .env file.`);
         console.log(`Copy this secret into the PeerTube Plugin Settings so they can communicate securely.\n`);
