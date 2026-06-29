@@ -1238,9 +1238,6 @@ window.arcEndSession = async function() {
     xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
-            localStorage.removeItem('arc_cashier_user_id');
-            localStorage.removeItem('arc_circle_wallet_id');
-            localStorage.removeItem('arc_circle_wallet_address');
             viewerState.ephemeralPk = null;
             // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
             // These stay persistent for subsequent sessions or top-ups.
@@ -1251,6 +1248,21 @@ window.arcEndSession = async function() {
             // Force render overlay
             renderPaywallOverlay();
 
+            // Parse transaction hash from response
+            let txHash = '';
+            try {
+                const resData = JSON.parse(xhr.responseText);
+                txHash = resData.txHash || '';
+            } catch (_) {}
+
+            const scanUrl = txHash 
+                ? `https://testnet.arcscan.app/tx/${txHash}` 
+                : `https://testnet.arcscan.app/address/${walletAddress}`;
+
+            const scanText = txHash
+                ? '🧾 View Transaction on Arcscan'
+                : '🧾 View Balance on Arcscan';
+
             // Transition to success phase on overlay
             document.getElementById('arc-phase-login').style.display = 'none';
             document.getElementById('arc-phase-fund').style.display = 'none';
@@ -1258,7 +1270,10 @@ window.arcEndSession = async function() {
             if (successPhase) {
                 successPhase.style.display = 'block';
                 const link = document.getElementById('arc-success-scan-link');
-                if (link) link.href = `https://testnet.arcscan.app/address/${walletAddress}`;
+                if (link) {
+                    link.href = scanUrl;
+                    link.textContent = scanText;
+                }
                 const doneBtn = document.getElementById('arc-success-done-btn');
                 if (doneBtn) {
                     doneBtn.onclick = () => {
@@ -1341,7 +1356,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
     // Renders the container styled dynamically based on whether the wallet is active
     const updateContainerStyle = () => {
-        if (viewerState.userId) {
+        if (viewerState.userId && viewerState.ephemeralPk) {
             // Funded/Connected card style
             container.style.cssText = `
                 position: fixed;
@@ -1429,7 +1444,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
 
     const refreshStatus = async () => {
-        if (!viewerState.userId) {
+        if (!viewerState.userId || !viewerState.ephemeralPk) {
             updateContainerStyle();
             header.style.display = 'none';
             statusCard.style.display = 'none';
@@ -1489,28 +1504,43 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
             if (res.ok) {
                 const walletAddress = viewerState.walletAddress || '';
+                
+                // Parse transaction hash from response
+                let txHash = '';
+                try {
+                    const resData = await res.json();
+                    txHash = resData.txHash || '';
+                } catch (_) {}
+
                 localStorage.removeItem('arc_ephemeral_pk');
-                localStorage.removeItem('arc_cashier_user_id');
-                localStorage.removeItem('arc_circle_wallet_id');
-                localStorage.removeItem('arc_circle_wallet_address');
                 viewerState.ephemeralPk = null;
                 // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
                 // These stay persistent for subsequent sessions or top-ups.
+
+                const scanUrl = txHash 
+                    ? `https://testnet.arcscan.app/tx/${txHash}` 
+                    : `https://testnet.arcscan.app/address/${walletAddress}`;
+
+                const scanText = txHash
+                    ? '🧾 View Transaction on Arcscan'
+                    : '🧾 View Balance on Arcscan';
 
                 // Render success screen inside the tipping widget card
                 container.innerHTML = `
                     <div style="padding:10px;text-align:center;font-family:'Inter',sans-serif;color:#f1f5f9;width:100%;box-sizing:border-box;">
                         <h3 style="color:#68d391;margin:0 0 10px 0;font-size:13px;font-weight:600;">✅ Cashed Out</h3>
                         <p style="font-size:11px;color:#a0aec0;margin:0 0 12px 0;line-height:1.4;">Your refund was successfully processed to your wallet.</p>
-                        <a href="https://testnet.arcscan.app/address/${walletAddress}" target="_blank"
+                        <a href="${scanUrl}" target="_blank"
                            style="font-size:11px;color:#38ef7d;text-decoration:underline;font-weight:600;display:inline-block;margin-bottom:8px;">
-                            🧾 View on Arcscan
+                            ${scanText}
                         </a>
                         <button id="arc-tip-success-close" class="arc-btn" style="padding:4px 8px;font-size:10px;background:#4a5568;width:100%;margin-top:6px;box-shadow:none;justify-content:center;">Close</button>
                     </div>
                 `;
                 document.getElementById('arc-tip-success-close').addEventListener('click', () => {
-                    container.remove();
+                    // Reset the tipping button state and immediately open the onboarding modal
+                    window.arcShowTipButton(creatorWallet, tipAmount);
+                    openTipOnboarding();
                 });
             } else {
                 throw new Error('Cash-out failed on server');
@@ -1525,8 +1555,8 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
     // ── Click handler ─────────────────────────────────────────────────────
     btn.addEventListener('click', async () => {
-        // No userId → trigger full wallet onboarding
-        if (!viewerState.userId) {
+        // No userId or no ephemeralPk (active session) -> trigger full wallet onboarding
+        if (!viewerState.userId || !viewerState.ephemeralPk) {
             openTipOnboarding();
             return;
         }
