@@ -78,6 +78,18 @@ let tipAmountVal = null;
 function initPaywall() {
     isTipMode = false;
     injectDependencies();
+
+    // Clear tipping widget if it was open from previous video
+    const tipBtn = document.getElementById('arc-tip-btn-container');
+    if (tipBtn) tipBtn.remove();
+
+    // Clear any active balance polling intervals
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+    playingMediaCount = 0;
+
     document.body.classList.add('arc-locked');
     lockMedia();
     renderPaywallOverlay();
@@ -1178,17 +1190,33 @@ window.arcLeaveSession = async function() {
         });
     } catch (_) { /* best effort */ }
 
-    const sm = document.getElementById('arc-session-manager');
-    if (sm) {
-        sm.innerHTML = `
-            <div style="padding:10px;">
-                <h3 style="color:#63b3ed;margin:0 0 8px 0;">⏸ Session Paused</h3>
-                <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe. Sign in again with the same email to resume.</p>
-                <p style="font-size:11px;color:#718096;margin:0;">Billing has stopped.</p>
-            </div>
-        `;
+    if (isTipMode) {
+        // Tipping mode: clear ephemeral session keys and reset the tipping widget UI
+        localStorage.removeItem('arc_ephemeral_pk');
+        viewerState.ephemeralPk = null;
+
+        // Reset tipping widget to onboarding/connect state
+        const container = document.getElementById('arc-tip-btn-container');
+        if (container) {
+            container.remove();
+            if (typeof window.arcShowTipButton === 'function') {
+                window.arcShowTipButton(tipCreatorWallet, tipAmountVal);
+            }
+        }
+    } else {
+        // Pay-per-second mode: lock video and show paused session message
+        const sm = document.getElementById('arc-session-manager');
+        if (sm) {
+            sm.innerHTML = `
+                <div style="padding:10px;">
+                    <h3 style="color:#63b3ed;margin:0 0 8px 0;">⏸ Session Paused</h3>
+                    <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe. Sign in again with the same email to resume.</p>
+                    <p style="font-size:11px;color:#718096;margin:0;">Billing has stopped.</p>
+                </div>
+            `;
+        }
+        document.body.classList.add('arc-locked');
     }
-    document.body.classList.add('arc-locked');
 };
 
 window.arcEndSession = async function() {
@@ -1587,6 +1615,24 @@ function initTipMode(creatorWallet, tipAmount) {
     tipCreatorWallet = creatorWallet;
     tipAmountVal = tipAmount;
     injectDependencies();
+
+    // Clear any active pay-per-second timers from previous premium videos
+    if (window.sessionTimer) {
+        clearInterval(window.sessionTimer);
+        window.sessionTimer = null;
+    }
+    if (window.arcPingInterval) {
+        clearInterval(window.arcPingInterval);
+        window.arcPingInterval = null;
+    }
+    playingMediaCount = 0;
+
+    // Clear any active balance polling intervals
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+
     // Guarantee video is never locked in tip mode
     document.body.classList.remove('arc-locked');
     // Remove any lingering paywall overlay from previous videos
