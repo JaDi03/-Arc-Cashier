@@ -126,7 +126,7 @@ router.post('/webhook', (req, res) => {
         console.warn(`[PeerTube] ⚠️ Invalid creator wallet in webhook: ${resolvedCreatorAddress}`);
     }
 
-    // 3. Process Events (Following BUILDING_A_CONNECTOR.md)
+    // 3. Process Events (Following building-a-connector.md)
     if (event === 'viewer_joined') {
         // --- Platform Fee Split (PeerTube-specific) ---
         // PeerTube has a distinct admin (instance host) and content creator.
