@@ -101,8 +101,6 @@ nav:
   - Connectors:
     - Overview: connectors/index.md
     - Building a Connector: connectors/building-a-connector.md
-  - Reference:
-    - Contributing: contributing.md
 
 extra_css:
   - stylesheets/extra.css
