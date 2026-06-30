@@ -87,9 +87,18 @@ Once your wallet is created, the funding panel will open:
 
 ## 3. Cashing Out (Withdrawing)
 
-Unlike traditional subscriptions, Tessera only bills you for the exact seconds you watch. When you decide to leave:
+Unlike traditional subscriptions, Tessera only bills you for the exact seconds you watch. When you decide to leave, you have two options:
+
+![Just Leave options](../assets/just_leave.png)
 
 * **Just Leave (Pause Billing):** 
     Clicking **Just Leave** stops the billing timer. Your remaining balance stays safely in your Tessera session balance, ready for the next time you watch.
+
 * **Cash Out & Exit:** 
-    If you want your remaining funds returned, click **Cash Out & Exit**. The system will batch settle your session, pay the creator, and automatically transfer all your unused USDC back to your personal wallet.
+    If you want your remaining funds returned, click **Cash Out & Exit**. 
+    
+    ![Cash Out Button](../assets/cash_out1.png)
+    
+    The system will batch settle your session, pay the creator, and automatically transfer all your unused USDC back to your personal wallet. You will see a confirmation modal with a direct link to Arcscan to verify your on-chain transaction.
+    
+    ![Cash Out Modal](../assets/cash_out2.png)
