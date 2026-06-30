@@ -102,6 +102,7 @@ nav:
     - Building a Connector: connectors/building-a-connector.md
   - Reference:
     - Architecture & Fees: ARCHITECTURE.md
+    - Building a Connector (Root): BUILDING_A_CONNECTOR.md
     - Contributing: contributing.md
 
 extra_css:
