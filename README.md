@@ -147,7 +147,7 @@ Tessera is designed to plug into the open-source creator stack where communities
 - **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
 - **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article subscriptions.
 
-Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/connectors/building-a-connector.md) to get started.
+Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](docs/connectors/building-a-connector.md) to get started.
 
 ---
 
@@ -213,7 +213,7 @@ Tessera uses a **sidecar pattern** to add payments without platform modification
 
 **Client Overlay** (`src/ui/`) — The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
 
-For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](https://github.com/JaDi03/tessera/blob/main/docs/ARCHITECTURE.md).
+For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -230,8 +230,8 @@ The economic model is simple: if a viewer watches a 10-minute stream at $0.01/mi
 
 ## Documentation
 
-- [Architecture & Fees](https://github.com/JaDi03/tessera/blob/main/docs/ARCHITECTURE.md) — Detailed technical architecture, fee structure, and settlement flow
-- [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/connectors/building-a-connector.md) — Add support for a new platform in ~100 lines of code
+- [Architecture & Fees](docs/ARCHITECTURE.md) — Detailed technical architecture, fee structure, and settlement flow
+- [Building a Connector](docs/connectors/building-a-connector.md) — Add support for a new platform in ~100 lines of code
 - [Contributing Guide](CONTRIBUTING.md) — Development setup, code standards, and submission process
 
 ---

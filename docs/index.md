@@ -149,7 +149,7 @@ Tessera is designed to plug into the open-source creator stack where communities
 - **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
 - **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article subscriptions.
 
-Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/connectors/building-a-connector.md) to get started.
+Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](connectors/building-a-connector.md) to get started.
 
 ---
 
@@ -177,7 +177,7 @@ Tessera uses a **sidecar pattern** to add payments without platform modification
 
 **Client Overlay** (`src/ui/`) — The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
 
-For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](https://github.com/JaDi03/tessera/blob/main/docs/ARCHITECTURE.md).
+For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
