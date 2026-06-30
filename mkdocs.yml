@@ -78,6 +78,7 @@ copyright: Copyright &copy; 2026 Tessera Contributors. Licensed under Apache-2.0
 nav:
   - Home: index.md
   - Architecture & Fees: ARCHITECTURE.md
+  - Payment Models: payment-models.md
   - Getting Started:
     - Prerequisites: getting-started/prerequisites.md
     - Installation: getting-started/installation.md
