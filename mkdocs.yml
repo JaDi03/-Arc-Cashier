@@ -85,6 +85,7 @@ nav:
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md
+    - Viewer Wallet Setup: tutorials/viewer-wallet.md
   - Reference:
     - Architecture & Fees: ARCHITECTURE.md
     - Building a Connector: BUILDING_A_CONNECTOR.md
