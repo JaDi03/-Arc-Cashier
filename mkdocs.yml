@@ -82,13 +82,27 @@ nav:
     - Installation: getting-started/installation.md
     - Configuration: getting-started/configuration.md
     - First Run: getting-started/first-run.md
+  - Supported Platforms:
+    - Owncast:
+      - Overview: platforms/owncast/index.md
+      - Managing Creators: platforms/owncast/managing-creators.md
+      - Monitoring: platforms/owncast/monitoring.md
+      - Withdrawals: platforms/owncast/withdrawals.md
+    - PeerTube:
+      - Overview: platforms/peertube/index.md
+      - Managing Creators: platforms/peertube/managing-creators.md
+      - Monitoring: platforms/peertube/monitoring.md
+      - Withdrawals: platforms/peertube/withdrawals.md
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md
     - Viewer Wallet Setup: tutorials/viewer-wallet.md
+  - Connectors:
+    - Overview: connectors/index.md
+    - Building a Connector: connectors/building-a-connector.md
   - Reference:
     - Architecture & Fees: ARCHITECTURE.md
-    - Building a Connector: BUILDING_A_CONNECTOR.md
+    - Contributing: contributing.md
 
 extra_css:
   - stylesheets/extra.css
