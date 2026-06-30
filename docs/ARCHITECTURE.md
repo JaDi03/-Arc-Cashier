@@ -39,6 +39,20 @@ flowchart LR
     Engine -.->|"Batched settlement claims"| Gateway
 ```
 
+## Fee Structure
+
+Because Tessera relies heavily on off-chain EIP-3009 signatures, viewers only pay network fees for two on-chain transactions during the entire lifecycle of a session:
+
+1. **Deposit (Gateway Funding):** When moving funds into the Gateway Smart Contract.
+2. **Withdrawal (Cash Out):** When settling the session and pulling unused funds back to their wallet.
+
+On the Arc Network, these transactions cost approximately **$0.01 USDC** in network fees (gas). 
+
+**Cross-Chain Forwarding Fees:**
+If a viewer decides to bridge funds from another network (e.g., Ethereum or Base) using Circle's CCTP Forwarding Service instead of direct funding, the Forwarding Service charges a flat **$0.20 USDC** service fee for the transfer.
+
+---
+
 **Why must the settlement engine run exclusively on Arc?**
 
 Tessera is designed for **high-frequency, per-second billing**. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. 
@@ -53,7 +67,7 @@ By leveraging the **Arc Network** combined with the **x402 protocol**:
 
 ### Environment Configuration
 - **Dynamic Routing:** `PUBLIC_URL` is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded `localhost` limitations.
-- **Gas Buffer:** `RETAINED_GAS_AMOUNT` (default 0.1 USDC) is utilized to ensure the ephemeral wallet always retains enough native token for on-chain interactions without failing.
+- **Gas Buffer:** `RETAINED_GAS_AMOUNT` (default 0.01 USDC) is utilized to ensure the ephemeral wallet always retains enough native token for on-chain interactions without failing.
 
 ### Security & Performance
 - **Rate Limiting:** Critical endpoints (`/register-session` and `/end-session`) are protected by IP rate limiting to prevent spam and DDoS attempts.
