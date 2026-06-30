@@ -77,6 +77,7 @@ copyright: Copyright &copy; 2026 Tessera Contributors. Licensed under Apache-2.0
 
 nav:
   - Home: index.md
+  - Architecture & Fees: ARCHITECTURE.md
   - Getting Started:
     - Prerequisites: getting-started/prerequisites.md
     - Installation: getting-started/installation.md
@@ -101,7 +102,6 @@ nav:
     - Overview: connectors/index.md
     - Building a Connector: connectors/building-a-connector.md
   - Reference:
-    - Architecture & Fees: ARCHITECTURE.md
     - Contributing: contributing.md
 
 extra_css:
