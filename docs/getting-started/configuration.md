@@ -16,6 +16,7 @@ Open `.env` in your text editor. Ensure the following critical variables are set
 | :--- | :--- |
 | `CIRCLE_API_KEY` | Your backend key from the Circle Console. |
 | `CIRCLE_APP_ID` | Your frontend UI App ID from the Circle Console. |
+| `MASTER_KEY` | High-entropy secret key used to encrypt ephemeral session keys at rest. **Required** for all platforms to operate securely. |
 | `SELLER_ADDRESS` | The default EVM address for earnings. **Note:** For multi-tenant platforms like PeerTube, this is ignored as the creator configures their wallet directly in the platform's UI. This acts as a fallback for single-tenant setups. |
 | `SELLER_PRIVATE_KEY` | A "Hot Wallet" private key used strictly to pay the gas fees for CCTP cross-chain deposits. If omitted, CCTP deposits will fail, but native payments still work. |
 
