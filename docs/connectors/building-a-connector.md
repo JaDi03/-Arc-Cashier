@@ -7,6 +7,24 @@ This guide walks you through adding support for a new streaming platform to Tess
 - Your platform must emit some form of "user joined" and "user left" events (webhooks, WebSocket messages, API polling, etc.).
 - You should understand how your platform tracks viewer presence.
 
+## The Core Concept: Mapping Events to Endpoints
+
+Tessera's core infrastructure is platform-agnostic. It provides fixed billing functions, and your connector's job is simply to translate your platform's native events into the appropriate Tessera payment model. 
+
+Every platform emits different signals. A music server emits a "scrobble" when a track is played. A live-streaming server fires a webhook when a viewer joins. A photo gallery resolves a shared link. As a developer, you decide which Tessera payment model best fits your platform's events:
+
+### Option A: Continuous Streaming (Per-Second)
+Best for: Live streams, Video-on-Demand, or time-based access.
+- **Start the meter:** Call `sessionService.recordJoin(userId, videoId, ratePerSecond, creatorAddress)` when the user starts consuming. (The `ratePerSecond` and `creatorAddress` allow you to dynamically price the stream and route funds directly to the specific creator).
+- **Stop the meter:** Call `sessionService.recordPartAndSettle(userId)` when the user leaves or playback stops.
+
+### Option B: One-Off Payments & Tips
+Best for: Voluntary donations, per-article purchases, photo downloads, or event-driven micro-licenses (e.g., a music scrobble).
+- **Trigger a Payment:** Your frontend or connector can call `POST /api/core/tip` with the `userId`, `creatorWallet`, and `amount`.
+- This executes a one-time, off-chain settlement directly from the user's Gateway balance to the creator.
+
+You can implement either of these models, or both, depending on what data structures and events your platform exposes.
+
 ## Step 1: Create the Connector Directory
 
 ```
