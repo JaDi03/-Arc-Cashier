@@ -79,12 +79,8 @@ nav:
   - Home: index.md
   - Architecture & Fees: ARCHITECTURE.md
   - Payment Models: payment-models.md
-  - Getting Started:
-    - Prerequisites: getting-started/prerequisites.md
-    - Installation: getting-started/installation.md
-    - Configuration: getting-started/configuration.md
-    - First Run: getting-started/first-run.md
-  - Supported Platforms:
+  - Getting Started: getting-started/index.md
+  - Integrated Platforms:
     - Owncast:
       - Overview: platforms/owncast/index.md
       - Managing Creators: platforms/owncast/managing-creators.md

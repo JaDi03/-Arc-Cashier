@@ -141,7 +141,7 @@ sequenceDiagram
 | Platform | Integration Type | Status |
 |---|---|---|
 | [Owncast](https://owncast.online/) | Built-in connector | Live |
-| [PeerTube](https://joinpeertube.org/) | Plugin + connector | Live |
+| [PeerTube](https://joinpeertube.org/) | Plugin | Live |
 
 Tessera is designed to plug into the open-source creator stack where communities already live. Because it relies on standard event streams, it can be easily extended to support:
 
