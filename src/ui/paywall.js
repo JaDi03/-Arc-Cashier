@@ -1395,10 +1395,11 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     updateContainerStyle();
 
     container.innerHTML = `
-        <div id="arc-tip-header" style="display:none;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <div id="arc-tip-header" style="display:none;justify-content:space-between;align-items:center;margin-bottom:2px;cursor:grab;">
             <h3 style="margin:0;font-size:13px;font-weight:600;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
                 <span class="arc-pulse-dot" style="background:#38ef7d;box-shadow:0 0 0 0 rgba(56,239,125,0.7);width:8px;height:8px;"></span> Support Creator
             </h3>
+            <button id="arc-tip-minimize-btn" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;">−</button>
         </div>
         
         <div id="arc-tip-status-card" class="arc-sm-stats" style="display:none;background:rgba(0,0,0,0.25);border-radius:8px;padding:8px 10px;margin:0;width:100%;box-sizing:border-box;">
@@ -1429,6 +1430,35 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     `;
 
     document.body.appendChild(container);
+
+    // Draggable & Minimizable
+    let isTipDragging = false, tipStartX, tipStartY, tipInitialX, tipInitialY;
+    const tipHeaderEl = document.getElementById('arc-tip-header');
+    
+    tipHeaderEl.addEventListener('mousedown', (e) => {
+        if (e.target.id === 'arc-tip-minimize-btn') return;
+        isTipDragging = true;
+        const rect = container.getBoundingClientRect();
+        tipInitialX = rect.left; tipInitialY = rect.top;
+        tipStartX = e.clientX; tipStartY = e.clientY;
+        container.style.right = 'auto'; container.style.bottom = 'auto';
+    });
+    tipHeaderEl.addEventListener('mousedown', () => { tipHeaderEl.style.cursor = 'grabbing'; });
+    document.addEventListener('mousemove', (e) => {
+        if (!isTipDragging) return;
+        container.style.left = `${tipInitialX + e.clientX - tipStartX}px`;
+        container.style.top = `${tipInitialY + e.clientY - tipStartY}px`;
+    });
+    document.addEventListener('mouseup', () => { 
+        isTipDragging = false; 
+        tipHeaderEl.style.cursor = 'grab';
+    });
+
+    document.getElementById('arc-tip-minimize-btn').addEventListener('click', () => {
+        container.classList.toggle('arc-tip-minimized');
+        document.getElementById('arc-tip-minimize-btn').innerText =
+            container.classList.contains('arc-tip-minimized') ? '+' : '−';
+    });
 
     const btn = document.getElementById('arc-tip-btn');
     const header = document.getElementById('arc-tip-header');
