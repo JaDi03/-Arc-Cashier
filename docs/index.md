@@ -44,7 +44,7 @@ The result is a sustainability crisis: instances shut down when admins can no lo
 
 ## The Solution
 
-Tessera is a **payment sidecar**: a separate process that sits between your users and your platform, adding a flexible micro-payment layer (be it per-second, per-action, or direct tips) without modifying any platform code.
+Tessera is a **payment sidecar**: a separate process that sits between your users and your platform, adding a flexible nanopayment layer (be it per-second, per-action, or direct tips) without modifying any platform code.
 
 ```mermaid
 flowchart LR
@@ -64,7 +64,7 @@ flowchart LR
 
     V -- "1. Consumes Content" --> P
     P -- "2. Emits Native Events" --> T
-    V -. "3. Approves Micropayments" .-> T
+    V -. "3. Approves Nanopayments" .-> T
     T -- "4. Batches & Settles" --> C
     C -- "5. Final Payout (USDC)" --> W
 
@@ -75,7 +75,7 @@ flowchart LR
 **Key Design Principles:**
 
 - **Zero platform modification** — Tessera acts as a reverse proxy; your platform's code remains untouched
-- **Pay only for what you consume (or tip)**: Whether it is per-second billing for a stream, a micro-fee for an article, or a voluntary tip for a creator, the audience pays directly for value without rigid monthly subscriptions
+- **Pay only for what you consume (or tip)**: Whether it is per-second billing for a stream, a fee for an article, or a voluntary tip for a creator, the audience pays directly for value without rigid monthly subscriptions
 - **Gas-free streaming** — Off-chain EIP-3009 signatures every second; batch settlement only happens when the session ends
 - **Cross-chain deposits** — Viewers can fund from any supported chain via Circle CCTP; settlement happens on Arc Testnet
 
@@ -129,10 +129,10 @@ sequenceDiagram
 **In plain terms:**
 
 1. **Viewer opens the platform** → Tessera proxies the request and injects the paywall overlay into the HTML response
-2. **Viewer funds a session** → A Circle Smart Contract Account (SCA) is created on Arc Testnet. The viewer deposits USDC into the Circle Gateway. This is the only on-chain transaction
+2. **Viewer funds a session** → A Circle Smart Contract Account (SCA) is created on Arc Testnet. The viewer deposits USDC into the Circle Gateway. This is one of the two on-chain transactions (along with the subsequent cash-out/withdrawal).
 3. **Session registers** → The client posts the ephemeral session key to Tessera. The GatewayClient makes a single x402 authorization call to unlock access
-4. **Billing runs off-chain** → Every second, an EIP-3009 signature authorizes a micro-payment. No gas. No blockchain transaction per tick
-5. **Viewer leaves** → The client calls `/end-session`. The Gateway batches all pending authorizations, settles on Arc Testnet, transfers earnings to the Creator, and refunds the unused balance to the viewer's wallet
+4. **Billing runs off-chain** → Every second, an EIP-3009 signature authorizes a nanopayment. No gas. No blockchain transaction per tick
+5. **Viewer leaves** → The client calls `/end-session`. Tessera stops billing, and the remaining funds stay in the Gateway contract. The viewer can manually withdraw/refund their balance to their wallet at any time via a `/cash-out` transaction.
 
 ---
 
@@ -147,9 +147,9 @@ Tessera is designed to plug into the open-source creator stack where communities
 
 - **Music Servers (Navidrome, Koel)**: Per-listen royalties triggered by scrobble events.
 - **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
-- **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article micro-subscriptions.
+- **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article subscriptions.
 
-Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](https://github.com/JaDi03/tessera/blob/main/docs/BUILDING_A_CONNECTOR.md) to get started.
+Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](connectors/building-a-connector.md) to get started.
 
 ---
 
@@ -157,12 +157,11 @@ Want to add your platform? Tessera connectors are ~100 lines of code. See [Build
 
 | Technology | Purpose | Why It Matters |
 |---|---|---|
-| [**Circle x402 Gateway**](https://developers.circle.com/gateway/nanopayments) | Batched nanopayment settlement | Enables gas-free USDC payments as small as $0.000001 |
+| [**Circle x402 Gateway**](https://developers.circle.com/gateway/nanopayments) | Batched nanopayment settlement & protocol | Enables gas-free USDC payments as small as $0.000001 using the open HTTP 402 standard |
 | [**Circle UCW SDK**](https://developers.circle.com/wallets/user-controlled) | Smart Contract Accounts on Arc Testnet | Non-custodial wallets with social login, PIN, or biometrics |
-| [**Circle CCTP**](https://www.circle.com/cross-chain-transfer-protocol) | Cross-chain USDC bridging (Domain 26) | Viewers can deposit from any supported chain |
+| [**Circle CCTP Forwarding**](https://www.circle.com/cross-chain-transfer-protocol) | Cross-chain USDC bridging (Domain 26) | Allows viewers to deposit USDC from any supported source chain |
 | [**Arc Testnet**](https://docs.arc.network) | Settlement layer (Chain ID 5042002) | Native USDC gas, sub-second finality, purpose-built for payments |
-| [**x402 Protocol**](https://x402.org/) | HTTP 402 Payment Required standard | Open, chain-agnostic protocol for machine-to-machine payments |
-| [**EIP-3009**](https://eips.ethereum.org/EIPS/eip-3009) | Off-chain transfer authorization | Gasless cryptographic signatures for micro-payments |
+| [**EIP-3009**](https://eips.ethereum.org/EIPS/eip-3009) | Off-chain transfer authorization | Gasless cryptographic signatures for nanopayments |
 | [**viem**](https://viem.sh/) | Type-safe EVM interactions | Modern TypeScript library for blockchain operations |
 | [**Express**](https://expressjs.com/) | HTTP proxy server | Industry-standard Node.js web framework |
 
@@ -178,7 +177,7 @@ Tessera uses a **sidecar pattern** to add payments without platform modification
 
 **Client Overlay** (`src/ui/`) — The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
 
-For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](https://github.com/JaDi03/tessera/blob/main/docs/ARCHITECTURE.md).
+For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -186,11 +185,10 @@ For detailed architecture diagrams, fee breakdowns, and settlement logic, see [d
 
 Tessera transforms how self-hosted platforms sustain themselves:
 
-- **Instance administrators** recover infrastructure costs directly from consumption, without relying on ads or donations
-- **Creators** receive direct, per-second support from their audience, with revenue splits handled automatically
-- **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, no platform fees.
+- **Creators** receive direct, per-second support from their audience, with settled earnings accumulating in their Gateway balance
+- **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, and zero platform fees
 
-The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. The creator receives ~$0.095. The platform admin covers bandwidth costs. Everyone wins.
+The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. These nanopayments are aggregated off-chain and settled to the creator's Gateway balance, which the creator can subsequently withdraw to their personal wallet. Everyone wins.
 
 ---
 

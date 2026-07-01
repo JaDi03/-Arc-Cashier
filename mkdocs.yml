@@ -77,17 +77,31 @@ copyright: Copyright &copy; 2026 Tessera Contributors. Licensed under Apache-2.0
 
 nav:
   - Home: index.md
+  - Architecture & Fees: ARCHITECTURE.md
+  - Payment Models: payment-models.md
   - Getting Started:
     - Prerequisites: getting-started/prerequisites.md
     - Installation: getting-started/installation.md
     - Configuration: getting-started/configuration.md
     - First Run: getting-started/first-run.md
+  - Supported Platforms:
+    - Owncast:
+      - Overview: platforms/owncast/index.md
+      - Managing Creators: platforms/owncast/managing-creators.md
+      - Monitoring: platforms/owncast/monitoring.md
+      - Withdrawals: platforms/owncast/withdrawals.md
+    - PeerTube:
+      - Overview: platforms/peertube/index.md
+      - Managing Creators: platforms/peertube/managing-creators.md
+      - Monitoring: platforms/peertube/monitoring.md
+      - Withdrawals: platforms/peertube/withdrawals.md
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md
-  - Reference:
-    - Architecture & Fees: ARCHITECTURE.md
-    - Building a Connector: BUILDING_A_CONNECTOR.md
+    - Viewer Wallet Setup: tutorials/viewer-wallet.md
+  - Connectors:
+    - Overview: connectors/index.md
+    - Building a Connector: connectors/building-a-connector.md
 
 extra_css:
   - stylesheets/extra.css

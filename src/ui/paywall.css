@@ -597,6 +597,7 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 }
 
 .arc-sm-minimized { height: 48px !important; overflow: hidden; }
+.arc-tip-minimized { height: 48px !important; overflow: hidden; padding-bottom: 0 !important; }
 
 #arc-sm-header {
     display: flex;
