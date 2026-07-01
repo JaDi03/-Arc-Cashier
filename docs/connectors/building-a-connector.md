@@ -165,13 +165,3 @@ The Owncast connector in `src/connectors/owncast/` is the reference implementati
 | `public/paywall.js` | Browser-side paywall (MetaMask connect, deposit, session UI) |
 | `public/paywall.css` | Paywall styling |
 
-## Platform Ideas
-
-Platforms with clean webhook/event surfaces that would make good connectors:
-
-| Platform | Presence Signal | Stars |
-|---|---|---|
-| **Jellyfin** | Session API (polling) | 47.9k |
-| **PeerTube** | ActivityPub / Webhooks | 14.6k |
-| **Navidrome** | Subsonic API (scrobbling) | 13.2k |
-| **Funkwhale** | API events | 1.8k |
