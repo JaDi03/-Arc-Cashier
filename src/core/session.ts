@@ -6,7 +6,7 @@ import { walletService } from './wallet';
  * Uses Circle Gateway for real settlement and refunds.
  */
 export class SessionService {
-    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number, creatorAddress?: string, videoId?: string }>();
+    private activeSessions = new Map<string, { joinedAt: number, ratePerSecond: number, creatorAddress?: string, adminAddress?: string, platformFee: number, tickCount: number, videoId?: string }>();
     private gatewayClients = new Map<string, GatewayClient>();
     private settlementLocks = new Set<string>();
     private paymentInterval: ReturnType<typeof setInterval> | null = null;
@@ -47,8 +47,26 @@ export class SessionService {
                             }
                             const sessionData = this.activeSessions.get(userId);
                             const headers: Record<string, string> = { 'x-user-id': userId };
-                            if (sessionData?.creatorAddress) {
-                                headers['x-seller-address'] = sessionData.creatorAddress;
+                            if (sessionData) {
+                                // Deterministic fee split: every Nth tick goes to admin, rest to creator.
+                                // N = round(1 / platformFee), e.g. every 10th tick for a 10% fee.
+                                // This guarantees an exact proportional split on every session,
+                                // unlike a per-session dice roll which can be wildly unfair.
+                                sessionData.tickCount++;
+                                const adminInterval = sessionData.platformFee > 0
+                                    ? Math.round(1 / sessionData.platformFee)
+                                    : 0;
+                                const routeToAdmin = adminInterval > 0
+                                    && !!sessionData.adminAddress
+                                    && sessionData.tickCount % adminInterval === 0;
+
+                                const payoutAddress = routeToAdmin
+                                    ? sessionData.adminAddress
+                                    : sessionData.creatorAddress;
+
+                                if (payoutAddress) {
+                                    headers['x-seller-address'] = payoutAddress;
+                                }
                             }
                             if (sessionData?.videoId) {
                                 headers['x-video-id'] = sessionData.videoId;
@@ -76,9 +94,13 @@ export class SessionService {
         }, this.PAYMENT_INTERVAL_MS);
     }
 
-    public recordJoin(userId: string, videoId?: string, ratePerSecond: number = 0.0001, creatorAddress?: string): void {
-        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond, creatorAddress, videoId });
-        console.log(`[Session] 🟢 Session started for user: ${userId} on video: ${videoId || 'unknown'} at rate $${ratePerSecond}/s (Creator: ${creatorAddress || 'Default Admin'})`);
+    public recordJoin(userId: string, videoId?: string, ratePerSecond: number = 0.0001, creatorAddress?: string, adminAddress?: string, platformFee: number = 0): void {
+        this.activeSessions.set(userId, { joinedAt: Date.now(), ratePerSecond, creatorAddress, adminAddress, platformFee, tickCount: 0, videoId });
+        const adminInterval = platformFee > 0 ? Math.round(1 / platformFee) : 0;
+        const splitDesc = adminAddress && adminInterval > 0
+            ? `every tick → creator, every ${adminInterval}th tick → admin (${(platformFee * 100).toFixed(0)}%)`
+            : `100% → creator (no admin configured)`;
+        console.log(`[Session] 🟢 Session started for user: ${userId} | video: ${videoId || 'unknown'} | $${ratePerSecond}/s | ${splitDesc}`);
     }
 
     public hasActiveSession(userId: string): boolean {
