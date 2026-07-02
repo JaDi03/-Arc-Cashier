@@ -128,31 +128,21 @@ router.post('/webhook', (req, res) => {
 
     // 3. Process Events (Following building-a-connector.md)
     if (event === 'viewer_joined') {
-        // --- Platform Fee Split (PeerTube-specific) ---
+        // --- Deterministic Platform Fee Split (PeerTube-specific) ---
         // PeerTube has a distinct admin (instance host) and content creator.
-        // The admin charges a platformFee (e.g. 10%) for instance hosting costs.
-        //
-        // Simple approach: the connector decides the effective payoutAddress
-        // probabilistically here, at join time. The session stores the chosen
-        // address so the plugin passes the correct x-seller-address to /stream-access.
-        // The core never sees platformFee — it always pays 100% to x-seller-address.
-        let effectivePayoutAddress = payoutAddress;
-        if (payoutAddress) {
-            const profile = creatorService.getCreatorByAddress(payoutAddress);
-            const platformFee = profile?.platformFee ?? 0.10;
-            const platformAdminAddress = process.env.SELLER_ADDRESS;
+        // Both addresses and the fee percentage are passed to the session service,
+        // which applies the split deterministically: every Nth payment tick goes to
+        // the admin (where N = round(1 / platformFee)), and the rest go to the creator.
+        // This guarantees an exact proportional split on EVERY session, unlike the
+        // previous per-session dice roll which could give 100% to one party unfairly.
+        const platformFee = payoutAddress
+            ? (creatorService.getCreatorByAddress(payoutAddress)?.platformFee ?? 0.10)
+            : 0;
+        const platformAdminAddress = process.env.SELLER_ADDRESS || undefined;
 
-            if (platformAdminAddress && Math.random() < platformFee) {
-                // This tick: route to platform admin (instance hosting fee)
-                effectivePayoutAddress = platformAdminAddress;
-                console.log(`[PeerTube] 🎲 Fee split: routing to platform admin (fee: ${platformFee * 100}%)`);
-            } else {
-                // This tick: route to creator
-                console.log(`[PeerTube] 🎲 Fee split: routing to creator ${payoutAddress}`);
-            }
-        }
+        console.log(`[PeerTube] 📊 Session fee split: ${((1 - platformFee) * 100).toFixed(0)}% creator / ${(platformFee * 100).toFixed(0)}% admin (every ${Math.round(1 / (platformFee || 1))} ticks)`);
 
-        sessionService.recordJoin(userId, videoId, activeRate, effectivePayoutAddress);
+        sessionService.recordJoin(userId, videoId, activeRate, payoutAddress, platformAdminAddress, platformFee);
     } else if (event === 'viewer_left') {
         sessionService.recordPartAndSettle(userId).catch(console.error);
     } else {

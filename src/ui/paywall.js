@@ -980,8 +980,9 @@ window.arcSetRate = function(ratePerSec) {
 // Resets the per-video cost counter and updates the displayed rate without
 // touching the global session or the gateway balance.
 window.arcResetVideoSession = function(newRate) {
-    // Reset per-video counter
+    // Reset per-video counters
     secondsThisVideo = 0;
+    initialGatewayBalance = null; // Will be re-captured on next heartbeat
 
     // Update rate if provided
     if (newRate && Number(newRate) > 0) {
@@ -1023,11 +1024,14 @@ document.addEventListener('ended', (e) => {
 let currentRatePerSecond = 0.0001;
 // Per-video cost counter — lives at module scope so arcResetVideoSession() can reset it
 let secondsThisVideo = 0;
+// Gateway balance at session start — used to display accurate real cost (not a client-side estimate)
+let initialGatewayBalance = null;
 
 function startSessionTimer() {
     if (window.sessionTimer) clearInterval(window.sessionTimer);
-    // Reset per-video counter for this new session unlock
+    // Reset per-video counters for this new session unlock
     secondsThisVideo = 0;
+    initialGatewayBalance = null;
     // Local tick counter for the 5-second backend sync interval
     // (ticks every 1s regardless of play state, so the sync is time-based)
     let tickCount = 0;
@@ -1036,15 +1040,17 @@ function startSessionTimer() {
     const initialRateEl = document.getElementById('arc-sm-rate');
     if (initialRateEl) initialRateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
 
+    // Fetch the initial gateway balance immediately so video cost is accurate from the first heartbeat
+    fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) { if (data) initialGatewayBalance = Number(data.gatewayWithdrawable); })
+        .catch(function() {});
+
     window.sessionTimer = setInterval(async () => {
         tickCount++;
         const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
         if (shouldTick) {
             secondsThisVideo++;
-            const videoCostEl = document.getElementById('arc-sm-video-cost');
-            if (videoCostEl) {
-                videoCostEl.textContent = '$' + (secondsThisVideo * currentRatePerSecond).toFixed(4) + ' USDC';
-            }
         }
 
         if (tickCount % 5 === 0) {
@@ -1060,8 +1066,16 @@ function startSessionTimer() {
                     if (balanceRes.ok) {
                         const data = await balanceRes.json();
                         const withdrawable = Number(data.gatewayWithdrawable);
+                        // Capture initial balance on first heartbeat if the immediate fetch above hadn't resolved yet
+                        if (initialGatewayBalance === null) initialGatewayBalance = withdrawable;
                         const balEl = document.getElementById('arc-sm-balance');
                         if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
+                        // Display real cost: what the gateway actually deducted, not a client-side estimate
+                        const videoCostEl = document.getElementById('arc-sm-video-cost');
+                        if (videoCostEl) {
+                            const spent = Math.max(0, initialGatewayBalance - withdrawable);
+                            videoCostEl.textContent = '$' + spent.toFixed(4) + ' USDC';
+                        }
                         const secondsLeft = withdrawable / currentRatePerSecond;
                         const warningDiv = document.getElementById('arc-sm-warning');
                         if (warningDiv) {

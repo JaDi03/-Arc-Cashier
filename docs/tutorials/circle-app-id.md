@@ -24,4 +24,4 @@ You will see your application listed along with its unique App ID. Copy this val
 
 ---
 
-**Next:** With both your API Key and App ID secured, return to the [Configuration guide](../getting-started/configuration.md) to finalize your sidecar setup.
+**Next:** With both your API Key and App ID secured, return to the [Quick Start guide](../getting-started/index.md#configure-environment-variables) to finalize your sidecar setup.

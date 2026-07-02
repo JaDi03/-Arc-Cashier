@@ -7,6 +7,32 @@ This guide walks you through adding support for a new streaming platform to Tess
 - Your platform must emit some form of "user joined" and "user left" events (webhooks, WebSocket messages, API polling, etc.).
 - You should understand how your platform tracks viewer presence.
 
+## The Core Concept: Mapping Events to Endpoints
+
+Tessera's core infrastructure is platform-agnostic. It provides fixed billing functions, and your connector's job is simply to translate your platform's native events into the appropriate Tessera payment model. 
+
+Every platform emits different signals. A music server emits a "scrobble" when a track is played. A live-streaming server fires a webhook when a viewer joins. A photo gallery resolves a shared link. As a developer, you decide which Tessera payment model best fits your platform's events:
+
+### Option A: Continuous Streaming (Per-Second)
+Best for: Live streams, Video-on-Demand, or time-based access.
+- **Start the meter:** Call `sessionService.recordJoin(userId, videoId, ratePerSecond, creatorAddress)` when the user starts consuming. (The `ratePerSecond` and `creatorAddress` allow you to dynamically price the stream and route funds directly to the specific creator).
+- **Stop the meter:** Call `sessionService.recordPartAndSettle(userId)` when the user leaves or playback stops.
+
+### Option B: One-Off Payments & Tips
+Best for: Voluntary donations, per-article purchases, photo downloads, or event-driven micro-licenses (e.g., a music scrobble).
+- **Trigger a Payment:** Your frontend or connector can call `POST /api/core/tip` with the `userId`, `creatorWallet`, and `amount`.
+- This executes a one-time, off-chain settlement directly from the user's Gateway balance to the creator.
+
+You can implement either of these models, or both, depending on what data structures and events your platform exposes.
+
+## The Frontend & Identity Concept
+
+Tessera provides a universal, platform-agnostic UI (`src/ui/paywall.js`) that handles wallets, CCTP bridging, and Circle sessions. You do not need to build a crypto frontend from scratch.
+
+Your connector has two responsibilities regarding the frontend:
+1. **Serve and Inject:** Serve the `src/ui` directory as static assets and inject the script into your platform's HTML response using a reverse proxy. The reverse proxy will route traffic to your platform's `upstreamUrl` (defined in the configuration).
+2. **Identity Synchronization (The `userId` rule):** If your platform tracks users, you must ensure that the `userId` in the frontend exactly matches the `userId` emitted by your backend webhooks. You can do this by injecting `window.PLATFORM_USER_ID = 'user_123'` into the HTML before the paywall loads. If left undefined, the paywall generates an anonymous local ID, which is fine for anonymous tips but will not map correctly to backend presence events.
+
 ## Step 1: Create the Connector Directory
 
 ```
@@ -24,6 +50,8 @@ Create `src/connectors/your-platform/index.ts`:
 ```typescript
 import express from 'express';
 import path from 'path';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import * as cheerio from 'cheerio';
 import type { Connector, ConnectorConfig } from '../../core/types';
 import { sessionService } from '../../core/session';
 
@@ -31,7 +59,10 @@ const myConnector: Connector = {
     name: 'YourPlatform',
 
     register(app: express.Express, config: ConnectorConfig): void {
-        // Register your webhook/event listener
+        // 1. Serve the universal frontend paywall assets
+        app.use('/your-platform-assets', express.static(path.join(__dirname, '..', '..', 'ui')));
+
+        // 2. Register your webhook/event listener
         app.post('/api/connectors/your-platform/webhook', (req, res) => {
             const { event, userId } = req.body;
 
@@ -44,11 +75,30 @@ const myConnector: Connector = {
             res.json({ status: 'ok' });
         });
 
-        // (Optional) Serve frontend paywall assets
-        app.use('/your-platform-assets', express.static(path.join(__dirname, 'public')));
-
-        // (Optional) Set up a reverse proxy to inject paywall into your platform's UI
-        // See src/connectors/owncast/proxy.ts for an example using http-proxy-middleware + cheerio
+        // 3. Set up a reverse proxy using config.upstreamUrl to inject the paywall
+        app.use('/', createProxyMiddleware({
+            target: config.upstreamUrl,
+            changeOrigin: true,
+            selfHandleResponse: true,
+            on: {
+                proxyRes: async (responseBuffer, proxyRes, req, res) => {
+                    const contentType = proxyRes.headers['content-type'];
+                    if (contentType && contentType.includes('text/html')) {
+                        const html = responseBuffer.toString('utf8');
+                        const $ = cheerio.load(html);
+                        
+                        // Inject the identity and the paywall script
+                        $('body').append(`<script>window.PLATFORM_USER_ID = 'dynamic_user_id_here';</script>`);
+                        $('body').append(`<script src="/your-platform-assets/paywall.js"></script>`);
+                        
+                        const modifiedHtml = $.html();
+                        res.setHeader('Content-Length', Buffer.byteLength(modifiedHtml));
+                        return modifiedHtml;
+                    }
+                    return responseBuffer;
+                }
+            }
+        }));
     }
 };
 
@@ -115,13 +165,3 @@ The Owncast connector in `src/connectors/owncast/` is the reference implementati
 | `public/paywall.js` | Browser-side paywall (MetaMask connect, deposit, session UI) |
 | `public/paywall.css` | Paywall styling |
 
-## Platform Ideas
-
-Platforms with clean webhook/event surfaces that would make good connectors:
-
-| Platform | Presence Signal | Stars |
-|---|---|---|
-| **Jellyfin** | Session API (polling) | 47.9k |
-| **PeerTube** | ActivityPub / Webhooks | 14.6k |
-| **Navidrome** | Subsonic API (scrobbling) | 13.2k |
-| **Funkwhale** | API events | 1.8k |
