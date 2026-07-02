@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { formatUnits, parseUnits } from 'viem';
+import { GATEWAY_FEE_BUFFER } from '../../core/gateway-utils';
 import {
     buildGatewayMintTransaction,
     computeCreatorWithdrawAmount,
@@ -227,13 +228,11 @@ creatorRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
 
         const balances = await sellerClient.getBalances();
         const availableMicro = parseUnits(balances.gateway.formattedAvailable, 6);
-        const feeBuffer = parseUnits('0.0035', 6);
-
-        if (availableMicro <= feeBuffer) {
+        if (availableMicro <= GATEWAY_FEE_BUFFER) {
             return res.json({ status: 'no_funds', balance: balances.gateway.formattedAvailable });
         }
 
-        const safeWithdrawMicro = availableMicro - feeBuffer;
+        const safeWithdrawMicro = availableMicro - GATEWAY_FEE_BUFFER;
         const safeWithdrawAmount = formatUnits(safeWithdrawMicro, 6);
 
         const withdrawResult = await sellerClient.withdraw(safeWithdrawAmount);
