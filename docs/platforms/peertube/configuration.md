@@ -1,26 +1,34 @@
-# Admin Configuration (Platform Fees)
+# Configuration
 
-As the administrator of the PeerTube instance, you provide the hosting and bandwidth. Therefore, Tessera allows you to configure a "Platform Fee" that is automatically deducted from the per-second payments before the funds reach the video creator's wallet.
+After installing the Tessera plugin on your PeerTube instance, you must configure the backend connection. The configuration is split into two parts: **Global Configuration** for the instance administrator, and **Channel Configuration** for individual content creators.
 
-## Environment Variables
+## Global Configuration (Administrator)
 
-To collect your platform fees, you must configure two critical variables in the `.env` file of your **Tessera** server (not PeerTube):
+As the administrator of the PeerTube instance, you must link the plugin to your Tessera sidecar and configure your foundational platform wallet.
 
-```env
-# The private key of the Administrator's wallet where fees will be deposited
-SELLER_PRIVATE_KEY="0xYourHexPrivateKey"
+1. Log in to your PeerTube instance as an Administrator.
+2. Go to **Administration** > **Plugins/Themes** > **Installed**.
+3. Locate the **plugin tessera** and click **Settings**.
 
-# A shared secret password between the PeerTube Plugin and Tessera
-PEERTUBE_WEBHOOK_SECRET="super_secret_random_123"
-```
+You will see the following configuration panel:
 
-### Why `PEERTUBE_WEBHOOK_SECRET`?
-The administrator withdrawal endpoint (`POST /api/connectors/peertube/seller/withdraw`) is protected to ensure external attackers cannot indiscriminately trigger your withdrawals or query your balance. Only the PeerTube Plugin knows this secret.
+![PeerTube Plugin Settings](../../assets/peertube_plugin_settings.png)
 
-## Withdrawing Platform Fees
+### Field Guide
 
-You do not need to interact with the terminal to withdraw your funds.
-1. Log in to PeerTube as an Administrator.
-2. Navigate to the **Settings** of the Tessera plugin.
-3. The plugin will use the `PEERTUBE_WEBHOOK_SECRET` to securely query Tessera and display your accumulated balance.
-4. Click **Withdraw Platform Fees**. The Tessera backend will use your `SELLER_PRIVATE_KEY` to sign the withdrawal transaction on the Arc network and send the USDC directly to your wallet.
+1. **Tessera Base URL**: The public URL where your Tessera backend is running (e.g., `https://tessera.yourdomain.com`). This is the same URL you configured during the `npm run setup` process.
+2. **Tessera Webhook URL**: The exact route where PeerTube will send server-side events. This must be your base URL appended with `/api/connectors/peertube/webhook`.
+3. **Tessera Webhook Secret**: The `WEBHOOK_SECRET` randomly generated during your `npm run setup` process. You can find this inside your Tessera `.env` file. This ensures all communication is cryptographically signed and secure.
+4. **Max Active Viewers**: The maximum number of concurrent viewers allowed in memory. `10000` is the recommended default to protect your server.
+5. **Admin Wallet (Arc Network)**: Your public wallet address (e.g., `0x...`) on the Arc Network. This is a **mandatory** field.
+
+> [!IMPORTANT]
+> **Why the Admin Wallet is Required**
+> The core Tessera engine uses your Admin Wallet as the foundational routing address to interface with the Circle Gateway. Without it, the engine will block all viewer deposits with a 400 Error. 
+> By default, the system automatically routes a fixed **10%** of all per-second micropayments to this address to help cover your hosting costs, while the remaining **90%** goes directly to the creators. This uses a **deterministic tick-routing engine** rather than a percentage calculation at the end of the session, guaranteeing that exactly 1 out of every 10 nanopayments goes straight to the admin's wallet.
+
+Once you have filled out these fields, click **Update plugin settings**.
+
+## Channel Configuration (Creator)
+
+*(This section will explain how individual creators set up their wallets and pricing. To be documented).*

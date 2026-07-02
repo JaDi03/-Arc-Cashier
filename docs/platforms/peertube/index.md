@@ -2,35 +2,40 @@
 
 Tessera integrates natively with PeerTube via an official plugin. Unlike other monolithic platforms, **PeerTube does not require setting up a reverse proxy**, as the plugin handles injecting the paywall directly into the video interface automatically.
 
-This guide assumes you already have a PeerTube instance running and that you have Administrator access.
+> [!IMPORTANT]
+> This guide assumes you have already successfully installed the Tessera backend following the [Quick Start](../../getting-started/index.md) guide and selected **Option 2 (PeerTube)** during the setup wizard.
+> It also assumes you have a PeerTube instance running and Administrator access.
 
-## Plugin Installation
+## The Sustainability Model (Plugin V1)
 
-The official Tessera plugin for PeerTube is not available in the public NPM registry, so it must be cloned and installed directly from its GitHub repository.
+In the self-hosted ecosystem, instance administrators generously bear the heavy infrastructure costs (servers, storage, bandwidth) out of pocket. To create a sustainable environment for both hosts and creators, the **V1 Plugin** introduces a transparent value exchange system. 
 
-### Step 1: Clone and Build
-SSH into your PeerTube server, navigate to the plugins directory, and run:
+Creators have two modes to receive direct financial support from their audience:
+
+1. **Pay-Per-Second**: Best suited for premium content, courses, or exclusive streams. The audience pays a micro-rate for the exact time they watch. In this mode, the system automatically routes **10%** of the earnings to the instance administrator to help cover hosting costs, while the remaining **90%** goes directly to the creator. This fee split is powered by a **deterministic tick-routing engine** (e.g., exactly 1 out of every 10 nanopayments is routed directly to the admin's wallet), guaranteeing absolute mathematical fairness down to the micro-cent.
+2. **Direct Tipping**: Available for any public video. Viewers can send one-off support directly from the video player. In this mode, **100%** of the tip goes directly to the creator.
+
+### Step 1: Clone and Install
+
+The official Tessera plugin for PeerTube is not available in the public NPM registry, so it must be cloned and installed directly from its GitHub repository. We provide an automated script that builds the plugin, locates your PeerTube Docker container, cleans the cache, and safely installs the latest version.
+
+SSH into your PeerTube server and run the following commands:
 
 ```bash
-cd /var/www/peertube/storage/plugins
-git clone https://github.com/JaDi03/peertube-plugin-tessera
+cd /opt/
+git clone https://github.com/JaDi03/peertube-plugin-tessera.git
 cd peertube-plugin-tessera
-npm install
-npm run build
+chmod +x update-plugin.sh
+./update-plugin.sh
 ```
 
-### Step 2: Enable in PeerTube
-Next, install the plugin locally using the PeerTube CLI:
+![Plugin Installation Success](../../assets/plugin_install_success.png)
 
-```bash
-cd /var/www/peertube/peertube-server
-NODE_ENV=production npm run plugin:install -- --plugin-path /var/www/peertube/storage/plugins/peertube-plugin-tessera
-```
-
-### Step 3: Configure the Tessera URL
+### Step 2: Verify in PeerTube
 1. Log in to your PeerTube instance as an Administrator.
-2. Go to **Administration** > **Plugins/Themes** > **Local**.
-3. Locate **Tessera Paywall Plugin** and click **Settings**.
-4. In the `Tessera Backend URL` field, enter the public URL of your Tessera instance (e.g., `https://tessera.my-server.com`).
+2. Go to **Administration** > **Plugins/Themes** > **Installed**.
+3. Verify that the **Tessera Paywall Plugin** is listed and active.
 
-Once configured, the PeerTube plugin will begin displaying the paywall on your videos and automatically sending per-second billing webhooks to the Tessera backend.
+![PeerTube Plugin Active](../../assets/peertube_plugin_active.png)
+
+Installation is complete. Please proceed to the [Configuration](configuration.md) guide to set up your platform fees and creator wallets.
