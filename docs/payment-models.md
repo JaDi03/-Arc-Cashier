@@ -10,6 +10,8 @@ This is the default mode for continuous content like live streams, music, or vid
 
 As long as the viewer's connection is active, the Tessera client silently generates an EIP-3009 cryptographic signature every second. The billing engine accumulates these signatures off-chain, verifying that the user has enough balance. The viewer is strictly charged for the exact time consumed.
 
+To ensure perfect transparency, the visual paywall modal synchronizes directly with the Circle Gateway every 5 seconds. This guarantees that viewers always see the exact, verifiably deducted amount of USDC in real-time, eliminating any risk of discrepancies between the UI and the blockchain.
+
 ![Streaming UI](assets/streaming_ui.png)
 
 ---
