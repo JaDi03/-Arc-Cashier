@@ -16,6 +16,20 @@ const ARC_CHAIN_ID_HEX = '0x' + ARC_CHAIN_ID.toString(16);
 // Arc Testnet — USDC native token address (verified from Circle docs)
 const ARC_USDC = '0x3600000000000000000000000000000000000000';
 
+const LOCK_SVG = `
+    <svg class="arc-btn-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; display:inline-block; vertical-align:middle;">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+`;
+
+const UNLOCK_SVG = `
+    <svg class="arc-btn-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; display:inline-block; vertical-align:middle;">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+    </svg>
+`;
+
 // CCTP — Source chains supported in testnet (verified from Circle docs)
 // TokenMessengerV2 is the same address on all EVM testnets
 const TOKEN_MESSENGER_V2 = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -150,14 +164,18 @@ function renderPaywallOverlay() {
                         <p class="arc-pricing-note">Unused funds can be cashed out to your wallet at any time.</p>
     `;
     const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
-    const unlockBtnText = isTipMode ? "🔓 Enable Tipping" : "🔓 Unlock Video";
+    const unlockBtnText = isTipMode 
+        ? `${UNLOCK_SVG} Enable Tipping` 
+        : `${UNLOCK_SVG} Unlock Video`;
 
     const overlay = document.createElement('div');
     overlay.id = 'arc-paywall-overlay';
     overlay.innerHTML = `
         <div id="arc-paywall-modal">
             <div id="arc-paywall-header">
-                <div id="arc-paywall-logo">TESSERA</div>
+                <div id="arc-paywall-logo">
+                    <img src="${SCRIPT_BASE_DIR}logo_yellow.svg" alt="Tessera" />
+                </div>
                 <h2>${title}</h2>
                 <p>${subtitle}</p>
             </div>
@@ -167,8 +185,7 @@ function renderPaywallOverlay() {
                         ${pricingBox}
                     </div>
                     <button id="arc-login-btn" class="arc-btn arc-btn-primary">
-                        <span class="arc-btn-icon">🔐</span>
-                        Sign in with PIN
+                        ${LOCK_SVG} Sign in with PIN
                     </button>
                     <p id="arc-login-status" class="arc-status-text" style="display:none;"></p>
                 </div>
@@ -205,6 +222,20 @@ function renderPaywallOverlay() {
                             </div>
                             <span class="arc-chevron">↗</span>
                         </a>
+                    </div>
+
+                    <!-- Deposit Selector Section -->
+                    <div class="arc-deposit-selector-wrap">
+                        <span class="arc-info-label">USDC Deposit Amount to Gateway</span>
+                        <div class="arc-deposit-selector">
+                            <button type="button" class="arc-deposit-opt active" data-amount="1.00">1 USDC</button>
+                            <button type="button" class="arc-deposit-opt" data-amount="5.00">5 USDC</button>
+                            <button type="button" class="arc-deposit-opt" data-amount="10.00">10 USDC</button>
+                            <div class="arc-deposit-custom-wrap">
+                                <span class="arc-deposit-custom-symbol">$</span>
+                                <input id="arc-deposit-custom-input" type="number" min="0.1" step="0.1" placeholder="Custom" />
+                            </div>
+                        </div>
                     </div>
 
                     <div id="arc-waiting-balance" class="arc-waiting-box" style="display:none;">
@@ -305,6 +336,27 @@ function renderPaywallOverlay() {
     document.getElementById('arc-cctp-info-btn').addEventListener('click', toggleCctpInfo);
     document.getElementById('arc-copy-btn').addEventListener('click', copyWalletAddress);
 
+    // Wire up deposit selector buttons and custom input events
+    const optButtons = overlay.querySelectorAll('.arc-deposit-opt');
+    const customInput = overlay.querySelector('#arc-deposit-custom-input');
+
+    optButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            optButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (customInput) customInput.value = '';
+        });
+    });
+
+    if (customInput) {
+        customInput.addEventListener('input', () => {
+            optButtons.forEach(b => b.classList.remove('active'));
+        });
+        customInput.addEventListener('focus', () => {
+            optButtons.forEach(b => b.classList.remove('active'));
+        });
+    }
+
     // Build network list inside CCTP modal
     buildCctpNetworkList();
 }
@@ -377,7 +429,7 @@ async function handleEmailLogin() {
     } catch (error) {
         console.error('[Tessera] Login error:', error);
         btn.disabled = false;
-        btn.innerHTML = '<span class="arc-btn-icon">🔐</span> Sign in with PIN';
+        btn.innerHTML = `${LOCK_SVG} Sign in with PIN`;
         setLoginStatus('Error: ' + (error.message || 'Unknown error. Please retry.'), true);
     }
 }
@@ -409,9 +461,8 @@ async function getOrCreateArcWallet() {
 
 // ─── Arc Balance Check (via eth_call on Arc RPC) ──────────────────────────────
 
-async function checkArcBalance(address) {
+async function getArcBalance(address) {
     try {
-        // On Arc Testnet, USDC is the native gas token. Use eth_getBalance instead of ERC20 balanceOf
         const res = await fetch('https://rpc.testnet.arc.network', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -421,15 +472,18 @@ async function checkArcBalance(address) {
             }),
         });
         const json = await res.json();
-        // Native balance on Arc Testnet uses 18 decimals!
-        // 0.01 USDC = 0.01 * 10^18 = 10000000000000000 wei
         const balance = BigInt(json.result || '0x0');
-        // Check if balance >= 0.01 native USDC (10^16 wei)
-        return balance >= 10000000000000000n;
+        // Native balance on Arc Testnet uses 18 decimals!
+        return Number(balance) / 1e18;
     } catch (e) {
-        console.warn('[Tessera] Balance check failed:', e);
-        return false;
+        console.warn('[Tessera] Balance fetch failed:', e);
+        return 0;
     }
+}
+
+async function checkArcBalance(address) {
+    const bal = await getArcBalance(address);
+    return bal >= 0.01;
 }
 
 // ─── Phase 2: Funding Panel ───────────────────────────────────────────────────
@@ -472,11 +526,25 @@ function enableUnlockButton() {
     const btn = document.getElementById('arc-unlock-btn');
     btn.disabled = false;
     btn.classList.remove('arc-btn-disabled');
-    btn.innerHTML = isTipMode ? '🔓 Enable Tipping' : '🔓 Unlock Video';
+    btn.innerHTML = isTipMode ? `${UNLOCK_SVG} Enable Tipping` : `${UNLOCK_SVG} Unlock Video`;
     document.getElementById('arc-waiting-balance').style.display = 'none';
     // Small celebration pulse
     btn.classList.add('arc-pulse-once');
     setTimeout(() => btn.classList.remove('arc-pulse-once'), 600);
+}
+
+function getSelectedDepositAmount() {
+    const customInput = document.getElementById('arc-deposit-custom-input');
+    if (customInput && customInput.value.trim() !== '') {
+        const amt = parseFloat(customInput.value);
+        return isNaN(amt) ? 1.00 : amt;
+    }
+    const activeBtn = document.querySelector('.arc-deposit-opt.active');
+    if (activeBtn) {
+        const amt = parseFloat(activeBtn.getAttribute('data-amount'));
+        return isNaN(amt) ? 1.00 : amt;
+    }
+    return 1.00;
 }
 
 // ─── Phase 3: Unlock Video / Enable Tipping ───────────────────────────────────
@@ -490,6 +558,17 @@ async function handleUnlock() {
     setFundStatus('');
 
     try {
+        const selectedAmount = getSelectedDepositAmount();
+        if (selectedAmount < 0.1) {
+            throw new Error('Minimum deposit amount is 0.1 USDC');
+        }
+
+        setFundStatus('Checking wallet balance…');
+        const currentBalance = await getArcBalance(viewerState.walletAddress);
+        if (currentBalance < selectedAmount) {
+            throw new Error(`Insufficient funds: Your wallet has $${currentBalance.toFixed(4)} USDC, but you chose to deposit $${selectedAmount.toFixed(2)} USDC.`);
+        }
+
         setFundStatus('Preparing deposit to Gateway…');
 
         // Refresh Circle token if expired
@@ -531,14 +610,14 @@ async function handleUnlock() {
         if (!skipDeposit) {
             setFundStatus('Approve USDC deposit in the popup…');
 
-            // Prepare a 1 USDC deposit challenge from SCA → Ephemeral Wallet
+            // Prepare a deposit challenge from SCA → Ephemeral Wallet
             const depositRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userToken: viewerState.userToken,
                     walletId: viewerState.walletId,
-                    depositAmount: '1',
+                    depositAmount: selectedAmount.toString(),
                     ephemeralPk: viewerState.ephemeralPk,
                 }),
             });
@@ -624,7 +703,7 @@ async function handleUnlock() {
     } catch (error) {
         console.error('[Tessera] Unlock error:', error);
         btn.disabled = false;
-        btn.innerHTML = isTipMode ? '🔓 Enable Tipping' : '🔓 Unlock Video';
+        btn.innerHTML = isTipMode ? `${UNLOCK_SVG} Enable Tipping` : `${UNLOCK_SVG} Unlock Video`;
         setFundStatus('Error: ' + (error.message || 'Please retry.'), true);
     }
 }
@@ -880,24 +959,24 @@ function renderSessionManager() {
                 <div><span>Video cost:</span> <span id="arc-sm-video-cost">$0.0000 USDC</span></div>
                 <div><span>Balance:</span>    <span id="arc-sm-balance">— USDC</span></div>
             </div>
-            <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.2);border:1px solid orange;padding:10px;margin-top:10px;margin-bottom:10px;border-radius:4px;text-align:center;">
-                <p style="margin:0 0 5px;color:orange;font-size:12px;font-weight:bold;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
+            <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.15);border:1px solid rgba(255,165,0,0.3);padding:10px;margin-top:10px;margin-bottom:10px;border-radius:12px;text-align:center;backdrop-filter:blur(5px);">
+                <p style="margin:0 0 8px;color:#ffa500;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
                 <div id="arc-sm-topup-form" style="display:none;margin:6px 0;">
                     <div style="display:flex;gap:6px;align-items:center;justify-content:center;">
-                        <span style="color:#e2e8f0;font-size:12px;">$</span>
-                        <input id="arc-sm-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount (USDC)"
-                            style="width:110px;padding:4px 8px;border-radius:4px;border:1px solid #4a5568;background:#2d3748;color:#e2e8f0;font-size:12px;" />
-                        <button id="arc-sm-topup-confirm-btn" class="arc-btn" style="padding:4px 10px;font-size:11px;">Confirm</button>
-                        <button id="arc-sm-topup-cancel-btn" class="arc-btn" style="padding:4px 10px;font-size:11px;background:#4a5568;">✕</button>
+                        <span style="color:#e2e8f0;font-size:12px;font-weight:700;">$</span>
+                        <input id="arc-sm-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount"
+                            style="width:90px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:white;font-size:12px;outline:none;" />
+                        <button id="arc-sm-topup-confirm-btn" class="arc-sm-btn" style="background:#22c55e;color:white;padding:4px 8px;">Confirm</button>
+                        <button id="arc-sm-topup-cancel-btn" class="arc-sm-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:4px 8px;">✕</button>
                     </div>
                 </div>
-                <button id="arc-sm-topup-btn" class="arc-btn" style="padding:5px 10px;font-size:11px;margin:0 auto;display:inline-block;">Top Up</button>
+                <button id="arc-sm-topup-btn" class="arc-sm-btn" style="background:#00b4d8;color:white;width:auto;margin:4px auto 0;padding:6px 12px;font-size:11px;box-shadow:0 2px 8px rgba(0,180,216,0.25);">Top Up</button>
             </div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
-                <button id="arc-sm-leave-btn" class="arc-btn" style="flex:1;background:#4a5568;font-size:11px;padding:8px 4px;">Just Leave</button>
-                <button id="arc-sm-end-btn" class="arc-btn arc-btn-danger" style="flex:2;font-size:11px;padding:8px 4px;">Cash Out &amp; Exit</button>
+            <div class="arc-sm-btn-group">
+                <button id="arc-sm-leave-btn" class="arc-sm-btn">Just Leave</button>
+                <button id="arc-sm-end-btn" class="arc-sm-btn">Cash Out &amp; Exit</button>
             </div>
-            <p style="margin:6px 0 0;font-size:10px;color:#718096;text-align:center;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
+            <p style="margin:8px 0 0;font-size:10px;color:#718096;text-align:center;line-height:1.3;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
         </div>
     `;
     document.body.appendChild(sm);
@@ -1046,6 +1125,8 @@ function startSessionTimer() {
         .then(function(data) { if (data) initialGatewayBalance = Number(data.gatewayWithdrawable); })
         .catch(function() {});
 
+    let lastWithdrawableBalance = null;
+
     window.sessionTimer = setInterval(async () => {
         tickCount++;
         const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
@@ -1067,7 +1148,13 @@ function startSessionTimer() {
                         const data = await balanceRes.json();
                         const withdrawable = Number(data.gatewayWithdrawable);
                         // Capture initial balance on first heartbeat if the immediate fetch above hadn't resolved yet
-                        if (initialGatewayBalance === null) initialGatewayBalance = withdrawable;
+                        if (initialGatewayBalance === null) {
+                            initialGatewayBalance = withdrawable;
+                        } else if (lastWithdrawableBalance !== null && withdrawable > lastWithdrawableBalance) {
+                            // Top-up detected! Adjust initial balance to keep spent calculation correct.
+                            initialGatewayBalance += (withdrawable - lastWithdrawableBalance);
+                        }
+                        lastWithdrawableBalance = withdrawable;
                         const balEl = document.getElementById('arc-sm-balance');
                         if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
                         // Display real cost: what the gateway actually deducted, not a client-side estimate

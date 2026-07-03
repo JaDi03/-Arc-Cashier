@@ -3,6 +3,8 @@
    Universal paywall for Owncast, PeerTube and beyond
    ═══════════════════════════════════════════════════ */
 
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 /* ── Overlay ─────────────────────────────────────── */
 
 #arc-paywall-overlay {
@@ -14,8 +16,9 @@
     justify-content: center;
     align-items: center;
     background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(10px);
-    font-family: 'Inter', system-ui, sans-serif;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
     color: white;
     opacity: 1;
     transition: opacity 0.5s ease;
@@ -30,42 +33,52 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 /* ── Modal ───────────────────────────────────────── */
 
 #arc-paywall-modal {
-    background: linear-gradient(150deg, #12122a 0%, #1a1f3a 100%);
-    border: 1px solid rgba(79, 172, 254, 0.18);
-    border-radius: 20px;
+    background: linear-gradient(150deg, rgba(18, 18, 42, 0.8) 0%, rgba(26, 31, 58, 0.8) 100%) padding-box,
+                linear-gradient(135deg, rgba(0, 242, 254, 0.35), rgba(79, 172, 254, 0.35), rgba(155, 81, 224, 0.35)) border-box;
+    border: 1px solid transparent;
+    border-radius: 24px;
     width: 420px;
     max-width: 96vw;
     box-shadow:
-        0 30px 60px -15px rgba(0, 0, 0, 0.6),
-        0 0 50px rgba(0, 112, 243, 0.15),
-        inset 0 1px 0 rgba(255,255,255,0.05);
+        0 30px 60px -15px rgba(0, 0, 0, 0.8),
+        0 0 50px rgba(0, 242, 254, 0.15),
+        inset 0 1px 0 rgba(255,255,255,0.08);
     overflow: hidden;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
 }
 
 #arc-paywall-header {
-    padding: 28px 32px 20px;
+    padding: 32px 32px 24px;
     text-align: center;
     border-bottom: 1px solid rgba(255,255,255,0.06);
-    background: linear-gradient(180deg, rgba(79,172,254,0.06) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(0, 242, 254, 0.05) 0%, transparent 100%);
 }
 
 #arc-paywall-logo {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(79,172,254,0.7);
-    margin-bottom: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+#arc-paywall-logo img {
+    height: 34px;
+    width: auto;
+    filter: drop-shadow(0 0 10px rgba(255, 179, 0, 0.4));
 }
 
 #arc-paywall-modal h2 {
-    margin: 0 0 6px;
-    font-size: 22px;
-    font-weight: 700;
-    background: linear-gradient(90deg, #4facfe, #00f2fe);
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #00f2fe, #4facfe);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    filter: drop-shadow(0 2px 8px rgba(0, 242, 254, 0.3));
 }
 
 #arc-paywall-modal p {
@@ -73,6 +86,7 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     font-size: 13px;
     margin: 0;
     line-height: 1.5;
+    font-weight: 500;
 }
 
 #arc-paywall-body {
@@ -145,7 +159,27 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     box-shadow: none !important;
 }
 
-.arc-btn-primary { /* same as .arc-btn, alias for clarity */ }
+.arc-btn-primary {
+    background: linear-gradient(90deg, #0082ff 0%, #00d4ff 100%) !important;
+    color: white !important;
+    border-radius: 12px !important;
+    padding: 14px 24px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
+    border: none !important;
+    box-shadow: 
+        0 4px 20px rgba(0, 130, 255, 0.35),
+        0 0 15px rgba(0, 212, 255, 0.2) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.arc-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px) !important;
+    box-shadow: 
+        0 8px 28px rgba(0, 130, 255, 0.45),
+        0 0 25px rgba(0, 212, 255, 0.35) !important;
+}
 
 .arc-btn-icon { font-size: 17px; }
 
@@ -181,17 +215,18 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 /* ── Wallet address box ───────────────────────────── */
 
 .arc-info-box {
-    background: rgba(0,0,0,0.25);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 10px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(5px);
 }
 
 .arc-info-label {
     display: block;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: #4facfe;
@@ -245,22 +280,23 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
-    padding: 13px 15px;
+    padding: 14px 16px;
     cursor: pointer;
     text-align: left;
     color: white;
     text-decoration: none;
-    transition: background 0.18s, border-color 0.18s, transform 0.18s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     width: 100%;
 }
 
 .arc-fund-card:hover {
-    background: rgba(79,172,254,0.1);
-    border-color: rgba(79,172,254,0.3);
-    transform: translateX(2px);
+    background: rgba(0, 242, 254, 0.08);
+    border-color: rgba(0, 242, 254, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 242, 254, 0.15);
 }
 
 .arc-fund-icon { font-size: 22px; flex-shrink: 0; }
@@ -583,17 +619,18 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     position: fixed;
     bottom: 20px; right: 20px;
     z-index: 999;
-    background: linear-gradient(145deg, rgba(18,18,42,0.96), rgba(22,31,56,0.96));
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    border: 1px solid rgba(79,172,254,0.15);
-    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(18,18,42,0.85), rgba(22,31,56,0.85)) padding-box,
+                linear-gradient(135deg, rgba(0, 242, 254, 0.35), rgba(79, 172, 254, 0.35), rgba(155, 81, 224, 0.35)) border-box;
+    border: 1px solid transparent;
+    border-radius: 20px;
     padding: 18px 20px;
     width: 275px;
-    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.55), 0 0 20px rgba(0,112,243,0.12);
-    font-family: 'Inter', system-ui, sans-serif;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 242, 254, 0.08);
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
     color: white;
     transition: opacity 0.3s ease, transform 0.3s ease;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .arc-sm-minimized { height: 48px !important; overflow: hidden; }
@@ -610,9 +647,11 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 #arc-sm-header:active { cursor: grabbing; }
 
 #arc-session-manager h3 {
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
     margin: 0;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 800;
+    letter-spacing: -0.01em;
     color: #f1f5f9;
     display: flex;
     align-items: center;
@@ -645,26 +684,164 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
 #arc-sm-minimize-btn:hover { color: #e2e8f0; }
 
 .arc-sm-stats {
-    background: rgba(0,0,0,0.25);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
 }
 
 .arc-sm-stats div {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 6px;
+    align-items: center;
+    margin-bottom: 8px;
     font-size: 12px;
-    color: #64748b;
+    color: #94a3b8;
 }
 
 .arc-sm-stats div:last-child {
     margin-bottom: 0;
     border-top: 1px solid rgba(255,255,255,0.07);
-    padding-top: 6px;
+    padding-top: 8px;
     color: #e2e8f0;
     font-weight: 600;
 }
 
-.arc-sm-stats span:last-child { color: #e2e8f0; }
+.arc-sm-stats span:last-child {
+    color: #f1f5f9;
+    font-weight: 600;
+}
+
+#arc-sm-video-cost {
+    color: #00f2fe !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 10px rgba(0, 242, 254, 0.35);
+}
+
+/* ── Deposit Selector ────────────────────────────── */
+
+.arc-deposit-selector-wrap {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.arc-deposit-selector {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.arc-deposit-opt {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    padding: 11px 8px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+}
+
+.arc-deposit-opt:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: white;
+    border-color: rgba(0, 242, 254, 0.3);
+}
+
+.arc-deposit-opt.active {
+    background: rgba(0, 242, 254, 0.06);
+    border: 1px solid #00f2fe;
+    color: #00f2fe;
+    box-shadow: 
+        0 0 15px rgba(0, 242, 254, 0.25),
+        inset 0 0 8px rgba(0, 242, 254, 0.1);
+}
+
+.arc-deposit-custom-wrap {
+    position: relative;
+    flex: 1.2;
+    display: flex;
+    align-items: center;
+}
+
+.arc-deposit-custom-symbol {
+    position: absolute;
+    left: 12px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+    pointer-events: none;
+}
+
+#arc-deposit-custom-input {
+    width: 100%;
+    padding: 11px 8px 11px 24px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.35);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#arc-deposit-custom-input:focus {
+    border-color: #00f2fe;
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow: 
+        0 0 15px rgba(0, 242, 254, 0.25),
+        inset 0 0 8px rgba(0, 242, 254, 0.1);
+}
+
+/* ── Session Manager Buttons ──────────────────────── */
+
+.arc-sm-btn-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.arc-sm-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+#arc-sm-leave-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+}
+
+#arc-sm-leave-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+#arc-sm-end-btn {
+    flex: 2;
+    background: linear-gradient(90deg, #ea4335 0%, #c5221f 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(234, 67, 53, 0.25);
+}
+
+#arc-sm-end-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(234, 67, 53, 0.35);
+}
