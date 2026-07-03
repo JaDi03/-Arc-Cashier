@@ -42,9 +42,11 @@ nano .env
 
 ![.env configuration](../assets/nano_env.png)
 
-Fill in the **indispensable** variables required for the engine to run:
+Fill in the required variables to run the engine:
 - `CIRCLE_API_KEY`
 - `CIRCLE_APP_ID`
+- `SELLER_ADDRESS`
+- `SELLER_PRIVATE_KEY`
 
 ## 3. Deployment
 
