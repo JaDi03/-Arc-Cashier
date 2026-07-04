@@ -31,6 +31,7 @@
 - [How It Works](#how-it-works)
 - [Supported Platforms](#supported-platforms)
 - [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
 - [License](#license)
 
@@ -114,6 +115,24 @@ npm run setup
 ```
 
 For detailed guides, see the [full documentation](docs/getting-started/index.md).
+
+---
+
+## Project Structure
+
+```text
+tessera/
+├── docs/                    # MkDocs documentation site source files
+├── scripts/                 # Setup and deployment helper scripts
+├── src/
+│   ├── connectors/          # Platform-specific webhook and proxy adapters
+│   ├── core/                # Core settlement engine and gateway integration
+│   ├── ui/                  # Injected client paywall interface assets
+│   ├── server.ts            # Express server configuration and routing
+│   └── tessera.config.ts    # Main sidecar configuration registry
+├── package.json             # Engine dependencies and execution scripts
+└── tsconfig.json            # TypeScript configuration
+```
 
 ---
 
