@@ -13,7 +13,12 @@ In the self-hosted ecosystem, instance administrators generously bear the heavy 
 Creators have two modes to receive direct financial support from their audience:
 
 1. **Pay-Per-Second**: Best suited for premium content, courses, or exclusive streams. The audience pays a micro-rate for the exact time they watch. In this mode, the system automatically routes **10%** of the earnings to the instance administrator to help cover hosting costs, while the remaining **90%** goes directly to the creator. This fee split is powered by a **deterministic tick-routing engine** (e.g., exactly 1 out of every 10 nanopayments is routed directly to the admin's wallet), guaranteeing absolute mathematical fairness down to the micro-cent.
+   
+   ![Sustainability Model Split](../../assets/sustainability_model_split.png)
 2. **Direct Tipping**: Available for any public video. Viewers can send one-off support directly from the video player. In this mode, **100%** of the tip goes directly to the creator.
+   
+   Viewer View (6 Tips Sent) & Creator View (Net Balance):
+   ![Tipping Flow Accumulated](../../assets/tipping_flow_accumulated.png)
 
 ### Step 1: Clone and Install
 
