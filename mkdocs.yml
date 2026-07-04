@@ -81,16 +81,14 @@ nav:
   - Payment Models: payment-models.md
   - Getting Started: getting-started/index.md
   - Integrated Platforms:
-    - Owncast:
+    - PeerTube:
+      - Overview: platforms/peertube/index.md
+      - Configuration: platforms/peertube/configuration.md
+    - Owncast (soon):
       - Overview: platforms/owncast/index.md
       - Managing Creators: platforms/owncast/managing-creators.md
       - Monitoring: platforms/owncast/monitoring.md
       - Withdrawals: platforms/owncast/withdrawals.md
-    - PeerTube:
-      - Overview: platforms/peertube/index.md
-      - Managing Creators: platforms/peertube/managing-creators.md
-      - Monitoring: platforms/peertube/monitoring.md
-      - Withdrawals: platforms/peertube/withdrawals.md
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md

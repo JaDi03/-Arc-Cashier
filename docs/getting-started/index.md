@@ -43,10 +43,14 @@ nano .env
 ![.env configuration](../assets/nano_env.png)
 
 Fill in the required variables to run the engine:
-- `CIRCLE_API_KEY`
-- `CIRCLE_APP_ID`
-- `SELLER_ADDRESS`
-- `SELLER_PRIVATE_KEY`
+- `CIRCLE_API_KEY`: Circle API Key.
+- `CIRCLE_APP_ID`: Circle App ID.
+- `SELLER_ADDRESS`: Platform admin wallet address to receive payouts.
+- `SELLER_PRIVATE_KEY`: Platform admin private key for withdrawal signatures.
+
+> [!NOTE]
+> `MASTER_KEY` (and `PEERTUBE_WEBHOOK_SECRET` for PeerTube) are automatically generated and configured in your `.env` file during the `npm run setup` wizard. You do not need to configure them manually.
+
 
 ## 3. Deployment
 

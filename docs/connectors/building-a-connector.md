@@ -106,8 +106,8 @@ export default myConnector;
 ```
 
 The two critical calls are:
-- `sessionService.recordJoin(userId)` — starts the billing meter
-- `sessionService.recordPartAndSettle(userId)` — stops the meter, calculates cost, refunds remaining balance
+- `sessionService.recordJoin(userId)` - starts the billing meter
+- `sessionService.recordPartAndSettle(userId)` - stops the meter, calculates cost, refunds remaining balance
 
 Everything else (Gateway deposit, x402 payment, withdrawal) is handled automatically by the core engine.
 

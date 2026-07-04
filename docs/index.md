@@ -20,9 +20,9 @@
 
 ## TL;DR
 
-Point Tessera at your self-hosted platform and your users start paying in USDC — by the second, by the article, or as a tip. No platform modification required.
+Point Tessera at your self-hosted platform and your users start paying in USDC - by the second, by the article, or as a tip. No platform modification required.
 
-Tessera is a **payment sidecar**: a separate process that runs alongside your platform, intercepts the HTML response, injects the payment overlay, and handles the entire [Circle Gateway](https://developers.circle.com/gateway) lifecycle (deposit → authorize → batch settle → withdraw) — without touching your platform's source code.
+Tessera is a **payment sidecar**: a separate process that runs alongside your platform, intercepts the HTML response, injects the payment overlay, and handles the entire [Circle Gateway](https://developers.circle.com/gateway) lifecycle (deposit → authorize → batch settle → withdraw) - without touching your platform's source code.
 
 The platform emits its native events as it always has. Whether that is a `USER_JOINED` webhook for a live stream, a scrobble event for a music track, or a shared-link resolution for a photo gallery, Tessera intercepts these signals and does the rest.
 
@@ -34,7 +34,7 @@ Self-hosted platforms empower creators and communities with ownership and contro
 
 | Stakeholder | Pain Point |
 |---|---|
-| **Instance Administrators** | Bear 100% of infrastructure costs — servers, storage, bandwidth — with limited tools to recoup expenses beyond donations or ads |
+| **Instance Administrators** | Bear 100% of infrastructure costs - servers, storage, bandwidth - with limited tools to recoup expenses beyond donations or ads |
 | **Creators** | Produce content on platforms they don't control, with no built-in mechanism to receive direct support from their audience |
 | **Viewers / Readers** | Want to support creators they love, but are forced into platform-wide subscriptions that don't reflect actual consumption |
 
@@ -74,10 +74,10 @@ flowchart LR
 
 **Key Design Principles:**
 
-- **Zero platform modification** — Tessera acts as a reverse proxy; your platform's code remains untouched
+- **Zero platform modification** - Tessera acts as a reverse proxy; your platform's code remains untouched
 - **Pay only for what you consume (or tip)**: Whether it is per-second billing for a stream, a fee for an article, or a voluntary tip for a creator, the audience pays directly for value without rigid monthly subscriptions
-- **Gas-free streaming** — Off-chain EIP-3009 signatures every second; batch settlement only happens when the session ends
-- **Cross-chain deposits** — Viewers can fund from any supported chain via Circle CCTP; settlement happens on Arc Testnet
+- **Gas-free streaming** - Off-chain EIP-3009 signatures every second; batch settlement only happens when the session ends
+- **Cross-chain deposits** - Viewers can fund from any supported chain via Circle CCTP; settlement happens on Arc Testnet
 
 ---
 
@@ -110,7 +110,7 @@ sequenceDiagram
     Note over Browser,Tessera: Sends ephemeral private key (session key)
     Tessera->>Gateway: GatewayClient.pay() → x402 authorization (off-chain)
     Gateway-->>Tessera: Signature verified, access granted
-    Tessera-->>Browser: 200 OK — session active
+    Tessera-->>Browser: 200 OK - session active
 
     %% 4. Per-second billing (off-chain)
     loop Every second while connected
@@ -120,10 +120,10 @@ sequenceDiagram
     %% 5. End session & refund
     Viewer->>Browser: Clicks "End Session"
     Browser->>Tessera: POST /api/core/end-session
-    Tessera->>Gateway: GatewayClient.withdraw() — batch settles & refunds
+    Tessera->>Gateway: GatewayClient.withdraw() - batch settles & refunds
     Gateway-->>Creator: Transfers USDC earnings
     Gateway-->>Tessera: Withdrawal confirmed
-    Tessera-->>Browser: 200 OK — unused balance returned
+    Tessera-->>Browser: 200 OK - unused balance returned
 ```
 
 **In plain terms:**
@@ -140,7 +140,7 @@ sequenceDiagram
 
 | Platform | Integration Type | Status |
 |---|---|---|
-| [Owncast](https://owncast.online/) | Built-in connector | Live |
+| [Owncast](https://owncast.online/) | Built-in connector | Soon |
 | [PeerTube](https://joinpeertube.org/) | Plugin | Live |
 
 Tessera is designed to plug into the open-source creator stack where communities already live. Because it relies on standard event streams, it can be easily extended to support:
@@ -171,11 +171,11 @@ Want to add your platform? Tessera connectors are ~100 lines of code. See [Build
 
 Tessera uses a **sidecar pattern** to add payments without platform modifications. The architecture separates concerns into three layers:
 
-**Core Engine** (`src/core/`) — Platform-agnostic payment logic: session management, per-second billing, wallet operations, and Circle Gateway integration via the x402 protocol.
+**Core Engine** (`src/core/`) - Platform-agnostic payment logic: session management, per-second billing, wallet operations, and Circle Gateway integration via the x402 protocol.
 
-**Platform Connectors** (`src/connectors/`) — Lightweight adapters that translate platform-specific events (webhooks, SSE, API calls) into the core engine's billing interface. Each connector is ~100 lines of TypeScript.
+**Platform Connectors** (`src/connectors/`) - Lightweight adapters that translate platform-specific events (webhooks, SSE, API calls) into the core engine's billing interface. Each connector is ~100 lines of TypeScript.
 
-**Client Overlay** (`src/ui/`) — The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
+**Client Overlay** (`src/ui/`) - The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
 
 For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -186,7 +186,7 @@ For detailed architecture diagrams, fee breakdowns, and settlement logic, see [d
 Tessera transforms how self-hosted platforms sustain themselves:
 
 - **Creators** receive direct, per-second support from their audience, with settled earnings accumulating in their Gateway balance
-- **Viewers** pay only for what they actually consume — no subscriptions, no lock-in, and zero platform fees
+- **Viewers** pay only for what they actually consume - no subscriptions, no lock-in, and zero platform fees
 
 The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. These nanopayments are aggregated off-chain and settled to the creator's Gateway balance, which the creator can subsequently withdraw to their personal wallet. Everyone wins.
 
@@ -194,4 +194,4 @@ The economic model is simple: if a viewer watches a 10-minute stream at $0.01/mi
 
 ## License
 
-Apache-2.0 — see [LICENSE](https://github.com/JaDi03/tessera/blob/main/LICENSE) for details.
+Apache-2.0 - see [LICENSE](https://github.com/JaDi03/tessera/blob/main/LICENSE) for details.
