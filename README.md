@@ -23,7 +23,7 @@
 
 **Documentation**: [https://jadi03.github.io/tessera/](https://jadi03.github.io/tessera/)
 
-**Live Playground**: [https://trytessera.xyz](https://trytessera.xyz)
+**Live Playground**: [https://try-tessera.xyz](https://try-tessera.xyz)
 
 ---
 
@@ -123,24 +123,6 @@ npm run setup
 ```
 
 For detailed installation, configuration, and deployment guides, see the [Quick Start Guide](https://jadi03.github.io/tessera/getting-started/).
-
----
-
-## Project Structure
-
-```text
-tessera/
-├── docs/                    # MkDocs documentation site source files
-├── scripts/                 # Setup and deployment helper scripts
-├── src/
-│   ├── connectors/          # Platform-specific webhook and proxy adapters
-│   ├── core/                # Core settlement engine and gateway integration
-│   ├── ui/                  # Injected client paywall interface assets
-│   ├── server.ts            # Express server configuration and routing
-│   └── tessera.config.ts    # Main sidecar configuration registry
-├── package.json             # Engine dependencies and execution scripts
-└── tsconfig.json            # TypeScript configuration
-```
 
 ---
 

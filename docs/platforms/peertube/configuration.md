@@ -86,4 +86,8 @@ Unlike the instance administrator, **Tessera NEVER stores the private keys of co
 3. **Sign with MetaMask (EIP-712)**: A MetaMask prompt will ask you to cryptographically sign this withdrawal intent. This signature is off-chain, completely free, and consumes no gas.
 4. **On-Chain Execution**: Tessera verifies the signature against the registered creator wallet. Once validated, Tessera (acting as the network operator) executes the transaction on-chain, transferring the USDC to your personal wallet.
 
+## Viewer Wallet Setup (Viewer)
+
+For viewers to fund their sessions, connect their wallets, and start watching or tipping, they need to set up their user-controlled wallet. You can direct your audience to the [Viewer Wallet Setup Guide](https://jadi03.github.io/tessera/tutorials/viewer-wallet/) for step-by-step instructions.
+
 

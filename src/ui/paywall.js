@@ -9,6 +9,13 @@ const SCRIPT_SRC = (document.currentScript && document.currentScript.src) ? docu
 const SCRIPT_BASE_DIR = SCRIPT_SRC ? SCRIPT_SRC.substring(0, SCRIPT_SRC.lastIndexOf('/') + 1) : '/demo-assets/';
 const ARC_API_BASE = SCRIPT_SRC ? new URL(SCRIPT_SRC).origin : window.location.origin;
 
+console.log(
+    "%c Tessera %c Universal Payment Sidecar initialized %c https://try-tessera.xyz ",
+    "background: #ffb300; color: #000; font-weight: bold; border-radius: 3px 0 0 3px; padding: 3px 6px;",
+    "background: #111827; color: #93c5fd; border-radius: 0; padding: 3px 6px;",
+    "background: #1f2937; color: #a7f3d0; text-decoration: underline; border-radius: 0 3px 3px 0; padding: 3px 6px;"
+);
+
 // Arc Testnet — Chain ID verified from docs.arc.network
 const ARC_CHAIN_ID = 5042002;
 const ARC_CHAIN_ID_HEX = '0x' + ARC_CHAIN_ID.toString(16);
