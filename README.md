@@ -19,6 +19,14 @@
   <a href="https://docs.arc.network"><img src="https://img.shields.io/badge/Arc_Testnet-5042002-6C63FF?style=for-the-badge" alt="Arc Testnet"></a>
 </div>
 
+---
+
+**Documentation**: [https://jadi03.github.io/tessera/](https://jadi03.github.io/tessera/)
+
+**Live Playground**: [https://trytessera.xyz](https://trytessera.xyz)
+
+---
+
 *Payment sidecar for self-hosted platforms enabling instant, per-second streaming payments and direct tipping.*
 
 > **TL;DR:** Point Tessera at your self-hosted platform and your users start paying in USDC - by the second, by the action, or as a tip - without modifying a single line of your platform's source code.
@@ -114,7 +122,25 @@ npm install
 npm run setup
 ```
 
-For detailed guides, see the [full documentation](docs/getting-started/index.md).
+For detailed installation, configuration, and deployment guides, see the [Quick Start Guide](https://jadi03.github.io/tessera/getting-started/).
+
+---
+
+## Project Structure
+
+```text
+tessera/
+├── docs/                    # MkDocs documentation site source files
+├── scripts/                 # Setup and deployment helper scripts
+├── src/
+│   ├── connectors/          # Platform-specific webhook and proxy adapters
+│   ├── core/                # Core settlement engine and gateway integration
+│   ├── ui/                  # Injected client paywall interface assets
+│   ├── server.ts            # Express server configuration and routing
+│   └── tessera.config.ts    # Main sidecar configuration registry
+├── package.json             # Engine dependencies and execution scripts
+└── tsconfig.json            # TypeScript configuration
+```
 
 ---
 
