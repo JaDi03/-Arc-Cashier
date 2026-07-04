@@ -1,6 +1,12 @@
-# Tessera
+[Documentation](https://jadi03.github.io/tessera/)
 
 <div align="center">
+  <img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="400">
+  <br>
+  
+  **Payment Sidecar for Self-Hosted Platforms**
+  <br><br>
+
   <!-- Row 1: Status Badges -->
   <a href="https://github.com/JaDi03/tessera/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Status"></a>
   <a href="https://github.com/JaDi03/tessera/releases"><img src="https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge" alt="Version"></a>
