@@ -20,7 +20,16 @@ export async function createServer(connectors: ConnectorConfig[]) {
 
     // Logging middleware MUST be first to catch everything
     app.use((req, res, next) => {
-        console.log(`[API] ${req.method} ${req.url}`);
+        if (req.url.includes('/stream-access')) {
+            console.log(`[API] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers)}`);
+            const originalJson = res.json;
+            res.json = function (body) {
+                console.log(`[API-DEBUG] Response (Status ${res.statusCode}):`, JSON.stringify(body));
+                return originalJson.call(this, body);
+            };
+        } else {
+            console.log(`[API] ${req.method} ${req.url}`);
+        }
         next();
     });
 
