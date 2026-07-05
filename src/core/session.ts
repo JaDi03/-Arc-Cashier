@@ -74,6 +74,9 @@ export class SessionService {
 
                             const PORT = process.env.PORT || 3000;
                             const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+                            
+                            console.log(`[Session-Loop-DEBUG] Ticking payment for ${userId}. URL: ${sidecarUrl}/api/core/stream-access | Headers: ${JSON.stringify(headers)}`);
+                            
                             const payResult = await gatewayClient.pay<{ access: boolean }>(
                                 `${sidecarUrl}/api/core/stream-access`,
                                 { headers }
@@ -84,12 +87,10 @@ export class SessionService {
                                 || error.response?.data 
                                 || error.message 
                                 || String(error);
-                            // Ignore errors silently for missing session records as they might have just disconnected
-                            if (!String(errMsg).includes('No session key found')) {
-                                console.error(`[Session] - Periodic payment failed for ${userId}:`, errMsg);
-                                if (error.response?.data) {
-                                    console.error(`[Session] - Error details:`, JSON.stringify(error.response.data));
-                                }
+                            const status = error.response?.status || 'N/A';
+                            console.error(`[Session-Loop-ERROR] Periodic payment failed for ${userId} (Status ${status}):`, errMsg);
+                            if (error.response?.data) {
+                                console.error(`[Session-Loop-ERROR] Response payload:`, JSON.stringify(error.response.data));
                             }
                         }
                     }));

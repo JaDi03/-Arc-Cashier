@@ -79,6 +79,8 @@ router.post('/webhook', (req, res) => {
     const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce, creatorAddress, creatorWallet } = payload;
     const resolvedCreatorAddress = (creatorAddress || creatorWallet || '').trim();
 
+    console.log(`[PeerTube-Webhook-DEBUG] Event: ${event}, userId: ${userId}, videoId: ${videoId}, resolvedCreatorAddress: ${resolvedCreatorAddress}`);
+
     if (!event || !userId) {
         return res.status(400).json({ error: 'Missing required fields: event, userId' });
     }
@@ -141,6 +143,7 @@ router.post('/webhook', (req, res) => {
         const platformAdminAddress = process.env.SELLER_ADDRESS || undefined;
 
         console.log(`[PeerTube] 📊 Session fee split: ${((1 - platformFee) * 100).toFixed(0)}% creator / ${(platformFee * 100).toFixed(0)}% admin (every ${Math.round(1 / (platformFee || 1))} ticks)`);
+        console.log(`[PeerTube-Webhook-DEBUG] Recording join for user: ${userId}. Payout creator: ${payoutAddress}, Admin: ${platformAdminAddress}, platformFee: ${platformFee}`);
 
         sessionService.recordJoin(userId, videoId, activeRate, payoutAddress, platformAdminAddress, platformFee);
     } else if (event === 'viewer_left') {

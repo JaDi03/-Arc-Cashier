@@ -51,7 +51,10 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
     //    No routing decisions are made here — the core trusts the header.
     const sellerAddress = req.headers['x-seller-address'] as string;
 
+    console.log(`[Routes-DEBUG] GET /stream-access. x-user-id: ${userId}, x-seller-address: ${sellerAddress}`);
+
     if (!sellerAddress) {
+        console.error(`[Routes-ERROR] GET /stream-access failed: Missing x-seller-address header.`);
         return res.status(400).json({ error: 'Missing x-seller-address header' });
     }
 
@@ -68,16 +71,25 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
         const userRate = sessionService.getRateForUser(userId);
         if (userRate !== null) {
             ratePerSecond = userRate;
+        } else {
+            console.warn(`[Routes-WARN] GET /stream-access: No active rate found for user ${userId} in sessionService. Using fallback 0.0001.`);
         }
     } else {
-        console.warn(`[Core] ⚠️ No x-user-id header provided to /stream-access. Falling back to $0.0001.`);
+        console.warn(`[Routes-WARN] GET /stream-access: No x-user-id header provided to /stream-access. Falling back to $0.0001.`);
     }
 
     const priceString = `$${ratePerSecond.toFixed(4)}`;
+    console.log(`[Routes-DEBUG] GET /stream-access calling x402 middleware with price: ${priceString} and seller: ${sellerAddress}`);
 
     // 5. Execute middleware
     const priceMiddleware = dynamicGateway.require(priceString);
-    priceMiddleware(req as any, res as any, next);
+    priceMiddleware(req as any, res as any, (err?: any) => {
+        if (err) {
+            console.error(`[Routes-ERROR] GET /stream-access Middleware error:`, err.message || err);
+            return next(err);
+        }
+        next();
+    });
 }, (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
     res.json({ access: true, payment: req.payment });
@@ -570,7 +582,9 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         console.log(`[Core] 🔓 Paying for stream access via x402...`);
         const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
         const resolvedSeller = sellerAddress || process.env.SELLER_ADDRESS || '';
+        console.log(`[Routes-DEBUG] /register-session resolvedSeller: ${resolvedSeller}`);
         if (!resolvedSeller) {
+            console.error(`[Routes-ERROR] /register-session failed: Missing sellerAddress and SELLER_ADDRESS env var is not set.`);
             return res.status(400).json({ error: 'Missing sellerAddress in request body and SELLER_ADDRESS env var is not set.' });
         }
         const payResult = await gatewayClient.pay<{ access: boolean }>(
