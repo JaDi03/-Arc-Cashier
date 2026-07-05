@@ -1,5 +1,3 @@
-[Documentation](https://jadi03.github.io/tessera/)
-
 <div align="center">
   <img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="400">
   <br>
