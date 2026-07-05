@@ -1136,7 +1136,17 @@ function startSessionTimer() {
 
     window.sessionTimer = setInterval(async () => {
         tickCount++;
-        const shouldTick = !document.body.classList.contains('arc-locked') && playingMediaCount > 0;
+        let isMediaPlaying = playingMediaCount > 0;
+        if (!isMediaPlaying) {
+            // Fallback: check if there's any active HTML5 video or audio element playing in the DOM
+            const mediaElements = document.querySelectorAll('video, audio');
+            mediaElements.forEach(m => {
+                if (!m.paused && !m.ended && m.readyState >= 2) {
+                    isMediaPlaying = true;
+                }
+            });
+        }
+        const shouldTick = !document.body.classList.contains('arc-locked') && isMediaPlaying;
         if (shouldTick) {
             secondsThisVideo++;
         }
