@@ -79,11 +79,17 @@ export class SessionService {
                                 { headers }
                             );
                             console.log(`[Session] - Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);
-                        } catch (error) {
-                            const err = error instanceof Error ? error : new Error(String(error));
+                        } catch (error: any) {
+                            const errMsg = error.response?.data?.error 
+                                || error.response?.data 
+                                || error.message 
+                                || String(error);
                             // Ignore errors silently for missing session records as they might have just disconnected
-                            if (!err.message.includes('No session key found')) {
-                                console.error(`[Session] - Periodic payment failed for ${userId}: ${err.message}`);
+                            if (!String(errMsg).includes('No session key found')) {
+                                console.error(`[Session] - Periodic payment failed for ${userId}:`, errMsg);
+                                if (error.response?.data) {
+                                    console.error(`[Session] - Error details:`, JSON.stringify(error.response.data));
+                                }
                             }
                         }
                     }));
