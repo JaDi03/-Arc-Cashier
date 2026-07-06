@@ -1,6 +1,6 @@
 # PeerTube Integration
 
-Tessera integrates natively with PeerTube via an official plugin. Unlike other monolithic platforms, **PeerTube does not require setting up a reverse proxy**, as the plugin handles injecting the paywall directly into the video interface automatically.
+Tessera integrates natively with PeerTube via an official plugin, which handles loading and configuring the paywall directly into the video interface automatically.
 
 > [!IMPORTANT]
 > This guide assumes you have already successfully installed the Tessera backend following the [Quick Start](../../getting-started/index.md) guide and selected **Option 2 (PeerTube)** during the setup wizard.
