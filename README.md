@@ -31,6 +31,10 @@
 
 ---
 
+https://github.com/user-attachments/assets/61b78027-93bc-44ea-bdcb-2f0a38f7441d
+
+---
+
 ## Table of Contents
 - [The Self-Hosted Monetization Layer](#the-self-hosted-monetization-layer)
 - [Why Arc Network?](#why-arc-network)
