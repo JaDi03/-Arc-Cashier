@@ -32,7 +32,7 @@ Tessera is designed to be easily extensible. If you want to add support for a ne
 
 1. Create a new folder under `src/connectors/<your-platform>`.
 2. Implement the `Connector` interface defined in `src/core/types.ts`.
-3. Provide a simple `README.md` inside your connector folder explaining how to configure the webhooks/proxy for your platform.
+3. Provide a simple `README.md` inside your connector folder explaining how to configure the webhooks or integration APIs for your platform.
 4. Add your connector to the `CONNECTOR_REGISTRY` en `src/server.ts` (optional for local forks, but required if you want it merged upstream).
 
 We welcome all new platform integrations!

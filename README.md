@@ -67,7 +67,7 @@ Tessera solves this by running its settlement core on the **Arc Network**:
 
 ## How It Works
 
-Tessera acts as a reverse proxy sitting between your users and your self-hosted platform.
+Tessera is a payment sidecar that integrates with your self-hosted platforms via native APIs, plugins, or webhook events.
 
 ```mermaid
 flowchart LR
@@ -95,7 +95,7 @@ flowchart LR
     style W fill:#6C63FF,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
-1.  **HTML Injection:** Tessera intercepts HTTP traffic and automatically injects the client-side paywall script (`paywall.js`) into the platform's HTML responses.
+1.  **Client Connection:** The platform or its native plugin loads Tessera's lightweight frontend paywall overlay (`paywall.js`) for the viewer.
 2.  **Wallet & Gateway Deposit:** The viewer funds a session. Circle's User-Controlled Wallets (UCW) SDK creates a non-custodial Smart Contract Account (SCA) on the Arc Network, and deposits USDC into the Circle Gateway.
 3.  **Off-Chain Streaming:** While watching, the client signs off-chain EIP-3009 payment signatures every second. This enables gasless streaming: no blockchain transactions are executed while playing.
 4.  **Batch Settlement:** When the viewer leaves, Tessera stops billing. The client calls `/end-session`, triggering the Circle Gateway to batch-settle the accumulated balance to the creator and refund any unused balance to the viewer.
@@ -107,7 +107,7 @@ flowchart LR
 | Platform | Integration Type | Status |
 |---|---|---|
 | [PeerTube](https://joinpeertube.org/) | Plugin + Webhook Connector | Live |
-| [Owncast](https://owncast.online/) | Built-in Reverse Proxy Connector | Soon (In Development) |
+| [Owncast](https://owncast.online/) | Webhook Connector | Soon (In Development) |
 
 ---
 
@@ -131,7 +131,7 @@ tessera/
 ├── docs/                    # MkDocs documentation site source files
 ├── scripts/                 # Setup and deployment helper scripts
 ├── src/
-│   ├── connectors/          # Platform-specific webhook and proxy adapters
+│   ├── connectors/          # Platform-specific webhook and integration adapters
 │   ├── core/                # Core settlement engine and gateway integration
 │   ├── ui/                  # Injected client paywall interface assets
 │   ├── server.ts            # Express server configuration and routing
@@ -150,7 +150,7 @@ tessera/
 - [Arc Testnet](https://docs.arc.network): USDC-native gas fee layer.
 - [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009): Off-chain transfer signatures.
 - [viem](https://viem.sh/): EVM interaction library.
-- [Express](https://expressjs.com/): Reverse proxy engine.
+- [Express](https://expressjs.com/): Web server serving sidecar APIs and static web assets.
 
 ---
 
