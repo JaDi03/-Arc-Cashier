@@ -31,7 +31,7 @@
 
 ---
 
-https://github.com/user-attachments/assets/61b78027-93bc-44ea-bdcb-2f0a38f7441d
+https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
 
 ---
 
@@ -49,17 +49,17 @@ https://github.com/user-attachments/assets/61b78027-93bc-44ea-bdcb-2f0a38f7441d
 
 ## The Self-Hosted Monetization Layer
 
-The hardest problem for any new Web3 payments primitive is distribution. Traditional crypto-native campaigns (airdrops, token incentives) fail to reach the creator economy because creators and communities are focused on content, not complex blockchain configurations.
+Self-hosted platforms empower creators with independent communities, but traditional payment gateways fail to support micro-contributions. High minimum fees make it impossible for viewers to tip a few cents or pay tiny rates per second without losing most of the value to transaction fees.
 
-Tessera takes a different approach: **we bring the payment rails to where the creators and audiences already live.**
+Tessera solves this by **bringing frictionless, sub-penny payment options directly to where the creators and audiences already live.**
 
-By integrating as a lightweight, non-intrusive payment sidecar directly into self-hosted platforms, Tessera attaches payments to data structures that these systems naturally emit (webhook events, presence events, or access logs). Creators gain access to frictionless monetization, and viewers pay only for what they consume - all without requiring a dedicated blockchain setup from the host.
+By integrating as a lightweight, non-intrusive payment sidecar, Tessera attaches payments to events that these platforms naturally emit (webhook events, presence events, or access logs). Creators gain access to seamless monetization, and viewers pay only for what they consume - all without requiring complex payment configurations from the host.
 
 ---
 
 ## Why Arc Network?
 
-Implementing micro-billing or per-second streaming payments is economically impossible on traditional fiat rails (where Stripe or PayPal transaction fees impose a high floor, e.g., 30¢ + 2.9%). Traditional Web3 networks also struggle because users must acquire and hold separate, volatile native tokens just to pay for transaction gas fees.
+Implementing micro-billing or per-second streaming payments is economically impossible on traditional fiat rails (where Stripe or PayPal transaction fees impose a high floor, e.g., 30¢ + 2.9%). Other decentralized networks also struggle because users must acquire and hold separate, volatile native tokens just to pay for network transaction fees.
 
 Tessera solves this by running its settlement core on the **Arc Network**:
 
