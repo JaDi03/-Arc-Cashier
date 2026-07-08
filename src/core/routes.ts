@@ -204,7 +204,28 @@ coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: 
             });
             challengeId = createRes.data?.challengeId;
         } catch (err: any) {
-            if (err?.message?.includes('PIN')) {
+            // Circle error 155106: "User already initialized"
+            // Per Circle UCW docs: "Fetch existing wallets instead of creating"
+            // This happens when the user completed PIN setup but the wallet hasn't indexed yet.
+            const errCode = err?.code ?? err?.response?.data?.code ?? err?.message;
+            if (String(errCode).includes('155106') || err?.message?.includes('155106')) {
+                console.log(`[Core] ♻️ Error 155106: User already initialized. Re-fetching existing wallets for ${userId}.`);
+                const retryRes = await circleClient.listWallets({
+                    userToken,
+                    blockchain: 'ARC-TESTNET' as any,
+                });
+                const retryWallet = (retryRes.data?.wallets || []).find((w: any) => w.state === 'LIVE');
+                if (retryWallet) {
+                    console.log(`[Core] 👛 Wallet found on retry for ${userId}: ${retryWallet.address}`);
+                    return res.json({
+                        status: 'existing',
+                        walletId: retryWallet.id,
+                        walletAddress: retryWallet.address
+                    });
+                }
+                // Wallet still not indexed — return a specific status so the frontend can retry
+                return res.json({ status: 'indexing' });
+            } else if (err?.message?.includes('PIN')) {
                 console.log(`[Core] 🔑 User needs PIN setup. Issuing createUserPinWithWallets challenge.`);
                 const pinRes = await circleClient.createUserPinWithWallets({
                     userToken,

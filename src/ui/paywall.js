@@ -463,6 +463,14 @@ async function getOrCreateArcWallet() {
         return getOrCreateArcWallet();
     }
 
+    // Circle error 155106: wallet just initialized, still indexing on Circle's side.
+    // Wait 1.5s and retry — per Circle docs: "Fetch existing wallets instead of creating".
+    if (walletData.status === 'indexing') {
+        setLoginStatus('Setting up your wallet…');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return getOrCreateArcWallet();
+    }
+
     return walletData;
 }
 
