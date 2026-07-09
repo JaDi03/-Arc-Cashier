@@ -403,6 +403,9 @@ async function handleEmailLogin() {
         arcSdk = new W3SSdk({
             appSettings: { appId: viewerState.appId }
         });
+        // REQUIRED per Circle UCW docs: establishes session with Circle's service via iframe.
+        // Without this call, sdk.execute() silently fails and no PIN popup appears.
+        arcSdk.getDeviceId();
         arcSdk.setAuthentication({
             userToken: viewerState.userToken,
             encryptionKey: viewerState.encryptionKey,
@@ -441,7 +444,11 @@ async function handleEmailLogin() {
     }
 }
 
-async function getOrCreateArcWallet() {
+async function getOrCreateArcWallet(retries = 0) {
+    if (retries > 10) {
+        throw new Error('No se pudo configurar la wallet. Por favor intenta de nuevo.');
+    }
+
     const walletRes = await fetch(ARC_API_BASE + '/api/core/circle/get-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -460,7 +467,7 @@ async function getOrCreateArcWallet() {
             });
         });
         // Re-fetch to get the walletId now that it's been created
-        return getOrCreateArcWallet();
+        return getOrCreateArcWallet(retries + 1);
     }
 
     // Circle error 155106: wallet just initialized, still indexing on Circle's side.
@@ -468,7 +475,7 @@ async function getOrCreateArcWallet() {
     if (walletData.status === 'indexing') {
         setLoginStatus('Setting up your wallet…');
         await new Promise(resolve => setTimeout(resolve, 1500));
-        return getOrCreateArcWallet();
+        return getOrCreateArcWallet(retries + 1);
     }
 
     return walletData;
