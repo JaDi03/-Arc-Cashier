@@ -12,7 +12,7 @@ import type { Connector, ConnectorConfig } from '../../core/types';
  * translates them into sessionService.recordJoin() / recordPartAndSettle() calls.
  *
  * Platform-specific logic that does NOT belong in the core lives here:
- *   - Platform fee split (probabilistic routing: creator vs. admin wallet)
+ *   - Platform fee split (deterministic tick-based routing: creator vs. admin wallet)
  *   - Creator balance queries and MetaMask-signed withdrawals (EIP-712 BurnIntent)
  *   - Admin/seller balance and withdrawal (PEERTUBE_WEBHOOK_SECRET protected)
  *
