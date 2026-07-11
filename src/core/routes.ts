@@ -605,30 +605,13 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             }
         }
 
-        // 4. Pay for stream access via x402
-        //    sellerAddress is provided by the connector/plugin — the core does not assume who the seller is.
-        console.log(`[Core] 🔓 Paying for stream access via x402...`);
-        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-        const resolvedSeller = sellerAddress || process.env.SELLER_ADDRESS || '';
-        console.log(`[Routes-DEBUG] /register-session resolvedSeller: ${resolvedSeller}`);
-        if (!resolvedSeller) {
-            console.error(`[Routes-ERROR] /register-session failed: Missing sellerAddress and SELLER_ADDRESS env var is not set.`);
-            return res.status(400).json({ error: 'Missing sellerAddress in request body and SELLER_ADDRESS env var is not set.' });
-        }
-        const payResult = await gatewayClient.pay<{ access: boolean }>(
-            `${sidecarUrl}/api/core/stream-access`,
-            { headers: { 'x-user-id': userId, 'x-seller-address': resolvedSeller } }
-        );
-        console.log(`[Core] ✅ Stream access granted!`);
-        console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
-        console.log(`[Core]    Settlement Tx: ${payResult.transaction}`);
+        // 4. Verify gateway connection and balance (free)
+        console.log(`[Core] 🔍 Verifying gateway connection (free)...`);
+        const finalBalances = await gatewayClient.getBalances();
+        console.log(`[Core] ✅ Gateway verified! Balance: ${finalBalances.gateway.formattedAvailable} USDC`);
 
         // 5. Register the session key for future settlement
         walletService.registerSessionKey(userId, privateKey, returnAddress);
-
-        // 6. Check remaining Gateway balance
-        const finalBalances = await gatewayClient.getBalances();
-        console.log(`[Core] 💰 Remaining Gateway balance: ${finalBalances.gateway.formattedAvailable} USDC`);
 
         return res.setHeader('Content-Type', 'application/json').send(
             JSON.stringify({
@@ -638,8 +621,8 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
                     amount: depositedAmount,
                 },
                 payment: {
-                    amount: payResult.formattedAmount,
-                    transaction: payResult.transaction,
+                    amount: '0.0000',
+                    transaction: 'free-handshake',
                 },
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)
