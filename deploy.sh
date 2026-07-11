@@ -9,9 +9,11 @@ CONTAINER_NAME="tessera-backend"
 IMAGE_NAME="tessera-backend"
 DATA_DIR="$(pwd)/data"
 
+BRANCH=${1:-main}
+
 echo "🔄 Pulling latest version from GitHub..."
 git fetch origin
-git reset --hard origin/main
+git reset --hard "origin/$BRANCH"
 
 echo "📦 Building Docker image (no cache)..."
 docker build --no-cache -t "$IMAGE_NAME" .
