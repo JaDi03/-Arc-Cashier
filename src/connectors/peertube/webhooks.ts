@@ -76,7 +76,7 @@ router.post('/webhook', (req, res) => {
         return res.status(400).json({ error: 'Invalid JSON payload' });
     }
 
-    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce, creatorAddress, creatorWallet } = payload;
+    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce, creatorAddress, creatorWallet, tesseraMode } = payload;
     const resolvedCreatorAddress = (creatorAddress || creatorWallet || '').trim();
 
     console.log(`[PeerTube-Webhook-DEBUG] Event: ${event}, userId: ${userId}, videoId: ${videoId}, resolvedCreatorAddress: ${resolvedCreatorAddress}`);
@@ -102,9 +102,13 @@ router.post('/webhook', (req, res) => {
     const MAX_RATE = 0.01;
     let activeRate = 0.0001; // default fallback
     
-    if (ratePerSecond !== undefined && !isNaN(Number(ratePerSecond))) {
+    if (tesseraMode === 'free') {
+        activeRate = 0;
+    } else if (ratePerSecond !== undefined && !isNaN(Number(ratePerSecond))) {
         const rate = Number(ratePerSecond);
-        if (rate >= MIN_RATE && rate <= MAX_RATE) {
+        if (rate === 0) {
+            activeRate = 0;
+        } else if (rate >= MIN_RATE && rate <= MAX_RATE) {
             activeRate = rate;
         } else {
             console.warn(`[PeerTube] ⚠️ Rate ${rate} out of bounds, using default`);
@@ -130,6 +134,12 @@ router.post('/webhook', (req, res) => {
 
     // 3. Process Events (Following building-a-connector.md)
     if (event === 'viewer_joined') {
+        // If the video is free, do not start the per-second billing loop in the backend
+        if (activeRate === 0) {
+            console.log(`[PeerTube] ℹ️ Free video (tesseraMode=free / rate=0) for user ${userId}. Skipping billing loop.`);
+            return res.json({ status: 'ok' });
+        }
+
         // --- Deterministic Platform Fee Split (PeerTube-specific) ---
         // PeerTube has a distinct admin (instance host) and content creator.
         // Both addresses and the fee percentage are passed to the session service,
