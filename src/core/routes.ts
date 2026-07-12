@@ -24,6 +24,11 @@ const circleClient = initiateUserControlledWalletsClient({
     apiKey: process.env.CIRCLE_API_KEY || ''
 });
 
+// Per-userId lock to prevent concurrent createWallet calls from creating duplicate wallets.
+// When the client retries get-wallet before Circle has indexed the first wallet, this lock
+// returns 'indexing' instead of calling createWallet a second time.
+const walletCreationLocks = new Map<string, ReturnType<typeof setTimeout>>();
+
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // limit each IP to 300 requests per windowMs
@@ -190,6 +195,27 @@ coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: 
             });
         }
 
+        // Wallet exists but is still being initialized on Circle's side.
+        // Return 'indexing' so the client waits and retries instead of
+        // triggering a second createWallet call that would create a duplicate.
+        const pendingWallet = existingWallets.find(
+            (w: any) => w.state === 'PENDING' || w.state === 'CREATING' || w.state === 'PENDING_BLOCKCHAIN'
+        );
+        if (pendingWallet) {
+            console.log(`[Core] ⏳ Wallet pending for ${userId} (state: ${pendingWallet.state}) — waiting for indexing.`);
+            return res.json({ status: 'indexing' });
+        }
+
+        // Lock guard: if another request is already creating a wallet for this userId,
+        // return 'indexing' immediately to prevent a second createWallet call.
+        if (walletCreationLocks.has(userId)) {
+            console.log(`[Core] 🔒 Wallet creation already in progress for ${userId} — returning indexing.`);
+            return res.json({ status: 'indexing' });
+        }
+        // Acquire lock. Auto-release after 60s as a failsafe.
+        const lockTimer = setTimeout(() => walletCreationLocks.delete(userId), 60_000);
+        walletCreationLocks.set(userId, lockTimer);
+
         let challengeId;
         try {
             // Derive a deterministic UUID v4-format string from userId via SHA-256.
@@ -251,6 +277,11 @@ coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: 
             challengeId
         });
     } catch (error: any) {
+        // Always release the lock on error so the user can retry
+        if (walletCreationLocks.has(userId)) {
+            clearTimeout(walletCreationLocks.get(userId));
+            walletCreationLocks.delete(userId);
+        }
         console.error(`[Core] ❌ Failed to get/create wallet:`, error?.response?.data || error.message);
         return res.status(500).json({ error: 'Failed to get or create Circle wallet', debugError: error.message, debugData: error?.response?.data });
     }
