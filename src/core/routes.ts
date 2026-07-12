@@ -8,15 +8,11 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { isAddress, isHex, verifyMessage, createWalletClient, createPublicClient, http, encodeFunctionData, formatUnits, parseUnits } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { arcTestnet } from 'viem/chains';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
 
-// Arc Testnet chain definition (viem does not bundle it yet, define inline)
-const arcTestnetChain = {
-    id: 5042002,
-    name: 'Arc Testnet',
-    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-    rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } },
-} as const;
+// Arc Testnet chain — imported from viem/chains (verified: exports chain ID 5042002)
+// Per use-arc.md: "Arc Testnet is available by default in Viem — a custom chain definition is NEVER required."
 
 // Arc Testnet CCTP contracts (verified from docs.arc.network official docs)
 const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`;
@@ -27,6 +23,11 @@ const IRIS_API_BASE = 'https://iris-api-sandbox.circle.com/v2/messages';
 const circleClient = initiateUserControlledWalletsClient({
     apiKey: process.env.CIRCLE_API_KEY || ''
 });
+
+// Per-userId lock to prevent concurrent createWallet calls from creating duplicate wallets.
+// When the client retries get-wallet before Circle has indexed the first wallet, this lock
+// returns 'indexing' instead of calling createWallet a second time.
+const walletCreationLocks = new Map<string, ReturnType<typeof setTimeout>>();
 
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -194,11 +195,43 @@ coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: 
             });
         }
 
+        // Wallet exists but is still being initialized on Circle's side.
+        // Return 'indexing' so the client waits and retries instead of
+        // triggering a second createWallet call that would create a duplicate.
+        const pendingWallet = existingWallets.find(
+            (w: any) => w.state === 'PENDING' || w.state === 'CREATING' || w.state === 'PENDING_BLOCKCHAIN'
+        );
+        if (pendingWallet) {
+            console.log(`[Core] ⏳ Wallet pending for ${userId} (state: ${pendingWallet.state}) — waiting for indexing.`);
+            return res.json({ status: 'indexing' });
+        }
+
+        // Lock guard: if another request is already creating a wallet for this userId,
+        // return 'indexing' immediately to prevent a second createWallet call.
+        if (walletCreationLocks.has(userId)) {
+            console.log(`[Core] 🔒 Wallet creation already in progress for ${userId} — returning indexing.`);
+            return res.json({ status: 'indexing' });
+        }
+        // Acquire lock. Auto-release after 60s as a failsafe.
+        const lockTimer = setTimeout(() => walletCreationLocks.delete(userId), 60_000);
+        walletCreationLocks.set(userId, lockTimer);
+
         let challengeId;
         try {
+            // Derive a deterministic UUID v4-format string from userId via SHA-256.
+            // Circle requires idempotencyKey to be a valid UUID — plain strings are rejected.
+            // This is deterministic (same userId → same key) preventing duplicate wallet creation on retries.
+            const userIdHash = crypto.createHash('sha256').update(`create-wallet-${userId}`).digest('hex');
+            const deterministicKey = [
+                userIdHash.slice(0, 8),
+                userIdHash.slice(8, 12),
+                '4' + userIdHash.slice(13, 16),
+                ((parseInt(userIdHash[16], 16) & 0x3) | 0x8).toString(16) + userIdHash.slice(17, 20),
+                userIdHash.slice(20, 32),
+            ].join('-');
             const createRes = await circleClient.createWallet({
                 userToken,
-                idempotencyKey: crypto.randomUUID(),
+                idempotencyKey: deterministicKey,
                 blockchains: ['ARC-TESTNET' as any],
                 accountType: 'SCA',
             });
@@ -244,6 +277,11 @@ coreRouter.post('/circle/get-wallet', sessionLimiter, async (req: Request, res: 
             challengeId
         });
     } catch (error: any) {
+        // Always release the lock on error so the user can retry
+        if (walletCreationLocks.has(userId)) {
+            clearTimeout(walletCreationLocks.get(userId));
+            walletCreationLocks.delete(userId);
+        }
         console.error(`[Core] ❌ Failed to get/create wallet:`, error?.response?.data || error.message);
         return res.status(500).json({ error: 'Failed to get or create Circle wallet', debugError: error.message, debugData: error?.response?.data });
     }
@@ -402,11 +440,11 @@ async function executeCctpFinalizationInBackground(
         const account = privateKeyToAccount(sellerKey as `0x${string}`);
         const arcWalletClient = createWalletClient({
             account,
-            chain: arcTestnetChain,
+            chain: arcTestnet,
             transport: http(),
         });
         const arcPublicClient = createPublicClient({
-            chain: arcTestnetChain,
+            chain: arcTestnet,
             transport: http(),
         });
 
@@ -598,30 +636,13 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             }
         }
 
-        // 4. Pay for stream access via x402
-        //    sellerAddress is provided by the connector/plugin — the core does not assume who the seller is.
-        console.log(`[Core] 🔓 Paying for stream access via x402...`);
-        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-        const resolvedSeller = sellerAddress || process.env.SELLER_ADDRESS || '';
-        console.log(`[Routes-DEBUG] /register-session resolvedSeller: ${resolvedSeller}`);
-        if (!resolvedSeller) {
-            console.error(`[Routes-ERROR] /register-session failed: Missing sellerAddress and SELLER_ADDRESS env var is not set.`);
-            return res.status(400).json({ error: 'Missing sellerAddress in request body and SELLER_ADDRESS env var is not set.' });
-        }
-        const payResult = await gatewayClient.pay<{ access: boolean }>(
-            `${sidecarUrl}/api/core/stream-access`,
-            { headers: { 'x-user-id': userId, 'x-seller-address': resolvedSeller } }
-        );
-        console.log(`[Core] ✅ Stream access granted!`);
-        console.log(`[Core]    Paid: ${payResult.formattedAmount} USDC`);
-        console.log(`[Core]    Settlement Tx: ${payResult.transaction}`);
+        // 4. Verify gateway connection and balance (free)
+        console.log(`[Core] 🔍 Verifying gateway connection (free)...`);
+        const finalBalances = await gatewayClient.getBalances();
+        console.log(`[Core] ✅ Gateway verified! Balance: ${finalBalances.gateway.formattedAvailable} USDC`);
 
         // 5. Register the session key for future settlement
         walletService.registerSessionKey(userId, privateKey, returnAddress);
-
-        // 6. Check remaining Gateway balance
-        const finalBalances = await gatewayClient.getBalances();
-        console.log(`[Core] 💰 Remaining Gateway balance: ${finalBalances.gateway.formattedAvailable} USDC`);
 
         return res.setHeader('Content-Type', 'application/json').send(
             JSON.stringify({
@@ -631,8 +652,8 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
                     amount: depositedAmount,
                 },
                 payment: {
-                    amount: payResult.formattedAmount,
-                    transaction: payResult.transaction,
+                    amount: '0.0000',
+                    transaction: 'free-handshake',
                 },
                 remainingBalance: finalBalances.gateway.formattedAvailable,
             }, stringifyBigInt)

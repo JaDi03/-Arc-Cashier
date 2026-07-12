@@ -403,6 +403,9 @@ async function handleEmailLogin() {
         arcSdk = new W3SSdk({
             appSettings: { appId: viewerState.appId }
         });
+        // REQUIRED per Circle UCW docs: establishes session with Circle's service via iframe.
+        // Without this call, sdk.execute() silently fails and no PIN popup appears.
+        arcSdk.getDeviceId();
         arcSdk.setAuthentication({
             userToken: viewerState.userToken,
             encryptionKey: viewerState.encryptionKey,
@@ -441,7 +444,11 @@ async function handleEmailLogin() {
     }
 }
 
-async function getOrCreateArcWallet() {
+async function getOrCreateArcWallet(retries = 0) {
+    if (retries > 10) {
+        throw new Error('No se pudo configurar la wallet. Por favor intenta de nuevo.');
+    }
+
     const walletRes = await fetch(ARC_API_BASE + '/api/core/circle/get-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -453,14 +460,37 @@ async function getOrCreateArcWallet() {
     // First-time user: complete wallet creation challenge via Circle SDK popup
     if (walletData.status === 'needs_creation') {
         setLoginStatus('Complete security setup in the popup…');
-        await new Promise((resolve, reject) => {
+        const execOutcome = await new Promise((resolve) => {
             arcSdk.execute(walletData.challengeId, (error, result) => {
-                if (error) reject(new Error('Wallet setup cancelled or failed'));
-                else resolve(result);
+                // Circle SDK can fire 'cancelled' even after the user completes PIN
+                // and the wallet is created on Circle's side. Always resolve (never
+                // reject here) so we can attempt recovery before giving up.
+                resolve({ error: error ?? null, result: result ?? null });
             });
         });
-        // Re-fetch to get the walletId now that it's been created
-        return getOrCreateArcWallet();
+
+        if (execOutcome.error) {
+            // SDK reported an error — could be a Circle SDK false-positive "cancelled",
+            // or the user genuinely closed the popup. Either way, check if the wallet
+            // was actually created before throwing.
+            const recoveryRes = await fetch(ARC_API_BASE + '/api/core/circle/get-wallet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: viewerState.userId, userToken: viewerState.userToken }),
+            });
+            if (recoveryRes.ok) {
+                const recoveryData = await recoveryRes.json();
+                if (recoveryData.status === 'ready') {
+                    console.log('[Tessera] SDK reported cancel but wallet exists — recovered silently.');
+                    return recoveryData;
+                }
+            }
+            // Wallet genuinely does not exist — user cancelled before completing PIN.
+            throw new Error('Setup cancelled. Click "Sign in with PIN" to try again.');
+        }
+
+        // SDK succeeded — re-fetch to get the confirmed walletId and address
+        return getOrCreateArcWallet(retries + 1);
     }
 
     // Circle error 155106: wallet just initialized, still indexing on Circle's side.
@@ -468,7 +498,7 @@ async function getOrCreateArcWallet() {
     if (walletData.status === 'indexing') {
         setLoginStatus('Setting up your wallet…');
         await new Promise(resolve => setTimeout(resolve, 1500));
-        return getOrCreateArcWallet();
+        return getOrCreateArcWallet(retries + 1);
     }
 
     return walletData;

@@ -46,8 +46,8 @@ Content creators can configure monetization settings independently for each of t
 ### Step 1: Access Video Settings
 
 1. Log in to your PeerTube account.
-2. Navigate to **Mis vídeos** (or **Manage my videos**) from the left sidebar.
-3. Locate the video you wish to monetize and click the **Gestionar** button on the right under the **Acciones** column.
+2. Navigate to **My Videos** from the left sidebar.
+3. Locate the video you wish to monetize and click the **Edit** button on the right under the **Actions** column.
 
 ![Manage My Videos](../../assets/peertube_creator_videos.png)
 

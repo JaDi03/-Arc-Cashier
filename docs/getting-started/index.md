@@ -48,6 +48,9 @@ Fill in the required variables to run the engine:
 - `SELLER_ADDRESS`: Platform admin wallet address to receive payouts.
 - `SELLER_PRIVATE_KEY`: Platform admin private key for withdrawal signatures.
 
+> [!CAUTION]
+> Use a **dedicated wallet** for Tessera, not your personal wallet. This key signs withdrawal transactions on-chain. Never reuse it across services.
+
 > [!NOTE]
 > `MASTER_KEY` (and `PEERTUBE_WEBHOOK_SECRET` for PeerTube) are automatically generated and configured in your `.env` file during the `npm run setup` wizard. You do not need to configure them manually.
 
