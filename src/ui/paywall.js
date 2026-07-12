@@ -93,6 +93,100 @@ let balancePollingInterval = null;
 let isTipMode = false;
 let tipCreatorWallet = null;
 let tipAmountVal = null;
+let isCheckingAutoUnlock = false;
+
+function getRequiredMinBalance() {
+    if (isTipMode) {
+        // Tipping mode: require at least the tip amount (e.g. 0.10 USDC)
+        const tipBtn = document.getElementById('arc-tip-btn');
+        if (tipBtn) {
+            const match = tipBtn.textContent.match(/\$([0-9.]+)/);
+            if (match) return parseFloat(match[1]) || 0.10;
+        }
+        return 0.10; // fallback tip amount
+    } else {
+        // Pay-per-second mode: require at least 1 second of playback rate
+        return typeof currentRatePerSecond !== 'undefined' ? currentRatePerSecond : 0.0001;
+    }
+}
+
+async function checkAutoUnlock() {
+    if (isCheckingAutoUnlock) return;
+    if (!viewerState.userId || !viewerState.walletAddress) return;
+
+    isCheckingAutoUnlock = true;
+    try {
+        setFundStatus('Checking wallet balance…');
+        const minReq = getRequiredMinBalance();
+        const hasFunds = await checkArcBalance(viewerState.walletAddress);
+
+        if (hasFunds) {
+            // Check if Gateway already has funds
+            const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+            if (balRes.ok) {
+                const balData = await balRes.json();
+                const available = Number(balData.gatewayAvailable || '0');
+
+                if (available >= minReq) {
+                    setFundStatus('Auto-unlocking session…');
+                    // Ensure we have an ephemeral key
+                    viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
+                    if (!viewerState.ephemeralPk) {
+                        viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('');
+                        localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
+                    }
+
+                    // Register session with backend
+                    const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: viewerState.userId,
+                            privateKey: viewerState.ephemeralPk,
+                            returnAddress: viewerState.walletAddress,
+                            ratePerSecond: getRequiredMinBalance(),
+                        }),
+                    });
+
+                    if (regRes.ok) {
+                        console.log('[Tessera] Auto-unlocked video using existing funded gateway session.');
+                        setFundStatus('');
+                        document.body.classList.remove('arc-locked');
+
+                        const overlay = document.getElementById('arc-paywall-overlay');
+                        if (overlay) {
+                            overlay.style.opacity = '0';
+                            setTimeout(() => overlay.remove(), 500);
+                        }
+
+                        const sm = document.getElementById('arc-session-manager');
+                        if (sm) sm.classList.remove('arc-hidden');
+                        startSessionTimer();
+                        return;
+                    }
+                }
+            }
+
+            // Wallet has funds but gateway is not funded yet -> enable unlock button
+            enableUnlockButton();
+            const overlay = document.getElementById('arc-paywall-overlay');
+            if (overlay) overlay.classList.remove('arc-hidden-initially');
+        } else {
+            // No funds in wallet yet -> start polling
+            startBalancePolling();
+            const overlay = document.getElementById('arc-paywall-overlay');
+            if (overlay) overlay.classList.remove('arc-hidden-initially');
+        }
+    } catch (error) {
+        console.error('[Tessera] Auto-unlock check failed:', error);
+        startBalancePolling();
+        const overlay = document.getElementById('arc-paywall-overlay');
+        if (overlay) overlay.classList.remove('arc-hidden-initially');
+    } finally {
+        isCheckingAutoUnlock = false;
+    }
+}
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 
@@ -113,8 +207,13 @@ function initPaywall() {
 
     document.body.classList.add('arc-locked');
     lockMedia();
-    renderPaywallOverlay();
+    renderPaywallOverlay(true);
     renderSessionManager();
+
+    if (viewerState.userId && viewerState.walletAddress) {
+        transitionToFundPhase();
+        void checkAutoUnlock();
+    }
 }
 
 function injectDependencies() {
@@ -143,7 +242,7 @@ function lockMedia() {
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
-function renderPaywallOverlay() {
+function renderPaywallOverlay(hideInitially = false) {
     const existing = document.getElementById('arc-paywall-overlay');
     if (existing) existing.remove();
 
@@ -177,6 +276,12 @@ function renderPaywallOverlay() {
 
     const overlay = document.createElement('div');
     overlay.id = 'arc-paywall-overlay';
+
+    // Check if user is logged in to hide initially and prevent flicker
+    const isLoggedIn = viewerState.userId && viewerState.walletAddress;
+    if (isLoggedIn && hideInitially) {
+        overlay.classList.add('arc-hidden-initially');
+    }
     overlay.innerHTML = `
         <div id="arc-paywall-modal">
             <div id="arc-paywall-header">
@@ -528,7 +633,9 @@ async function getArcBalance(address) {
 
 async function checkArcBalance(address) {
     const bal = await getArcBalance(address);
-    return bal >= 0.01;
+    const minReq = getRequiredMinBalance();
+    const minDeposit = isTipMode ? minReq : Math.max(0.10, minReq);
+    return bal >= minDeposit;
 }
 
 // ─── Phase 2: Funding Panel ───────────────────────────────────────────────────
@@ -626,6 +733,12 @@ async function handleUnlock() {
         const tokenData = await tokenRes.json();
         viewerState.userToken = tokenData.userToken;
         viewerState.encryptionKey = tokenData.encryptionKey;
+        if (!arcSdk) {
+            arcSdk = new W3SSdk({
+                appSettings: { appId: tokenData.appId }
+            });
+            arcSdk.getDeviceId();
+        }
         arcSdk.setAuthentication({
             userToken: viewerState.userToken,
             encryptionKey: viewerState.encryptionKey,
@@ -645,7 +758,7 @@ async function handleUnlock() {
             const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
             if (balRes.ok) {
                 const balData = await balRes.json();
-                if (Number(balData.gatewayAvailable) > 0.01) {
+                if (Number(balData.gatewayAvailable) >= getRequiredMinBalance()) {
                     skipDeposit = true;
                     console.log('[Tessera] Gateway already funded. Skipping deposit.');
                 }
@@ -707,6 +820,7 @@ async function handleUnlock() {
                 userId: viewerState.userId,
                 privateKey: viewerState.ephemeralPk,
                 returnAddress: viewerState.walletAddress,
+                ratePerSecond: getRequiredMinBalance(),
             }),
         });
         if (!regRes.ok) {
@@ -1123,6 +1237,11 @@ window.arcResetVideoSession = function(newRate) {
     // Also keep paywall overlay in sync
     const displayRate = document.getElementById('arc-display-rate');
     if (displayRate) displayRate.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' USDC / sec (varies by video)';
+
+    // Auto-unlock if credentials exist and paywall is still locked
+    if (document.body.classList.contains('arc-locked') && viewerState.userId && viewerState.walletAddress) {
+        void checkAutoUnlock();
+    }
 };
 
 document.addEventListener('play', (e) => {
@@ -1164,13 +1283,23 @@ function startSessionTimer() {
     const initialRateEl = document.getElementById('arc-sm-rate');
     if (initialRateEl) initialRateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
 
-    // Fetch the initial gateway balance immediately so video cost is accurate from the first heartbeat
+    let lastWithdrawableBalance = null;
+
+    // Fetch the initial gateway balance immediately so video cost is accurate and displayed from the start
     fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId)
         .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(data) { if (data) initialGatewayBalance = Number(data.gatewayWithdrawable); })
+        .then(function(data) {
+            if (data) {
+                const withdrawable = Number(data.gatewayWithdrawable);
+                initialGatewayBalance = withdrawable;
+                lastWithdrawableBalance = withdrawable;
+                const balEl = document.getElementById('arc-sm-balance');
+                if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
+                const videoCostEl = document.getElementById('arc-sm-video-cost');
+                if (videoCostEl) videoCostEl.textContent = '$0.0000 USDC';
+            }
+        })
         .catch(function() {});
-
-    let lastWithdrawableBalance = null;
 
     window.sessionTimer = setInterval(async () => {
         tickCount++;
@@ -1280,6 +1409,12 @@ async function handleTopUp(depositAmount) {
         if (!tokenRes.ok) throw new Error('Failed to refresh Circle session');
         const tokenData = await tokenRes.json();
 
+        if (!arcSdk) {
+            arcSdk = new W3SSdk({
+                appSettings: { appId: tokenData.appId }
+            });
+            arcSdk.getDeviceId();
+        }
         arcSdk.setAuthentication({
             userToken: tokenData.userToken,
             encryptionKey: tokenData.encryptionKey,
@@ -1516,36 +1651,12 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     const updateContainerStyle = () => {
         if (viewerState.userId && viewerState.ephemeralPk) {
             // Funded/Connected card style
-            container.style.cssText = `
-                position: fixed;
-                bottom: 20px; right: 20px;
-                z-index: 9999;
-                background: linear-gradient(145deg, rgba(18,18,42,0.96), rgba(22,31,56,0.96));
-                backdrop-filter: blur(18px) saturate(160%);
-                -webkit-backdrop-filter: blur(18px) saturate(160%);
-                border: 1px solid rgba(79,172,254,0.15);
-                border-radius: 16px;
-                padding: 16px 18px;
-                width: 240px;
-                box-shadow: 0 20px 40px -10px rgba(0,0,0,0.55), 0 0 20px rgba(0,112,243,0.12);
-                font-family: 'Inter', system-ui, sans-serif;
-                color: white;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-            `;
+            container.classList.remove('arc-tip-unconnected');
+            container.classList.add('arc-tip-connected');
         } else {
             // Simple floating button container style
-            container.style.cssText = `
-                position: fixed;
-                bottom: 20px; right: 20px;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: 6px;
-                font-family: 'Inter', system-ui, sans-serif;
-            `;
+            container.classList.remove('arc-tip-connected');
+            container.classList.add('arc-tip-unconnected');
         }
     };
     updateContainerStyle();
@@ -1786,6 +1897,7 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
                                         userId: viewerState.userId,
                                         privateKey: viewerState.ephemeralPk,
                                         returnAddress: viewerState.walletAddress,
+                                        ratePerSecond: getRequiredMinBalance(),
                                     }),
                                 });
                                 if (regRes.ok) {

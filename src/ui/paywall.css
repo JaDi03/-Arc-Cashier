@@ -24,6 +24,11 @@
     transition: opacity 0.5s ease;
 }
 
+#arc-paywall-overlay.arc-hidden-initially {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
 body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     filter: blur(14px) grayscale(40%);
     pointer-events: none;
@@ -845,3 +850,36 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(234, 67, 53, 0.35);
 }
+
+/* ── Tipping Button Container & States ──────────────── */
+
+#arc-tip-btn-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+#arc-tip-btn-container.arc-tip-unconnected {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+#arc-tip-btn-container.arc-tip-connected {
+    background: linear-gradient(145deg, rgba(18,18,42,0.96), rgba(22,31,56,0.96));
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(79,172,254,0.15);
+    border-radius: 16px;
+    padding: 16px 18px;
+    width: 240px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.55), 0 0 20px rgba(0,112,243,0.12);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+

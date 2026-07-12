@@ -541,7 +541,7 @@ coreRouter.get('/circle/cctp-status/:jobId', sessionLimiter, (req: Request, res:
 
 // --- BUYER SIDE: Register session, deposit to Gateway, and pay for access ---
 coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId, privateKey, returnAddress, sellerAddress } = req.body;
+    const { userId, privateKey, returnAddress, sellerAddress, ratePerSecond } = req.body;
 
     if (!userId || !privateKey || !returnAddress) {
         console.error(`[Core] ❌ /register-session missing fields. userId: ${userId}, privateKey: ${privateKey}, returnAddress: ${returnAddress}`);
@@ -576,8 +576,9 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         let gatewayBalanceNum = Number(balances.gateway.formattedAvailable);
         let walletUsdc = Number(balances.wallet.formatted);
         const minWalletBalance = Number(process.env.MIN_WALLET_BALANCE || '0.01');
+        const minGatewayBalance = typeof ratePerSecond === 'number' ? ratePerSecond : 0.01;
 
-        if (gatewayBalanceNum <= 0.01 && walletUsdc < minWalletBalance) {
+        if (gatewayBalanceNum < minGatewayBalance && walletUsdc < minWalletBalance) {
             console.log(`[Core] ⏳ Waiting for ephemeral wallet to receive funds...`);
             let attempts = 0;
             while (attempts < 15 && walletUsdc < minWalletBalance) {
@@ -594,7 +595,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         let depositTxHash = 'skipped';
         let depositedAmount = '0';
 
-        if (gatewayBalanceNum > 0.01) {
+        if (gatewayBalanceNum >= minGatewayBalance) {
             console.log(`[Core] ⏩ User already has ${gatewayBalanceNum} USDC in Gateway. Skipping deposit phase.`);
             skippedDeposit = true;
         } else {
