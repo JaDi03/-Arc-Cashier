@@ -48,6 +48,12 @@ export class SessionService {
                             const sessionData = this.activeSessions.get(userId);
                             const headers: Record<string, string> = { 'x-user-id': userId };
                             if (sessionData) {
+                                // Prevent billing ahead of actual elapsed time (latency/jitter buffer)
+                                const elapsedSeconds = Math.floor((Date.now() - sessionData.joinedAt) / 1000);
+                                if (sessionData.tickCount >= elapsedSeconds) {
+                                    return;
+                                }
+
                                 // Deterministic fee split: every Nth tick goes to admin, rest to creator.
                                 // N = round(1 / platformFee), e.g. every 10th tick for a 10% fee.
                                 // This guarantees an exact proportional split on every session,
