@@ -247,7 +247,7 @@ function renderPaywallOverlay(hideInitially = false) {
     if (existing) existing.remove();
 
     const title = isTipMode ? "Support Creator" : "Premium Stream";
-    const subtitle = isTipMode ? "Set up your wallet to send tips." : "Pay only for the seconds you watch. No subscriptions.";
+    const subtitle = isTipMode ? "Set up your wallet to send tips." : "Pay only for the seconds you watch.<br>No subscriptions.";
     const pricingBox = isTipMode ? `
                         <div class="arc-pricing-row">
                             <span>Action</span>
@@ -267,7 +267,6 @@ function renderPaywallOverlay(hideInitially = false) {
                             <span>Min. deposit</span>
                             <span class="arc-accent">1.00 USDC</span>
                         </div>
-                        <p class="arc-pricing-note">Unused funds can be cashed out to your wallet at any time.</p>
     `;
     const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
     const unlockBtnText = isTipMode 
@@ -321,18 +320,14 @@ function renderPaywallOverlay(hideInitially = false) {
                     <div class="arc-fund-options">
                         <button id="arc-bridge-btn" class="arc-fund-card">
                             <div>
-                                <strong>Bridge from another chain</strong>
-                                <span>Ethereum, Base, Arbitrum (testnets)</span>
+                                <strong>Bridge USDC</strong>
                             </div>
-                            <span class="arc-chevron">›</span>
                         </button>
 
                         <a href="https://faucet.circle.com" target="_blank" rel="noopener" class="arc-fund-card">
                             <div>
-                                <strong>Get test USDC (Faucet)</strong>
-                                <span>faucet.circle.com</span>
+                                <strong>USDC Faucet</strong>
                             </div>
-                            <span class="arc-chevron">↗</span>
                         </a>
                     </div>
 
@@ -362,12 +357,18 @@ function renderPaywallOverlay(hideInitially = false) {
                 </div>
 
                 <div id="arc-phase-success" class="arc-phase" style="display:none;">
-                    <div style="text-align:center;padding:10px 0;">
-                        <h3 style="color:#68d391;margin:0 0 12px 0;font-size:18px;">✅ Session Ended</h3>
-                        <p style="font-size:13px;color:#a0aec0;margin:0 0 20px 0;line-height:1.5;">Your refund was successfully processed to your wallet.</p>
+                    <div style="text-align:center;padding:12px 0 0;">
+                        <!-- Circular Green SVG Checkmark -->
+                        <div style="margin: 0 auto 16px; width: 44px; height: 44px; border-radius: 50%; background: rgba(34, 197, 94, 0.05); border: 1.5px solid rgba(34, 197, 94, 0.25); display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                        <h3 style="color:#ffffff;margin:0 0 8px 0;font-size:18px;font-weight:700;font-family:'Outfit',sans-serif;">Session Ended</h3>
+                        <p style="font-size:13.5px;color:#ffffff;margin:0 0 16px 0;line-height:1.5;font-weight:500;font-family:'Plus Jakarta Sans',sans-serif;">Your refund was successfully processed to your wallet.</p>
                         <a id="arc-success-scan-link" href="#" target="_blank"
-                           style="font-size:13px;color:#38ef7d;text-decoration:underline;font-weight:600;display:inline-block;margin-bottom:24px;">
-                            🧾 View Balance on Arcscan
+                           style="font-size:13px;color:#22c55e;text-decoration:none;font-weight:700;display:inline-block;margin-bottom:20px;font-family:'Plus Jakarta Sans',sans-serif;">
+                            View Balance on Arcscan ↗
                         </a>
                         <button id="arc-success-done-btn" class="arc-btn arc-btn-primary" style="width:100%;">Return to Home</button>
                     </div>
@@ -395,14 +396,21 @@ function renderPaywallOverlay(hideInitially = false) {
                             </div>
                         </div>
 
-                        <div id="arc-cctp-supported-info" class="arc-supported-info">
-                            <span class="arc-info-icon" id="arc-cctp-info-btn">ℹ️ Supported networks</span>
+                        <div id="arc-cctp-supported-info" class="arc-supported-info" style="margin-top: 2px; margin-bottom: 12px;">
+                            <span class="arc-info-icon" id="arc-cctp-info-btn" style="display: flex; align-items: center; gap: 4px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px; flex-shrink:0;">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                Supported networks
+                            </span>
                             <div id="arc-cctp-info-popup" class="arc-info-popup" style="display:none;">
                                 <strong>CCTP-supported testnets:</strong>
                                 <ul>
-                                    <li>🔷 Ethereum Sepolia</li>
-                                    <li>🔵 Base Sepolia</li>
-                                    <li>🔶 Arbitrum Sepolia</li>
+                                    <li>Ethereum Sepolia</li>
+                                    <li>Base Sepolia</li>
+                                    <li>Arbitrum Sepolia</li>
                                 </ul>
                                 <p>Mainnet support will be added at launch.</p>
                             </div>
@@ -645,18 +653,29 @@ function transitionToFundPhase() {
     const fundPhase = document.getElementById('arc-phase-fund');
     fundPhase.style.display = 'block';
 
+    // Change header content to the simplified Phase 2 label
+    const headerTitle = document.querySelector('#arc-paywall-header h2');
+    if (headerTitle) {
+        headerTitle.innerHTML = 'Fund your wallet to watch:';
+        headerTitle.className = 'arc-fund-header-label'; // Change layout style
+    }
+    const headerSub = document.querySelector('#arc-paywall-header p');
+    if (headerSub) headerSub.style.display = 'none';
+
     // Show abbreviated wallet address
     const addr = viewerState.walletAddress || '';
     const display = addr ? addr.slice(0, 6) + '…' + addr.slice(-4) : '';
-    document.getElementById('arc-wallet-display').textContent = display;
+    const displayEl = document.getElementById('arc-wallet-display');
+    if (displayEl) displayEl.textContent = display;
 }
 
 function copyWalletAddress() {
     if (!viewerState.walletAddress) return;
     navigator.clipboard.writeText(viewerState.walletAddress).then(() => {
         const btn = document.getElementById('arc-copy-btn');
-        btn.textContent = '✅';
-        setTimeout(() => { btn.textContent = '📋'; }, 2000);
+        const oldHtml = btn.innerHTML;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        setTimeout(() => { btn.innerHTML = oldHtml; }, 2000);
     });
 }
 
@@ -877,7 +896,7 @@ function buildCctpNetworkList() {
         const btn = document.createElement('button');
         btn.className = 'arc-network-btn';
         btn.dataset.chainId = chain.chainId;
-        btn.innerHTML = `<span>${chain.icon}</span> <span>${chain.name}</span>`;
+        btn.innerHTML = `<span>${chain.name}</span>`;
         btn.addEventListener('click', () => selectCctpChain(chain, btn));
         list.appendChild(btn);
     });
@@ -925,7 +944,7 @@ async function executeCctpBridge(chain) {
     // Switch to progress view
     document.getElementById('arc-cctp-step-select').style.display = 'none';
     document.getElementById('arc-cctp-step-progress').style.display = 'block';
-    setCctpProgress('Connecting MetaMask…');
+    setCctpProgress('Connecting wallet…');
 
     try {
         // Step 1: Connect MetaMask
@@ -958,7 +977,7 @@ async function executeCctpBridge(chain) {
 
         // ── Step 1: Approve USDC -> TokenMessengerV2 ──────────────────────────
         setStepStatus('arc-step-approve-status', 'pending');
-        setCctpProgress('Approving USDC… Sign in MetaMask.');
+        setCctpProgress('Approving USDC…<br>Confirm in your wallet.');
 
         const bridgeAmount = amountUnits;
         const forwardingFee = BigInt(200000); // 0.20 USDC fee for Circle Forwarding Service
@@ -977,7 +996,7 @@ async function executeCctpBridge(chain) {
 
         // ── Step 2: depositForBurnWithHook -> burn USDC with Forwarding hook ──
         setStepStatus('arc-step-burn-status', 'pending');
-        setCctpProgress('Burning USDC on source chain… Sign in MetaMask.');
+        setCctpProgress('Burning USDC on source chain…<br>Confirm in your wallet.');
 
         // mintRecipient must be bytes32 (padded Arc wallet address)
         const recipient = viewerState.walletAddress;
@@ -1018,7 +1037,7 @@ async function executeCctpBridge(chain) {
 
         // ── Step 3: Poll Circle Forwarding status on frontend ─────────────────
         setStepStatus('arc-step-mint-status', 'pending');
-        setCctpProgress('Minting on Arc via Circle Relayer… This takes ~1-2 minutes. You can close this modal.');
+        setCctpProgress('Minting on Arc via Circle Relayer…<br>This takes ~1-2 minutes. You can close this modal.');
         closeCctpModal();
 
         // Show waiting indicator on funding panel
@@ -1090,12 +1109,16 @@ async function pollCctpForwarding(sourceDomain, txHash) {
 function setStepStatus(stepId, status) {
     const el = document.getElementById(stepId);
     if (!el) return;
-    el.textContent = status === 'pending' ? '⏳' : status === 'done' ? '✅' : '';
+    el.innerHTML = status === 'pending' 
+        ? '<div class="arc-spinner-sm"></div>' 
+        : status === 'done' 
+            ? '<span style="color:#22c55e;font-weight:700;">✓</span>' 
+            : '';
 }
 
 function setCctpProgress(msg) {
     const el = document.getElementById('arc-cctp-progress-msg');
-    if (el) el.textContent = msg;
+    if (el) el.innerHTML = msg;
 }
 
 // ─── Session Manager (post-unlock) ───────────────────────────────────────────
@@ -1118,24 +1141,23 @@ function renderSessionManager() {
                 <div><span>Video cost:</span> <span id="arc-sm-video-cost">$0.0000 USDC</span></div>
                 <div><span>Balance:</span>    <span id="arc-sm-balance">— USDC</span></div>
             </div>
-            <div id="arc-sm-warning" class="arc-hidden" style="background:rgba(255,165,0,0.15);border:1px solid rgba(255,165,0,0.3);padding:10px;margin-top:10px;margin-bottom:10px;border-radius:12px;text-align:center;backdrop-filter:blur(5px);">
-                <p style="margin:0 0 8px;color:#ffa500;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
+            <div id="arc-sm-warning" class="arc-hidden">
+                <p class="arc-warning-text">⚠️ Low Balance: <span id="arc-sm-time-left"></span> left</p>
                 <div id="arc-sm-topup-form" style="display:none;margin:6px 0;">
                     <div style="display:flex;gap:6px;align-items:center;justify-content:center;">
-                        <span style="color:#e2e8f0;font-size:12px;font-weight:700;">$</span>
-                        <input id="arc-sm-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount"
-                            style="width:90px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:white;font-size:12px;outline:none;" />
-                        <button id="arc-sm-topup-confirm-btn" class="arc-sm-btn" style="background:#22c55e;color:white;padding:4px 8px;">Confirm</button>
-                        <button id="arc-sm-topup-cancel-btn" class="arc-sm-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:4px 8px;">✕</button>
+                        <span style="color:#ffffff;font-size:12px;font-weight:700;">$</span>
+                        <input id="arc-sm-topup-input" type="number" min="0.01" step="0.01" placeholder="Amount" />
+                        <button id="arc-sm-topup-confirm-btn" class="arc-sm-btn">Confirm</button>
+                        <button id="arc-sm-topup-cancel-btn" class="arc-sm-btn">✕</button>
                     </div>
                 </div>
-                <button id="arc-sm-topup-btn" class="arc-sm-btn" style="background:#00b4d8;color:white;width:auto;margin:4px auto 0;padding:6px 12px;font-size:11px;box-shadow:0 2px 8px rgba(0,180,216,0.25);">Top Up</button>
+                <button id="arc-sm-topup-btn" class="arc-sm-btn">Top Up</button>
             </div>
             <div class="arc-sm-btn-group">
                 <button id="arc-sm-leave-btn" class="arc-sm-btn">Just Leave</button>
                 <button id="arc-sm-end-btn" class="arc-sm-btn">Cash Out &amp; Exit</button>
             </div>
-            <p style="margin:8px 0 0;font-size:10px;color:#718096;text-align:center;line-height:1.3;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
+            <p style="margin:8px 0 0;font-size:10px;color:#ffffff;text-align:center;line-height:1.3;font-weight:500;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
         </div>
     `;
     document.body.appendChild(sm);
@@ -1144,7 +1166,8 @@ function renderSessionManager() {
     let isDragging = false, startX, startY, initialX, initialY;
     const header = document.getElementById('arc-sm-header');
     header.addEventListener('mousedown', (e) => {
-        if (e.target.id === 'arc-sm-minimize-btn') return;
+        if (e.target.id === 'arc-sm-minimize-btn' || e.target.closest('button') || e.target.closest('input')) return;
+        e.preventDefault(); // Prevent text selection and cursor updates while dragging
         isDragging = true;
         const rect = sm.getBoundingClientRect();
         initialX = rect.left; initialY = rect.top;
@@ -1662,36 +1685,34 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     updateContainerStyle();
 
     container.innerHTML = `
-        <div id="arc-tip-header" style="display:none;justify-content:space-between;align-items:center;margin-bottom:2px;cursor:grab;">
-            <h3 style="margin:0;font-size:13px;font-weight:600;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
-                <span class="arc-pulse-dot" style="background:#38ef7d;box-shadow:0 0 0 0 rgba(56,239,125,0.7);width:8px;height:8px;"></span> Support Creator
-            </h3>
-            <button id="arc-tip-minimize-btn" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;">−</button>
+        <div id="arc-tip-header" style="display:none;">
+            <h3><span class="arc-pulse-dot"></span> Support Creator</h3>
+            <button id="arc-tip-minimize-btn" title="Minimize">−</button>
         </div>
         
-        <div id="arc-tip-status-card" class="arc-sm-stats" style="display:none;background:rgba(0,0,0,0.25);border-radius:8px;padding:8px 10px;margin:0;width:100%;box-sizing:border-box;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:0;font-size:11px;color:#64748b;align-items:center;width:100%;">
+        <div id="arc-tip-status-card" class="arc-sm-stats" style="display:none;">
+            <div>
                 <span>Balance:</span>
-                <span id="arc-tip-balance-val" style="color:#68d391;font-weight:600;">⏳ Checking…</span>
+                <span id="arc-tip-balance-val">⏳ Checking…</span>
             </div>
-            <div id="arc-tip-sent-row" style="display:none;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;margin-top:6px;font-size:11px;color:#64748b;width:100%;">
+            <div id="arc-tip-sent-row" style="display:none;">
                 <span>Tips Sent:</span>
-                <span id="arc-tip-sent-val" style="color:#38ef7d;font-weight:600;">$0.00 USDC</span>
+                <span id="arc-tip-sent-val">$0.00 USDC</span>
             </div>
         </div>
 
-        <div id="arc-tip-status-pill" style="font-size:11px;color:#a0aec0;padding:4px 10px;background:rgba(17,24,39,0.85);border:1px solid rgba(99,179,237,0.2);border-radius:10px;backdrop-filter:blur(4px);display:none;">
+        <div id="arc-tip-status-pill" style="display:none;">
             🔗 Connect wallet to tip
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
-            <button id="arc-tip-btn" class="arc-btn" style="padding:8px 16px;font-size:12px;background:linear-gradient(135deg,#11998e,#38ef7d);border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 12px rgba(56,239,125,0.25);font-weight:600;width:100%;transition:transform 0.1s;margin:0;box-sizing:border-box;justify-content:center;">
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%;box-sizing:border-box;">
+            <button id="arc-tip-btn" class="arc-btn">
                 ❤️ Support $${amount.toFixed(2)}
             </button>
             
-            <div id="arc-tip-wallet-actions" style="display:none;gap:6px;width:100%;box-sizing:border-box;">
-                <button id="arc-tip-leave-btn" class="arc-btn" style="flex:1;padding:6px 2px;font-size:10px;background:#4a5568;border-radius:6px;height:auto;box-shadow:none;justify-content:center;">Just Leave</button>
-                <button id="arc-tip-end-btn" class="arc-btn arc-btn-danger" style="flex:1.5;padding:6px 2px;font-size:10px;border-radius:6px;height:auto;box-shadow:none;justify-content:center;">Cash Out &amp; Exit</button>
+            <div id="arc-tip-wallet-actions" style="display:none;">
+                <button id="arc-tip-leave-btn">Just Leave</button>
+                <button id="arc-tip-end-btn">Cash Out &amp; Exit</button>
             </div>
         </div>
     `;
@@ -1703,7 +1724,8 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     const tipHeaderEl = document.getElementById('arc-tip-header');
     
     tipHeaderEl.addEventListener('mousedown', (e) => {
-        if (e.target.id === 'arc-tip-minimize-btn') return;
+        if (e.target.id === 'arc-tip-minimize-btn' || e.target.closest('button') || e.target.closest('input')) return;
+        e.preventDefault(); // Prevent text selection and cursor updates while dragging
         isTipDragging = true;
         const rect = container.getBoundingClientRect();
         tipInitialX = rect.left; tipInitialY = rect.top;
