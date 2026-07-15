@@ -39,6 +39,12 @@ export interface ConnectorConfig {
 
     /** Per-second rate in USDC (default: 0.0001) */
     ratePerSecond?: number;
+
+    /** Platform display fee fraction (e.g. 0.10 for 10%) */
+    displayFee?: number;
+
+    /** Platform origin fee fraction (e.g. 0.10 for 10%) */
+    originFee?: number;
 }
 
 /**

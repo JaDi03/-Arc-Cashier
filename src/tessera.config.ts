@@ -7,7 +7,7 @@ import type { CashierConfig } from './core/types';
  * Only connectors listed here will be loaded at startup.
  */
 const config: CashierConfig = {
-    port: 3000,
+    port: 7878,
 
     connectors: [
         // {
@@ -21,6 +21,8 @@ const config: CashierConfig = {
             name: 'peertube',
             upstreamUrl: 'http://localhost:9000',
             ratePerSecond: 0.0001,
+            displayFee: 0.10,
+            originFee: 0.10,
         },
     ],
 };

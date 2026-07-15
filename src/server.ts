@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import coreRouter from './core/routes';
+import instanceInfoRouter from './core/instance-info';
 import { sessionService } from './core/session';
 import type { Connector, ConnectorConfig } from './core/types';
 
@@ -47,6 +47,10 @@ export async function createServer(connectors: ConnectorConfig[]) {
 
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);
+
+    // 2. Register public Tessera identity endpoint (no auth — read by remote sidecars)
+    //    Used by federated display instances to discover this sidecar's wallet and fees.
+    app.use('/api/tessera', instanceInfoRouter);
 
 
 
