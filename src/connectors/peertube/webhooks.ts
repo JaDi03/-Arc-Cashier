@@ -1,5 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { sessionService } from '../../core/session';
 import { creatorService } from './creators';
 import { isValidEvmAddress } from './gateway-creator';
@@ -57,7 +59,7 @@ function verifySignature(signature: string | undefined, payload: Buffer | undefi
  * Webhook endpoint for PeerTube
  * Expects the PeerTube plugin to send 'viewer_joined' and 'viewer_left' events.
  */
-router.post('/webhook', (req, res) => {
+router.post('/webhook', async (req, res) => {
     // 1. Verify Signature
     const signature = req.headers['x-peertube-signature'] as string;
     // Note: We cast to any because rawBody is a custom property we will add in server.ts
@@ -69,14 +71,31 @@ router.post('/webhook', (req, res) => {
     }
 
     // 2. Parse payload safely since we already verified the rawBody
-    let payload;
+    let payload: any;
     try {
         payload = JSON.parse(rawBody.toString('utf-8'));
     } catch (e) {
         return res.status(400).json({ error: 'Invalid JSON payload' });
     }
 
-    const { event, userId, videoId, instanceUrl, ratePerSecond, timestamp, nonce, creatorAddress, creatorWallet, tesseraMode } = payload;
+    const {
+        event,
+        userId,
+        videoId,
+        instanceUrl,
+        ratePerSecond,
+        timestamp,
+        nonce,
+        creatorAddress,
+        creatorWallet,
+        tesseraMode,
+        adminWallet,
+        displayFee,
+        originFee,
+        originInstanceUrl,
+        isLocal
+    } = payload;
+    
     const resolvedCreatorAddress = (creatorAddress || creatorWallet || '').trim();
 
     console.log(`[PeerTube-Webhook-DEBUG] Event: ${event}, userId: ${userId}, videoId: ${videoId}, resolvedCreatorAddress: ${resolvedCreatorAddress}`);
@@ -97,6 +116,26 @@ router.post('/webhook', (req, res) => {
     }
     usedNonces.set(nonce, now);
 
+    // 3. Dynamically persist local instance settings received from the plugin
+    if (adminWallet && isValidEvmAddress(adminWallet)) {
+        try {
+            const DATA_DIR = path.resolve(process.cwd(), 'data');
+            const SETTINGS_PATH = path.join(DATA_DIR, 'instance-settings.json');
+            const settings = {
+                adminWallet: adminWallet.trim(),
+                displayFee: displayFee !== undefined ? Number(displayFee) : 0.10,
+                originFee: originFee !== undefined ? Number(originFee) : 0.10
+            };
+            if (!fs.existsSync(DATA_DIR)) {
+                fs.mkdirSync(DATA_DIR, { recursive: true });
+            }
+            fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+            console.log(`[PeerTube-Webhook] 💾 Updated local instance settings: admin: ${settings.adminWallet} | displayFee: ${settings.displayFee} | originFee: ${settings.originFee}`);
+        } catch (err) {
+            console.error('[PeerTube-Webhook] ⚠️ Failed to save instance-settings.json:', err);
+        }
+    }
+
     // Determine the dynamic rate
     const MIN_RATE = 0.000001;
     const MAX_RATE = 0.01;
@@ -114,7 +153,7 @@ router.post('/webhook', (req, res) => {
             console.warn(`[PeerTube] ⚠️ Rate ${rate} out of bounds, using default`);
         }
     } else if (instanceUrl && videoId) {
-        // Best effort: Log the metadata for future expansion (e.g., fetching custom pricing from API)
+        // Best effort: Log the metadata for future expansion
         console.log(`[PeerTube] ℹ️ Video ${videoId} from ${instanceUrl} joined without explicit rate. Using default $0.0001/s.`);
     }
 
@@ -132,7 +171,7 @@ router.post('/webhook', (req, res) => {
         console.warn(`[PeerTube] ⚠️ Invalid creator wallet in webhook: ${resolvedCreatorAddress}`);
     }
 
-    // 3. Process Events (Following building-a-connector.md)
+    // 4. Process Events
     if (event === 'viewer_joined') {
         // If the video is free, do not start the per-second billing loop in the backend
         if (activeRate === 0) {
@@ -140,28 +179,61 @@ router.post('/webhook', (req, res) => {
             return res.json({ status: 'ok' });
         }
 
-        // --- Deterministic Platform Fee Split (PeerTube-specific) ---
-        // PeerTube has a distinct admin (instance host) and content creator.
-        // Both addresses and the fee percentage are passed to the session service,
-        // which applies the split deterministically: every Nth payment tick goes to
-        // the admin (where N = round(1 / platformFee)), and the rest go to the creator.
-        // This guarantees an exact proportional split on EVERY session, unlike the
-        // previous per-session dice roll which could give 100% to one party unfairly.
-        const platformFee = payoutAddress
-            ? (creatorService.getCreatorByAddress(payoutAddress)?.platformFee ?? 0.10)
-            : 0;
-        const platformAdminAddress = process.env.SELLER_ADDRESS || undefined;
+        // Determine local admin wallet and fees (with fallback to environment)
+        const localAdminAddress = adminWallet || process.env.TESSERA_ADMIN_WALLET || process.env.SELLER_ADDRESS || undefined;
+        const localDisplayFee = displayFee !== undefined ? Number(displayFee) : Number(process.env.TESSERA_DISPLAY_FEE || 0.10);
 
-        console.log(`[PeerTube] 📊 Session fee split: ${((1 - platformFee) * 100).toFixed(0)}% creator / ${(platformFee * 100).toFixed(0)}% admin (every ${Math.round(1 / (platformFee || 1))} ticks)`);
-        console.log(`[PeerTube-Webhook-DEBUG] Recording join for user: ${userId}. Payout creator: ${payoutAddress}, Admin: ${platformAdminAddress}, platformFee: ${platformFee}`);
+        let displayAdminAddress = localAdminAddress;
+        let finalDisplayFee = localDisplayFee;
+        let originAdminAddress: string | undefined = undefined;
+        let finalOriginFee = 0;
 
-        sessionService.recordJoin(userId, videoId, activeRate, payoutAddress, platformAdminAddress, platformFee);
+        // If the video is federated, discover the remote origin sidecar's wallet and fee
+        if (isLocal === false && originInstanceUrl) {
+            try {
+                const originUrlObj = new URL(originInstanceUrl);
+                const remoteSidecarUrl = `${originUrlObj.protocol}//${originUrlObj.hostname}:7878/api/tessera/instance-info`;
+                
+                console.log(`[PeerTube-Webhook] 🌐 Federated play detected. Fetching remote host from: ${remoteSidecarUrl}`);
+                
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 3000); // 3-second timeout
+                
+                const response = await fetch(remoteSidecarUrl, { signal: controller.signal });
+                clearTimeout(timeout);
+                
+                if (response.ok) {
+                    const remoteData = await response.json() as { adminWallet: string; originFee: number };
+                    if (remoteData.adminWallet && isValidEvmAddress(remoteData.adminWallet)) {
+                        originAdminAddress = remoteData.adminWallet.trim();
+                        finalOriginFee = remoteData.originFee !== undefined ? Number(remoteData.originFee) : 0.10;
+                        console.log(`[PeerTube-Webhook] 🌐 Federated host discovered: wallet ${originAdminAddress} | originFee ${finalOriginFee}`);
+                    }
+                } else {
+                    console.warn(`[PeerTube-Webhook] ⚠️ Remote sidecar info returned status ${response.status}`);
+                }
+            } catch (err) {
+                console.warn(`[PeerTube-Webhook] ⚠️ Failed to query remote sidecar:`, err);
+            }
+        }
+
+        console.log(`[PeerTube-Webhook] 📊 Starting session for user: ${userId}. Payouts: creator ${payoutAddress}, displayAdmin: ${displayAdminAddress} (${finalDisplayFee}), originAdmin: ${originAdminAddress} (${finalOriginFee})`);
+        
+        sessionService.recordJoin(
+            userId,
+            videoId,
+            activeRate,
+            payoutAddress,
+            displayAdminAddress,
+            finalDisplayFee,
+            originAdminAddress,
+            finalOriginFee
+        );
     } else if (event === 'viewer_left') {
         sessionService.recordPartAndSettle(userId).catch(console.error);
     } else {
         console.warn(`[PeerTube] ⚠️ Unknown event received: ${event}`);
     }
-
     // Always return 200 OK to acknowledge receipt
     res.json({ status: 'ok' });
 });
