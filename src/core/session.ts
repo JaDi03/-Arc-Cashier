@@ -176,6 +176,10 @@ export class SessionService {
         return session ? session.ratePerSecond : null;
     }
 
+    public getSession(userId: string) {
+        return this.activeSessions.get(userId);
+    }
+
     public async recordPartAndSettle(userId: string): Promise<void> {
         if (this.settlementLocks.has(userId)) {
             console.log(`[Session] 🔒 Settlement already in progress for ${userId}, skipping.`);

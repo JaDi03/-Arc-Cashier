@@ -3,6 +3,7 @@ import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
 import { sessionService } from './session';
+import { statsService } from './stats';
 import { GATEWAY_FEE_BUFFER } from './gateway-utils';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
@@ -82,7 +83,19 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
         next();
     });
 }, (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
+    const userId = req.headers['x-user-id'] as string;
+    const sellerAddress = req.headers['x-seller-address'] as string;
     console.log(`[x402] ✅ Payment verified. Payer: ${req.payment?.payer}, Amount: ${req.payment?.amount}`);
+
+    if (userId && sellerAddress) {
+        const ratePerSecond = sessionService.getRateForUser(userId) ?? 0.0001;
+        try {
+            statsService.recordPayment(userId, sellerAddress, ratePerSecond);
+        } catch (err) {
+            console.error(`[Routes-ERROR] Failed to record payment stats:`, err);
+        }
+    }
+
     res.json({ access: true, payment: req.payment });
 });
 
