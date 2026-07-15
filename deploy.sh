@@ -32,7 +32,7 @@ echo "🚀 Starting new container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
-  -p 3000:3000 \
+  -p 7878:7878 \
   --env-file .env \
   -v "$DATA_DIR:/app/data" \
   "$IMAGE_NAME"
