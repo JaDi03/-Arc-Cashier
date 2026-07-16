@@ -593,7 +593,7 @@ async function getOrCreateArcWallet(retries = 0) {
             });
             if (recoveryRes.ok) {
                 const recoveryData = await recoveryRes.json();
-                if (recoveryData.status === 'ready') {
+                if (recoveryData.status === 'existing' || recoveryData.status === 'ready') {
                     console.log('[Tessera] SDK reported cancel but wallet exists — recovered silently.');
                     return recoveryData;
                 }
