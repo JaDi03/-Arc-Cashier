@@ -1,6 +1,8 @@
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { walletService } from './wallet';
 
+const ARC_RPC_URL = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+
 /**
  * Streaming Session Management Service
  * Uses Circle Gateway for real settlement and refunds.
@@ -42,6 +44,7 @@ export class SessionService {
                                 gatewayClient = new GatewayClient({
                                     privateKey: sessionRecord.privateKey as `0x${string}`,
                                     chain: 'arcTestnet',
+                                    rpcUrl: ARC_RPC_URL,
                                 });
                                 this.gatewayClients.set(userId, gatewayClient);
                             }
@@ -168,6 +171,7 @@ export class SessionService {
                 client = new GatewayClient({
                     privateKey: sessionRecord.privateKey as `0x${string}`,
                     chain: 'arcTestnet',
+                    rpcUrl: ARC_RPC_URL,
                 });
                 this.gatewayClients.set(userId, client);
             } catch (_) {

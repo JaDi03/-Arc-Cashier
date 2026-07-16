@@ -621,21 +621,29 @@ async function getOrCreateArcWallet(retries = 0) {
 
 async function getArcBalance(address) {
     try {
-        const res = await fetch('https://rpc.testnet.arc.network', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                jsonrpc: '2.0', id: 1, method: 'eth_getBalance',
-                params: [address, 'latest'],
-            }),
-        });
+        const res = await fetch(ARC_API_BASE + '/api/core/wallet-balance?address=' + address);
+        if (!res.ok) throw new Error('Balance endpoint returned non-OK status');
         const json = await res.json();
-        const balance = BigInt(json.result || '0x0');
-        // Native balance on Arc Testnet uses 18 decimals!
-        return Number(balance) / 1e18;
+        return json.balance;
     } catch (e) {
-        console.warn('[Tessera] Balance fetch failed:', e);
-        return 0;
+        console.warn('[Tessera] Balance fetch via backend failed, using direct query fallback:', e);
+        // Direct query fallback (handles case when backend is down/unreachable during early setup)
+        try {
+            const res = await fetch('https://rpc.testnet.arc.network', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0', id: 1, method: 'eth_getBalance',
+                    params: [address, 'latest'],
+                }),
+            });
+            const json = await res.json();
+            const balance = BigInt(json.result || '0x0');
+            return Number(balance) / 1e18;
+        } catch (innerErr) {
+            console.warn('[Tessera] Direct query fallback also failed:', innerErr);
+            return 0;
+        }
     }
 }
 

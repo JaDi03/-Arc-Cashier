@@ -24,6 +24,13 @@ const circleClient = initiateUserControlledWalletsClient({
     apiKey: process.env.CIRCLE_API_KEY || ''
 });
 
+const ARC_RPC_URL = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+
+const publicClient = createPublicClient({
+    chain: arcTestnet,
+    transport: http(ARC_RPC_URL)
+});
+
 // Per-userId lock to prevent concurrent createWallet calls from creating duplicate wallets.
 // When the client retries get-wallet before Circle has indexed the first wallet, this lock
 // returns 'indexing' instead of calling createWallet a second time.
@@ -567,6 +574,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         const gatewayClient = new GatewayClient({
             privateKey: privateKey as `0x${string}`,
             chain: 'arcTestnet',
+            rpcUrl: ARC_RPC_URL,
         });
 
         // 2. Check current balances (with retry since blockchain indexers may lag)
@@ -700,6 +708,7 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
         const gatewayClient = new GatewayClient({
             privateKey: sessionRecord.privateKey as `0x${string}`,
             chain: 'arcTestnet',
+            rpcUrl: ARC_RPC_URL,
         });
 
         const balances = await gatewayClient.getBalances();
@@ -764,6 +773,7 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
         const gatewayClient = new GatewayClient({
             privateKey: sessionRecord.privateKey as `0x${string}`,
             chain: 'arcTestnet',
+            rpcUrl: ARC_RPC_URL,
         });
         const balances = await gatewayClient.getBalances();
         res.json({
@@ -791,6 +801,7 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
         const gatewayClient = new GatewayClient({
             privateKey: sessionRecord.privateKey as `0x${string}`,
             chain: 'arcTestnet',
+            rpcUrl: ARC_RPC_URL,
         });
         
         let balances = await gatewayClient.getBalances();
@@ -885,6 +896,26 @@ coreRouter.get('/tip-access', (req: Request, res: Response, next: NextFunction) 
     priceMiddleware(req as any, res as any, next);
 }, (req: Request, res: Response) => {
     res.json({ success: true });
+});
+
+// --- CLIENT SIDE: Check Native Balance of any Wallet ---
+coreRouter.get('/wallet-balance', async (req: Request, res: Response) => {
+    const address = req.query.address as string;
+    if (!address) {
+        return res.status(400).json({ error: 'Missing address' });
+    }
+
+    try {
+        const balance = await publicClient.getBalance({
+            address: address as `0x${string}`
+        });
+        const formatted = formatUnits(balance, 18);
+        return res.json({ balance: parseFloat(formatted) });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Core] ❌ Failed to fetch balance for ${address}:`, err.message);
+        return res.status(500).json({ error: 'Failed to fetch balance' });
+    }
 });
 
 export default coreRouter;
