@@ -724,19 +724,42 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
         const withdrawAmount = formatUnits(availableMicro - GATEWAY_FEE_BUFFER, 6);
         console.log(`[Core] 🧹 Cashing out ${withdrawAmount} USDC to ${sessionRecord.returnAddress}...`);
 
-        const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
-            recipient: sessionRecord.returnAddress as `0x${string}`,
-        });
+        try {
+            const withdrawResult = await gatewayClient.withdraw(withdrawAmount, {
+                recipient: sessionRecord.returnAddress as `0x${string}`,
+            });
 
-        walletService.clearSession(userId);
-        console.log(`[Core] ✅ Cash-out complete! Tx: ${withdrawResult.mintTxHash}`);
+            walletService.clearSession(userId);
+            console.log(`[Core] ✅ Cash-out complete! Tx: ${withdrawResult.mintTxHash}`);
 
-        return res.json({ 
-            status: 'cashed_out', 
-            amount: withdrawResult.formattedAmount,
-            txHash: withdrawResult.mintTxHash
-        });
-
+            return res.json({ 
+                status: 'cashed_out', 
+                amount: withdrawResult.formattedAmount,
+                txHash: withdrawResult.mintTxHash
+            });
+        } catch (withdrawError) {
+            const err = withdrawError instanceof Error ? withdrawError : new Error(String(withdrawError));
+            const txHashMatch = err.message.match(/0x[a-fA-F0-9]{64}/);
+            if (txHashMatch) {
+                const txHash = txHashMatch[0];
+                console.log(`[Core] ⚠️ Cash-out SDK failed but tx submitted: ${txHash}. Checking receipt...`);
+                try {
+                    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+                    if (receipt && receipt.status === 'success') {
+                        console.log(`[Core] ✅ Cash-out verified on-chain: ${txHash}`);
+                        walletService.clearSession(userId);
+                        return res.json({
+                            status: 'cashed_out',
+                            amount: withdrawAmount,
+                            txHash: txHash
+                        });
+                    }
+                } catch (receiptErr) {
+                    console.error(`[Core] Failed to verify receipt for cash-out ${txHash}:`, receiptErr);
+                }
+            }
+            throw withdrawError;
+        }
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[Core] ❌ /cash-out failed:`, err.message);

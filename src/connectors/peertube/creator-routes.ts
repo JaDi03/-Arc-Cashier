@@ -1,7 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { GatewayClient } from '@circle-fin/x402-batching/client';
-import { formatUnits, parseUnits } from 'viem';
+import { formatUnits, parseUnits, createPublicClient, http } from 'viem';
+import { arcTestnet } from 'viem/chains';
 import { GATEWAY_FEE_BUFFER } from '../../core/gateway-utils';
+
+const ARC_RPC_URL = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+
+const publicClient = createPublicClient({
+    chain: arcTestnet,
+    transport: http(ARC_RPC_URL),
+});
 import {
     buildGatewayMintTransaction,
     computeCreatorWithdrawAmount,
@@ -197,6 +205,7 @@ creatorRouter.get('/seller/balance', async (req: Request, res: Response) => {
         const sellerClient = new GatewayClient({
             chain: 'arcTestnet',
             privateKey: sellerKey as `0x${string}`,
+            rpcUrl: ARC_RPC_URL,
         });
 
         const balances = await sellerClient.getBalances();
@@ -224,6 +233,7 @@ creatorRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
         const sellerClient = new GatewayClient({
             chain: 'arcTestnet',
             privateKey: sellerKey as `0x${string}`,
+            rpcUrl: ARC_RPC_URL,
         });
 
         const balances = await sellerClient.getBalances();
@@ -235,13 +245,36 @@ creatorRouter.post('/seller/withdraw', async (req: Request, res: Response) => {
         const safeWithdrawMicro = availableMicro - GATEWAY_FEE_BUFFER;
         const safeWithdrawAmount = formatUnits(safeWithdrawMicro, 6);
 
-        const withdrawResult = await sellerClient.withdraw(safeWithdrawAmount);
+        try {
+            const withdrawResult = await sellerClient.withdraw(safeWithdrawAmount);
 
-        return res.json({
-            status: 'success',
-            withdrawnAmount: withdrawResult.formattedAmount,
-            txHash: withdrawResult.mintTxHash,
-        });
+            return res.json({
+                status: 'success',
+                withdrawnAmount: withdrawResult.formattedAmount,
+                txHash: withdrawResult.mintTxHash,
+            });
+        } catch (withdrawError) {
+            const err = withdrawError instanceof Error ? withdrawError : new Error(String(withdrawError));
+            const txHashMatch = err.message.match(/0x[a-fA-F0-9]{64}/);
+            if (txHashMatch) {
+                const txHash = txHashMatch[0];
+                console.log(`[PeerTube] ⚠️ Seller withdrawal SDK failed but tx submitted: ${txHash}. Checking receipt...`);
+                try {
+                    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+                    if (receipt && receipt.status === 'success') {
+                        console.log(`[PeerTube] ✅ Seller withdrawal verified on-chain: ${txHash}`);
+                        return res.json({
+                            status: 'success',
+                            withdrawnAmount: safeWithdrawAmount,
+                            txHash: txHash,
+                        });
+                    }
+                } catch (receiptErr) {
+                    console.error(`[PeerTube] Failed to verify receipt for seller withdrawal ${txHash}:`, receiptErr);
+                }
+            }
+            throw withdrawError;
+        }
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[PeerTube] ❌ Seller withdrawal failed:`, err.message);
