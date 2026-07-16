@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import instanceInfoRouter from './instance-info';
+import coreRouter from './routes';
+import { statsService } from './stats';
 import { Request, Response } from 'express';
 import * as fs from 'fs';
 
-vi.mock('fs', () => ({
-    existsSync: vi.fn(),
-    readFileSync: vi.fn(),
-}));
+vi.mock('fs', async (importOriginal) => {
+    const actual = await importOriginal() as any;
+    return {
+        ...actual,
+        existsSync: vi.fn(),
+        readFileSync: vi.fn(),
+    };
+});
 
 describe('Instance Info Endpoint', () => {
     let handler: any;
@@ -82,5 +88,42 @@ describe('Instance Info Endpoint', () => {
         expect(responseJson.adminWallet).toBe('0x9999999999999999999999999999999999999999');
         expect(responseJson.displayFee).toBe(0.30);
         expect(responseJson.originFee).toBe(0.10); // default fallback
+    });
+});
+
+describe('Stream Access Endpoint', () => {
+    let successHandler: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        const layer = coreRouter.stack.find(s => s.route && s.route.path === '/stream-access');
+        successHandler = layer?.route?.stack[layer.route.stack.length - 1]?.handle;
+    });
+
+    it('should call statsService.recordPayment on success callback with headers and payment info', () => {
+        const spyRecord = vi.spyOn(statsService, 'recordPayment').mockImplementation(() => {});
+
+        const req = {
+            headers: {
+                'x-user-id': 'user_123',
+                'x-seller-address': '0xSeller',
+            },
+            payment: {
+                payer: '0xPayer',
+                amount: 0.0005,
+            }
+        } as unknown as Request;
+
+        const res = {
+            json: vi.fn(),
+        } as unknown as Response;
+
+        successHandler(req, res);
+
+        expect(spyRecord).toHaveBeenCalledWith('user_123', '0xSeller', 0.0005);
+        expect(res.json).toHaveBeenCalledWith({
+            access: true,
+            payment: (req as any).payment,
+        });
     });
 });

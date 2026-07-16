@@ -20,3 +20,6 @@ creators.json
 
 # MkDocs build output
 site/
+
+# Runtime data directory
+data/
