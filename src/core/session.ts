@@ -85,10 +85,14 @@ export class SessionService {
                                     }
                                 }
 
+                                // Creator-first ordering: creator fills the opening slots of every cycle.
+                                // Admin fees are placed at the END of the cycle so that short sessions
+                                // always benefit the creator rather than the platform admins.
+                                const creatorSlots = TICK_CYCLE - dSlots - oSlots;
                                 let payoutAddress = sessionData.creatorAddress;
-                                if (posInCycle < dSlots && sessionData.displayAdminAddress) {
+                                if (posInCycle >= creatorSlots && posInCycle < creatorSlots + dSlots && sessionData.displayAdminAddress) {
                                     payoutAddress = sessionData.displayAdminAddress;
-                                } else if (posInCycle < dSlots + oSlots && sessionData.originAdminAddress) {
+                                } else if (posInCycle >= creatorSlots + dSlots && sessionData.originAdminAddress) {
                                     payoutAddress = sessionData.originAdminAddress;
                                 }
 
