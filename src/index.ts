@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createServer } from './server';
 import config from './tessera.config';
 
-const PORT = Number(process.env.PORT || config.port || 3000);
+const PORT = Number(process.env.PORT || config.port || 7878);
 
 async function main() {
     try {

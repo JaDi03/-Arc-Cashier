@@ -47,7 +47,7 @@ const sessionLimiter = rateLimit({
 
 const coreRouter = Router();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 7878;
 
 // Routes 100% of the payment to the address provided via x-seller-address.
 // Platform-specific routing logic (e.g. platform fee splits) is handled by the

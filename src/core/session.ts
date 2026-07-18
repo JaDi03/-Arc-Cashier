@@ -100,7 +100,7 @@ export class SessionService {
                                 headers['x-video-id'] = sessionData.videoId;
                             }
 
-                            const PORT = process.env.PORT || 3000;
+                            const PORT = process.env.PORT || 7878;
                             const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
                             
                             console.log(`[Session-Loop-DEBUG] Ticking payment for ${userId}. URL: ${sidecarUrl}/api/core/stream-access | Headers: ${JSON.stringify(headers)}`);
