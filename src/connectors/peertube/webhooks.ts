@@ -188,17 +188,59 @@ router.post('/webhook', async (req, res) => {
         let originAdminAddress: string | undefined = undefined;
         let finalOriginFee = 0;
 
-        // Federation discovery: the remote origin server's wallet and fee are obtained
-        // through the PeerTube plugin's /instance-info relay route, not by probing the
-        // sidecar directly at hostname:7878 (which fails behind reverse proxies).
+        // Federation discovery (Phase 3b): query the remote PeerTube's public plugin API
+        // to get the installed plugin version, then fetch instance-info through the plugin router.
+        // This avoids direct sidecar access (hostname:7878) which fails behind reverse proxies.
         //
-        // TODO (Phase 3b): implement plugin-based federation lookup by querying:
-        //   GET {originInstanceUrl}/plugins/peertube-plugin-tessera/{version}/router/instance-info
+        // Step 1: GET {originInstanceUrl}/api/v1/plugins/peertube-plugin-tessera → { plugin: { version } }
+        // Step 2: GET {originInstanceUrl}/plugins/peertube-plugin-tessera/{version}/router/instance-info
+        //         → { adminWallet, originFee }
         //
-        // Until then, federated sessions start without origin fees (originAdminAddress = undefined,
-        // finalOriginFee = 0). The creator still receives 100% of those ticks.
+        // Fails gracefully: if either request fails or times out, originFee = 0 and the
+        // creator receives 100% of the federated session ticks.
         if (isLocal === false && originInstanceUrl) {
-            console.log(`[PeerTube-Webhook] 🌐 Federated play detected from: ${originInstanceUrl}. Origin fees deferred to Phase 3b.`);
+            console.log(`[PeerTube-Webhook] 🌐 Federated play detected from: ${originInstanceUrl}. Looking up remote Tessera plugin...`);
+            try {
+                // Step 1: Resolve plugin version from remote PeerTube's public REST API
+                const pluginInfoRes = await fetch(
+                    `${originInstanceUrl}/api/v1/plugins/peertube-plugin-tessera`,
+                    { signal: AbortSignal.timeout(3000) }
+                );
+
+                if (pluginInfoRes.ok) {
+                    const pluginInfo = await pluginInfoRes.json() as { plugin?: { version?: string }, version?: string };
+                    const version = pluginInfo?.plugin?.version ?? pluginInfo?.version;
+
+                    if (version) {
+                        // Step 2: Fetch instance-info through the plugin relay (no port 7878 needed)
+                        const instanceInfoUrl = `${originInstanceUrl}/plugins/peertube-plugin-tessera/${version}/router/instance-info`;
+                        console.log(`[PeerTube-Webhook] 🔍 Fetching remote instance-info from: ${instanceInfoUrl}`);
+
+                        const infoRes = await fetch(instanceInfoUrl, { signal: AbortSignal.timeout(3000) });
+
+                        if (infoRes.ok) {
+                            const remoteData = await infoRes.json() as { adminWallet?: string; originFee?: number };
+                            if (remoteData.adminWallet && isValidEvmAddress(remoteData.adminWallet)) {
+                                originAdminAddress = remoteData.adminWallet.trim();
+                                finalOriginFee = remoteData.originFee !== undefined ? Number(remoteData.originFee) : 0.10;
+                                console.log(`[PeerTube-Webhook] ✅ Federated origin: wallet ${originAdminAddress} | originFee ${finalOriginFee}`);
+                            } else {
+                                console.warn(`[PeerTube-Webhook] ⚠️ Remote instance-info missing valid adminWallet.`);
+                            }
+                        } else {
+                            console.warn(`[PeerTube-Webhook] ⚠️ instance-info returned HTTP ${infoRes.status} from ${originInstanceUrl}`);
+                        }
+                    } else {
+                        console.warn(`[PeerTube-Webhook] ⚠️ Could not determine Tessera plugin version on ${originInstanceUrl}`);
+                    }
+                } else {
+                    // Remote server doesn't have Tessera installed or plugin API is inaccessible
+                    console.log(`[PeerTube-Webhook] ℹ️ Remote server ${originInstanceUrl} has no Tessera plugin (HTTP ${pluginInfoRes.status}). Origin fees skipped.`);
+                }
+            } catch (err: any) {
+                // Network timeout or unreachable — degrade gracefully
+                console.warn(`[PeerTube-Webhook] ⚠️ Federation lookup failed for ${originInstanceUrl}: ${err.message}`);
+            }
         }
 
 

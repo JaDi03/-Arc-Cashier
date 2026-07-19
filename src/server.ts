@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import coreRouter from './core/routes';
+import circleRouter from './core/circle-routes';
 import instanceInfoRouter from './core/instance-info';
 import { sessionService } from './core/session';
 import type { Connector, ConnectorConfig } from './core/types';
@@ -53,6 +54,10 @@ export async function createServer(connectors: ConnectorConfig[]) {
 
     // 1. Register Core Engine routes (agnostic to platforms)
     app.use('/api/core', coreRouter);
+
+    // 1b. Circle SDK + CCTP routes (extracted from core for separation of concerns)
+    //     External paths remain unchanged: /api/core/circle/*
+    app.use('/api/core', circleRouter);
 
     // 2. Register public Tessera identity endpoint (no auth — read by remote sidecars)
     //    Used by federated display instances to discover this sidecar's wallet and fees.
