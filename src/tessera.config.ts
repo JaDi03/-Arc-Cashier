@@ -10,19 +10,9 @@ const config: CashierConfig = {
     port: 7878,
 
     connectors: [
-        // {
-        //     name: 'owncast',
-        //     upstreamUrl: 'http://127.0.0.1:8080',
-        //     ratePerSecond: 0.0001, // $0.0001 USDC per second (~$0.36/hour)
-        // },
-
-        // To add a new connector, uncomment and configure:
         {
             name: 'peertube',
             upstreamUrl: 'http://localhost:9000',
-            ratePerSecond: 0.0001,
-            displayFee: 0.10,
-            originFee: 0.10,
         },
     ],
 };
