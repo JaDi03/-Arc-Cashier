@@ -18,6 +18,12 @@ const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> 
 export async function createServer(connectors: ConnectorConfig[]) {
     const app = express();
 
+    // Trust the first proxy in the chain (nginx → PeerTube plugin relay → sidecar).
+    // Required after Phase 3: all browser requests arrive via the plugin relay, which
+    // causes nginx to set X-Forwarded-For. Without this, express-rate-limit throws
+    // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+    app.set('trust proxy', 1);
+
     // Logging middleware MUST be first to catch everything
     app.use((req, res, next) => {
         if (req.url.includes('/stream-access')) {

@@ -73,6 +73,15 @@ export class SessionService {
                                     return;
                                 }
 
+                                // Guard: skip tick if the viewer_join webhook hasn't set the creator
+                                // address yet. This prevents a payment attempt with no seller address
+                                // (which Circle would reject) during the race between register-session
+                                // and the webhook. The loop retries every second — safe to skip.
+                                if (!sessionData.creatorAddress) {
+                                    console.log(`[Session-Loop] ⏳ Skipping tick for ${userId}: waiting for webhook to set creator address.`);
+                                    return;
+                                }
+
                                 sessionData.tickCount++;
 
                                 const TICK_CYCLE = 10;
