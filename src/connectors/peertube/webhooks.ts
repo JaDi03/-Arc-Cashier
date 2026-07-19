@@ -188,34 +188,19 @@ router.post('/webhook', async (req, res) => {
         let originAdminAddress: string | undefined = undefined;
         let finalOriginFee = 0;
 
-        // If the video is federated, discover the remote origin sidecar's wallet and fee
+        // Federation discovery: the remote origin server's wallet and fee are obtained
+        // through the PeerTube plugin's /instance-info relay route, not by probing the
+        // sidecar directly at hostname:7878 (which fails behind reverse proxies).
+        //
+        // TODO (Phase 3b): implement plugin-based federation lookup by querying:
+        //   GET {originInstanceUrl}/plugins/peertube-plugin-tessera/{version}/router/instance-info
+        //
+        // Until then, federated sessions start without origin fees (originAdminAddress = undefined,
+        // finalOriginFee = 0). The creator still receives 100% of those ticks.
         if (isLocal === false && originInstanceUrl) {
-            try {
-                const originUrlObj = new URL(originInstanceUrl);
-                const remoteSidecarUrl = `${originUrlObj.protocol}//${originUrlObj.hostname}:7878/api/tessera/instance-info`;
-                
-                console.log(`[PeerTube-Webhook] 🌐 Federated play detected. Fetching remote host from: ${remoteSidecarUrl}`);
-                
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 3000); // 3-second timeout
-                
-                const response = await fetch(remoteSidecarUrl, { signal: controller.signal });
-                clearTimeout(timeout);
-                
-                if (response.ok) {
-                    const remoteData = await response.json() as { adminWallet: string; originFee: number };
-                    if (remoteData.adminWallet && isValidEvmAddress(remoteData.adminWallet)) {
-                        originAdminAddress = remoteData.adminWallet.trim();
-                        finalOriginFee = remoteData.originFee !== undefined ? Number(remoteData.originFee) : 0.10;
-                        console.log(`[PeerTube-Webhook] 🌐 Federated host discovered: wallet ${originAdminAddress} | originFee ${finalOriginFee}`);
-                    }
-                } else {
-                    console.warn(`[PeerTube-Webhook] ⚠️ Remote sidecar info returned status ${response.status}`);
-                }
-            } catch (err) {
-                console.warn(`[PeerTube-Webhook] ⚠️ Failed to query remote sidecar:`, err);
-            }
+            console.log(`[PeerTube-Webhook] 🌐 Federated play detected from: ${originInstanceUrl}. Origin fees deferred to Phase 3b.`);
         }
+
 
         console.log(`[PeerTube-Webhook] 📊 Starting session for user: ${userId}. Payouts: creator ${payoutAddress}, displayAdmin: ${displayAdminAddress} (${finalDisplayFee}), originAdmin: ${originAdminAddress} (${finalOriginFee})`);
         
