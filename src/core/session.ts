@@ -1,7 +1,7 @@
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { walletService } from './wallet';
 
-const ARC_RPC_URL = 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com';
 
 /**
  * Streaming Session Management Service
