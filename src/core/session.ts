@@ -3,6 +3,12 @@ import { walletService } from './wallet';
 
 const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com';
 
+// The payment loop always calls itself via localhost. The GatewayClient (x402 buyer)
+// sends a payment to /api/core/stream-access, which runs in the same process.
+// Circle's Gateway never makes inbound callbacks — so no public URL is ever needed here.
+const PORT = process.env.PORT || 7878;
+const SIDECAR_URL = `http://localhost:${PORT}`;
+
 /**
  * Streaming Session Management Service
  * Uses Circle Gateway for real settlement and refunds.
@@ -104,13 +110,10 @@ export class SessionService {
                                 headers['x-video-id'] = sessionData.videoId;
                             }
 
-                            const PORT = process.env.PORT || 7878;
-                            const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-                            
-                            console.log(`[Session-Loop-DEBUG] Ticking payment for ${userId}. URL: ${sidecarUrl}/api/core/stream-access | Headers: ${JSON.stringify(headers)}`);
+                            console.log(`[Session-Loop-DEBUG] Ticking payment for ${userId}. URL: ${SIDECAR_URL}/api/core/stream-access | Headers: ${JSON.stringify(headers)}`);
                             
                             const payResult = await gatewayClient.pay<{ access: boolean }>(
-                                `${sidecarUrl}/api/core/stream-access`,
+                                `${SIDECAR_URL}/api/core/stream-access`,
                                 { headers }
                             );
                             console.log(`[Session] - Periodic payment successful for ${userId}: ${payResult.formattedAmount} USDC`);

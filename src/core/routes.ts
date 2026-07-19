@@ -888,7 +888,9 @@ coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'No active session found for this user.' });
         }
 
-        const sidecarUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+        // The GatewayClient calls /tip-access on the same server via localhost.
+        // PUBLIC_URL is not needed — Circle never makes inbound callbacks.
+        const sidecarUrl = `http://localhost:${PORT}`;
 
         // Pay via the /tip-access endpoint — routes 100% to creator, no platform split
         await gatewayClient.pay<{ success: boolean }>(
