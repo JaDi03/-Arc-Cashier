@@ -7,7 +7,13 @@ import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 
 const SCRIPT_SRC = (document.currentScript && document.currentScript.src) ? document.currentScript.src : '';
 const SCRIPT_BASE_DIR = SCRIPT_SRC ? SCRIPT_SRC.substring(0, SCRIPT_SRC.lastIndexOf('/') + 1) : '/demo-assets/';
-const ARC_API_BASE = SCRIPT_SRC ? new URL(SCRIPT_SRC).origin : window.location.origin;
+// Derive the API base by stripping the asset-directory suffix from the script URL.
+// This works in both deployment modes:
+//   Sidecar-direct:  https://api.domain.com/peertube-assets/paywall.bundle.js → https://api.domain.com
+//   Plugin relay:    https://peertube.domain.com/.../router/assets/paywall.bundle.js → https://peertube.domain.com/.../router
+const ARC_API_BASE = SCRIPT_SRC
+    ? SCRIPT_SRC.replace(/\/(peertube-assets|assets)\/[^?#]*.*$/, '')
+    : window.location.origin;
 
 console.log(
     "%c Tessera %c Universal Payment Sidecar initialized %c https://try-tessera.xyz ",
