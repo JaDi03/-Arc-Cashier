@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 import { walletService } from './wallet';
@@ -14,13 +14,12 @@ import { arcTestnet } from 'viem/chains';
 // Arc Testnet chain â€” imported from viem/chains (verified: exports chain ID 5042002)
 // Per use-arc.md: "Arc Testnet is available by default in Viem â€” a custom chain definition is NEVER required."
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
 
 const publicClient = createPublicClient({
     chain: arcTestnet,
     transport: http(ARC_RPC_URL)
 });
-
 const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // limit each IP to 300 requests per windowMs
@@ -326,7 +325,7 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
             });
 
             walletService.clearSession(userId);
-            console.log(`[Core] âœ… Cash-out complete! Tx: ${withdrawResult.mintTxHash}`);
+            console.log(`[Core] ✅ Cash-out complete! Tx: ${withdrawResult.mintTxHash}`);
 
             return res.json({ 
                 status: 'cashed_out', 
@@ -338,11 +337,11 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
             const txHashMatch = err.message.match(/0x[a-fA-F0-9]{64}/);
             if (txHashMatch) {
                 const txHash = txHashMatch[0];
-                console.log(`[Core] âš ï¸ Cash-out SDK failed but tx submitted: ${txHash}. Checking receipt...`);
+                console.log(`[Core] ⚠️ Cash-out SDK failed but tx submitted: ${txHash}. Checking receipt...`);
                 try {
                     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
                     if (receipt && receipt.status === 'success') {
-                        console.log(`[Core] âœ… Cash-out verified on-chain: ${txHash}`);
+                        console.log(`[Core] ✅ Cash-out verified on-chain: ${txHash}`);
                         walletService.clearSession(userId);
                         return res.json({
                             status: 'cashed_out',
@@ -358,7 +357,7 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
         }
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] âŒ /cash-out failed:`, err.message);
+        console.error(`[Core] ❌ /cash-out failed:`, err.message);
         return res.status(500).json({ error: 'Failed to cash out' });
     }
 });
@@ -402,7 +401,7 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
         });
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] âŒ Failed to fetch balance for ${userId}:`, err.message);
+        console.error(`[Core] ❌ Failed to fetch balance for ${userId}:`, err.message);
         res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
@@ -428,7 +427,7 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
         const RETAINED_GAS_AMOUNT = Number(process.env.RETAINED_GAS_AMOUNT || 0.01);
 
         if (expectFunds && walletBalance <= RETAINED_GAS_AMOUNT) {
-            console.log(`[Core] â³ Waiting for top-up funds to arrive in ephemeral wallet...`);
+            console.log(`[Core] ⏳ Waiting for top-up funds to arrive in ephemeral wallet...`);
             let attempts = 0;
             while (attempts < 15 && walletBalance <= RETAINED_GAS_AMOUNT) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -436,14 +435,14 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
                 walletBalance = Number(balances.wallet.formatted);
                 attempts++;
             }
-            console.log(`[Core] ðŸ’° Ephemeral wallet balance after wait: ${walletBalance} USDC`);
+            console.log(`[Core] 💰 Ephemeral wallet balance after wait: ${walletBalance} USDC`);
         }
 
         // How much to deposit to gateway? Everything minus gas buffer
         const depositAmount = Math.max(0, walletBalance - RETAINED_GAS_AMOUNT);
 
         if (depositAmount > 0.001) {
-            console.log(`[Core] ðŸ’¸ Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
+            console.log(`[Core] 💸 Top-up detected! Depositing ${depositAmount.toFixed(6)} USDC to Gateway...`);
             await gatewayClient.deposit(depositAmount.toFixed(6));
             return res.json({ status: 'success', deposited: depositAmount.toFixed(6) });
         } else {
@@ -451,7 +450,7 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
         }
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] âŒ Failed to process top-up for ${userId}:`, err.message);
+        console.error(`[Core] ❌ Failed to process top-up for ${userId}:`, err.message);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -460,7 +459,7 @@ coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Resp
 // have been moved to the PeerTube connector: src/connectors/peertube/creator-routes.ts
 // They are served under /api/connectors/peertube/creator/* and /api/connectors/peertube/seller/*
 
-// --- Tip: Off-chain payment from viewer's Arc Gateway to creator (100% â€” no platform split) ---
+// --- Tip: Off-chain payment from viewer's Arc Gateway to creator (100% — no platform split) ---
 coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
     const { userId, creatorWallet, amount } = req.body;
 
@@ -475,23 +474,23 @@ coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
         }
 
         // The GatewayClient calls /tip-access on the same server via localhost.
-        // PUBLIC_URL is not needed â€” Circle never makes inbound callbacks.
+        // PUBLIC_URL is not needed — Circle never makes inbound callbacks.
         const sidecarUrl = `http://localhost:${PORT}`;
 
-        // Pay via the /tip-access endpoint â€” routes 100% to creator, no platform split
+        // Pay via the /tip-access endpoint — routes 100% to creator, no platform split
         await gatewayClient.pay<{ success: boolean }>(
             `${sidecarUrl}/api/core/tip-access`,
             { headers: { 'x-tip-amount': amount, 'x-seller-address': creatorWallet } }
         );
 
-        console.log(`[Core] â¤ï¸ Tip of ${amount} USDC sent from ${userId} to ${creatorWallet}`);
+        console.log(`[Core] ❤️ Tip of ${amount} USDC sent from ${userId} to ${creatorWallet}`);
         return res.json({ status: 'success', amount, creatorWallet });
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         if (err.message.includes('402') || err.message.toLowerCase().includes('insufficient')) {
             return res.status(402).json({ error: 'Insufficient gateway balance. Please top up.' });
         }
-        console.error(`[Core] âŒ Tip failed:`, err.message);
+        console.error(`[Core] ❌ Tip failed:`, err.message);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -508,7 +507,7 @@ coreRouter.get('/tip-access', (req: Request, res: Response, next: NextFunction) 
     const tipAmount = req.headers['x-tip-amount'] as string || '0.10';
 
     const tipGateway = createGatewayMiddleware({
-        sellerAddress: creatorAddress,  // 100% to creator â€” no random split
+        sellerAddress: creatorAddress,  // 100% to creator — no random split
         facilitatorUrl: 'https://gateway-api-testnet.circle.com',
         networks: ['eip155:5042002'],
     });
@@ -534,7 +533,7 @@ coreRouter.get('/wallet-balance', async (req: Request, res: Response) => {
         return res.json({ balance: parseFloat(formatted) });
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[Core] âŒ Failed to fetch balance for ${address}:`, err.message);
+        console.error(`[Core] ❌ Failed to fetch balance for ${address}:`, err.message);
         return res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
