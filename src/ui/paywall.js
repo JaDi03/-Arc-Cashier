@@ -196,7 +196,7 @@ async function checkAutoUnlock() {
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 
-function initPaywall() {
+function initPaywall(targetContainer) {
     isTipMode = false;
     injectDependencies();
 
@@ -213,7 +213,7 @@ function initPaywall() {
 
     document.body.classList.add('arc-locked');
     lockMedia();
-    renderPaywallOverlay(true);
+    renderPaywallOverlay(true, targetContainer);
     renderSessionManager();
 
     if (viewerState.userId && viewerState.walletAddress) {
@@ -248,7 +248,7 @@ function lockMedia() {
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
-function renderPaywallOverlay(hideInitially = false) {
+function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     const existing = document.getElementById('arc-paywall-overlay');
     if (existing) existing.remove();
 
@@ -453,7 +453,22 @@ function renderPaywallOverlay(hideInitially = false) {
             </div>
         </div>
     `;
-    document.body.appendChild(overlay);
+    let containerEl = targetContainer;
+    if (!containerEl && typeof targetContainer === 'string') {
+        containerEl = document.querySelector(targetContainer);
+    }
+    if (!containerEl) {
+        containerEl = document.querySelector('.peertube-player-container, .video-js, video-player') || document.body;
+    }
+    if (containerEl !== document.body) {
+        overlay.classList.add('arc-contained-overlay');
+        try {
+            if (window.getComputedStyle(containerEl).position === 'static') {
+                containerEl.style.position = 'relative';
+            }
+        } catch (_) {}
+    }
+    containerEl.appendChild(overlay);
 
     // Wire up events
     if (isTipMode) {
@@ -1340,6 +1355,10 @@ function startSessionTimer() {
     // (ticks every 1s regardless of play state, so the sync is time-based)
     let tickCount = 0;
 
+    // Ensure session manager is visible when starting timer
+    const smEl = document.getElementById('arc-session-manager');
+    if (smEl) smEl.classList.remove('arc-hidden');
+
     // Show initial rate in the session manager immediately
     const initialRateEl = document.getElementById('arc-sm-rate');
     if (initialRateEl) initialRateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
@@ -1599,6 +1618,8 @@ window.arcResumeSession = async function() {
             console.log('[Tessera] Session resumed successfully.');
             document.body.classList.remove('arc-locked');
             renderSessionManager();
+            const sm = document.getElementById('arc-session-manager');
+            if (sm) sm.classList.remove('arc-hidden');
             startSessionTimer();
             return;
         }
@@ -1729,6 +1750,10 @@ function openTipOnboarding() {
         document.body.classList.remove('arc-locked');
         renderPaywallOverlay();
         document.body.classList.remove('arc-locked');
+        if (viewerState.userId && viewerState.walletAddress) {
+            transitionToFundPhase();
+            void checkAutoUnlock();
+        }
     } else if (window.ArcCashier && typeof window.ArcCashier.initPaywall === 'function') {
         window.ArcCashier.initPaywall();
     } else {
@@ -2016,11 +2041,23 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
                         void refreshStatus();
                         openTipOnboarding();
                     } else {
+                        if (attempt < 3) {
+                            console.log(`[Tessera] Tip failed with status ${res.status}. Retrying in 500ms... (attempt ${attempt})`);
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await sendTip(attempt + 1);
+                            return;
+                        }
                         btn.textContent = 'Error \u2014 retry';
                     }
                 }
             } catch (e) {
                 console.error('[Tessera] Tip request error:', e);
+                if (attempt < 3) {
+                    console.log(`[Tessera] Tip network error. Retrying in 500ms... (attempt ${attempt})`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await sendTip(attempt + 1);
+                    return;
+                }
                 btn.textContent = 'Error \u2014 retry';
             }
         };

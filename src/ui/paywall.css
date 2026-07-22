@@ -41,6 +41,26 @@
     color: var(--text-primary);
 }
 
+/* Container-constrained overlay (scoped to video player element) */
+#arc-paywall-overlay.arc-contained-overlay,
+.peertube-player-container #arc-paywall-overlay,
+.video-js #arc-paywall-overlay,
+video-player #arc-paywall-overlay {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 50 !important;
+    border-radius: inherit;
+}
+
+.peertube-player-container,
+.video-js,
+video-player {
+    position: relative !important;
+}
+
 #arc-paywall-overlay.arc-hidden-initially {
     opacity: 0 !important;
     pointer-events: none;
@@ -52,10 +72,9 @@
     -webkit-backdrop-filter: none !important;
 }
 
-body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
-    filter: blur(16px) grayscale(30%);
-    pointer-events: none;
-    user-select: none;
+/* Video blur is handled by overlay backdrop-filter; body is not blurred to preserve full UI interactivity */
+body.arc-locked {
+    /* lock indicator class */
 }
 
 /* -- Modal ----------------------------------------- */
@@ -65,12 +84,13 @@ body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 24px;
     width: 330px;
-    max-width: 96vw;
+    max-width: 92%;
+    max-height: 92%;
+    overflow-y: auto;
     box-shadow:
         0 40px 80px -20px rgba(0, 0, 0, 0.9),
         0 0 40px rgba(0, 0, 0, 0.5),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    overflow: hidden;
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     position: relative;
