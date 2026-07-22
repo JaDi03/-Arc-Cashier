@@ -234,13 +234,13 @@ function injectDependencies() {
 
 function lockMedia() {
     document.addEventListener('play', (e) => {
-        if (document.body.classList.contains('arc-locked') &&
+        if (!isTipMode && document.body.classList.contains('arc-locked') &&
             (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
             e.target.pause();
         }
     }, true);
     setInterval(() => {
-        if (document.body.classList.contains('arc-locked')) {
+        if (!isTipMode && document.body.classList.contains('arc-locked')) {
             document.querySelectorAll('video, audio').forEach(m => { if (!m.paused) m.pause(); });
         }
     }, 500);
@@ -288,7 +288,8 @@ function renderPaywallOverlay(hideInitially = false) {
         overlay.classList.add('arc-hidden-initially');
     }
     overlay.innerHTML = `
-        <div id="arc-paywall-modal">
+        <div id="arc-paywall-modal" style="position:relative;">
+            ${isTipMode ? '<button id="arc-paywall-close-btn" class="arc-modal-close" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#a0aec0;font-size:18px;cursor:pointer;z-index:10;">✕</button>' : ''}
             <div id="arc-paywall-header">
                 <div id="arc-paywall-logo">
                     <img src="${SCRIPT_BASE_DIR}logo_yellow.svg" alt="Tessera" />
@@ -455,6 +456,27 @@ function renderPaywallOverlay(hideInitially = false) {
     document.body.appendChild(overlay);
 
     // Wire up events
+    if (isTipMode) {
+        overlay.classList.add('arc-tip-mode-overlay');
+        document.body.classList.remove('arc-locked');
+
+        // Dismiss modal on clicking outside the modal box
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+                document.body.classList.remove('arc-locked');
+            }
+        });
+
+        const tipCloseBtn = document.getElementById('arc-paywall-close-btn');
+        if (tipCloseBtn) {
+            tipCloseBtn.addEventListener('click', () => {
+                const ov = document.getElementById('arc-paywall-overlay');
+                if (ov) ov.remove();
+                document.body.classList.remove('arc-locked');
+            });
+        }
+    }
     document.getElementById('arc-login-btn').addEventListener('click', handleEmailLogin);
     document.getElementById('arc-bridge-btn').addEventListener('click', openCctpModal);
     document.getElementById('arc-cctp-close').addEventListener('click', closeCctpModal);
@@ -841,6 +863,8 @@ async function handleUnlock() {
                 await new Promise(r => setTimeout(r, 2000));
             }
             if (!confirmed) throw new Error('Deposit timed out. Please try again.');
+            // Allow 2 seconds for Arc blockchain indexers to register the USDC transfer
+            await new Promise(r => setTimeout(r, 2000));
         }
 
         // Register session with ephemeral key
@@ -1521,11 +1545,7 @@ window.arcLeaveSession = async function() {
     } catch (_) { /* best effort */ }
 
     if (isTipMode) {
-        // Tipping mode: clear ephemeral session keys and reset the tipping widget UI
-        localStorage.removeItem('arc_ephemeral_pk');
-        viewerState.ephemeralPk = null;
-
-        // Reset tipping widget to onboarding/connect state
+        // Tipping mode: reset tipping widget UI while keeping viewer session keys intact for next tips
         const container = document.getElementById('arc-tip-btn-container');
         if (container) {
             container.remove();
@@ -1534,19 +1554,60 @@ window.arcLeaveSession = async function() {
             }
         }
     } else {
-        // Pay-per-second mode: lock video and show paused session message
+        // Pay-per-second mode: lock video and show paused session card with explicit Resume button
         const sm = document.getElementById('arc-session-manager');
         if (sm) {
             sm.innerHTML = `
-                <div style="padding:10px;">
+                <div style="padding:10px;text-align:center;">
                     <h3 style="color:#63b3ed;margin:0 0 8px 0;">⏸ Session Paused</h3>
-                    <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe. Sign in again with the same email to resume.</p>
-                    <p style="font-size:11px;color:#718096;margin:0;">Billing has stopped.</p>
+                    <p style="font-size:12px;color:#a0aec0;margin:0 0 10px 0;">Your balance is safe in Circle Gateway.</p>
+                    <button id="arc-resume-btn" onclick="window.arcResumeSession()" class="arc-btn arc-btn-primary" style="padding:6px 14px;font-size:12px;cursor:pointer;">▶ Resume Stream</button>
                 </div>
             `;
         }
         document.body.classList.add('arc-locked');
     }
+};
+
+window.arcResumeSession = async function() {
+    const resumeBtn = document.getElementById('arc-resume-btn');
+    if (resumeBtn) {
+        resumeBtn.disabled = true;
+        resumeBtn.innerText = 'Resuming…';
+    }
+
+    try {
+        viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
+        if (!viewerState.ephemeralPk) {
+            viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
+        }
+
+        const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: viewerState.userId,
+                privateKey: viewerState.ephemeralPk,
+                returnAddress: viewerState.walletAddress,
+                ratePerSecond: getRequiredMinBalance(),
+            }),
+        });
+
+        if (regRes.ok) {
+            console.log('[Tessera] Session resumed successfully.');
+            document.body.classList.remove('arc-locked');
+            renderSessionManager();
+            startSessionTimer();
+            return;
+        }
+    } catch (err) {
+        console.error('[Tessera] Resume session error:', err);
+    }
+
+    // Fallback if silent resume fails: check auto unlock or open onboarding
+    await checkAutoUnlock();
 };
 
 window.arcEndSession = async function() {
@@ -1665,7 +1726,9 @@ async function fetchTipBalance() {
 function openTipOnboarding() {
     if (isTipMode) {
         injectDependencies();
+        document.body.classList.remove('arc-locked');
         renderPaywallOverlay();
+        document.body.classList.remove('arc-locked');
     } else if (window.ArcCashier && typeof window.ArcCashier.initPaywall === 'function') {
         window.ArcCashier.initPaywall();
     } else {
@@ -1674,6 +1737,9 @@ function openTipOnboarding() {
 }
 
 window.arcShowTipButton = function(creatorWallet, tipAmount) {
+    if (creatorWallet) tipCreatorWallet = creatorWallet;
+    if (tipAmount) tipAmountVal = tipAmount;
+
     // Remove any existing tip button
     const existing = document.getElementById('arc-tip-btn-container');
     if (existing) existing.remove();
@@ -1725,7 +1791,6 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             </button>
             
             <div id="arc-tip-wallet-actions" style="display:none;">
-                <button id="arc-tip-leave-btn">Just Leave</button>
                 <button id="arc-tip-end-btn">Cash Out &amp; Exit</button>
             </div>
         </div>
@@ -1772,7 +1837,6 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
     const sentVal = document.getElementById('arc-tip-sent-val');
     const walletActions = document.getElementById('arc-tip-wallet-actions');
 
-    const leaveBtn = document.getElementById('arc-tip-leave-btn');
     const endBtn = document.getElementById('arc-tip-end-btn');
 
     btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.03)'; });
@@ -1813,8 +1877,6 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
             clearInterval(tipInterval);
         }
     }, 5000);
-
-    leaveBtn.addEventListener('click', window.arcLeaveSession);
 
     endBtn.addEventListener('click', async () => {
         if (!confirm('Are you sure you want to cash out and exit? This will return your remaining balance to your wallet.')) {

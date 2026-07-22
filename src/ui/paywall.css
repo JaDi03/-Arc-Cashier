@@ -46,6 +46,12 @@
     pointer-events: none;
 }
 
+#arc-paywall-overlay.arc-tip-mode-overlay {
+    background: rgba(0, 0, 0, 0.4) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
 body.arc-locked > *:not(#arc-paywall-overlay):not(iframe) {
     filter: blur(16px) grayscale(30%);
     pointer-events: none;
