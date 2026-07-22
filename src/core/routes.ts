@@ -182,15 +182,15 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         const minGatewayBalance = typeof ratePerSecond === 'number' ? ratePerSecond : 0.01;
 
         if (gatewayBalanceNum < minGatewayBalance && walletUsdc < minWalletBalance) {
-            console.log(`[Core] â³ Waiting for ephemeral wallet to receive funds...`);
+            console.log(`[Core] ⏳ Waiting for ephemeral wallet to receive funds...`);
             let attempts = 0;
-            while (attempts < 15 && walletUsdc < minWalletBalance) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
+            while (attempts < 12 && walletUsdc < minWalletBalance) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
                 balances = await gatewayClient.getBalances();
                 walletUsdc = Number(balances.wallet.formatted);
                 attempts++;
             }
-            console.log(`[Core] ðŸ’° Final Ephemeral wallet balance: ${walletUsdc} USDC`);
+            console.log(`[Core] 💰 Final Ephemeral wallet balance: ${walletUsdc} USDC`);
         }
 
         // If the user already has enough balance in the Gateway, skip the deposit phase!
@@ -199,7 +199,7 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         let depositedAmount = '0';
 
         if (gatewayBalanceNum >= minGatewayBalance) {
-            console.log(`[Core] â© User already has ${gatewayBalanceNum} USDC in Gateway. Skipping deposit phase.`);
+            console.log(`[Core] ⏩ User already has ${gatewayBalanceNum} USDC in Gateway. Skipping deposit phase.`);
             skippedDeposit = true;
         } else {
             if (walletUsdc < minWalletBalance) {
@@ -209,30 +209,30 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
             // 3. Deposit to Gateway
             const retainedGasAmount = Number(process.env.RETAINED_GAS_AMOUNT || '0.01');
             const depositAmount = Math.max(0, walletUsdc - retainedGasAmount).toFixed(2);
-            console.log(`[Core] ðŸ’³ Depositing ${depositAmount} USDC to Circle Gateway...`);
+            console.log(`[Core] 💳 Depositing ${depositAmount} USDC to Circle Gateway...`);
 
             const depositResult = await gatewayClient.deposit(depositAmount);
             depositTxHash = depositResult.depositTxHash;
             depositedAmount = depositResult.formattedAmount;
             
-            console.log(`[Core] âœ… Deposit confirmed! Tx: ${depositTxHash}`);
+            console.log(`[Core] ✅ Deposit confirmed! Tx: ${depositTxHash}`);
 
-            // Wait for deposit to reflect in Gateway balance
-            console.log(`[Core] â³ Waiting for deposit to reflect in Gateway balance...`);
+            // Wait for deposit to reflect in Gateway balance (max 15s to fit within Nginx proxy timeouts)
+            console.log(`[Core] ⏳ Waiting for deposit to reflect in Gateway balance...`);
             let attempts = 0;
             const expectedMinBalance = gatewayBalanceNum + Number(depositAmount);
             let gatewayUpdated = false;
 
-            while (attempts < 30) {
+            while (attempts < 10) {
                 balances = await gatewayClient.getBalances();
                 gatewayBalanceNum = Number(balances.gateway.formattedAvailable);
                 if (gatewayBalanceNum >= expectedMinBalance) {
-                    console.log(`[Core] âœ… Gateway balance updated! (${gatewayBalanceNum} USDC)`);
+                    console.log(`[Core] ✅ Gateway balance updated! (${gatewayBalanceNum} USDC)`);
                     gatewayUpdated = true;
                     break;
                 }
                 attempts++;
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
             }
 
             if (!gatewayUpdated) {
@@ -487,7 +487,7 @@ coreRouter.post('/tip', sessionLimiter, async (req: Request, res: Response) => {
         return res.json({ status: 'success', amount, creatorWallet });
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        if (err.message.includes('402') || err.message.toLowerCase().includes('insufficient')) {
+        if (err.message.includes('402') || err.message.toLowerCase().includes('insufficient') || err.message.toLowerCase().includes('settlement failed')) {
             return res.status(402).json({ error: 'Insufficient gateway balance. Please top up.' });
         }
         console.error(`[Core] ❌ Tip failed:`, err.message);
