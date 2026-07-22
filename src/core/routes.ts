@@ -14,7 +14,7 @@ import { arcTestnet } from 'viem/chains';
 // Arc Testnet chain â€” imported from viem/chains (verified: exports chain ID 5042002)
 // Per use-arc.md: "Arc Testnet is available by default in Viem â€” a custom chain definition is NEVER required."
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
 
 const publicClient = createPublicClient({
     chain: arcTestnet,

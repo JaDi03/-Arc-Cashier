@@ -1,7 +1,7 @@
 import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { walletService } from './wallet';
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/REDACTED_USE_ARC_RPC_URL_ENV';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
 
 // The payment loop always calls itself via localhost. The GatewayClient (x402 buyer)
 // sends a payment to /api/core/stream-access, which runs in the same process.

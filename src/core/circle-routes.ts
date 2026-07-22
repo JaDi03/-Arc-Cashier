@@ -39,7 +39,7 @@ const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as 
 // Iris attestation API (testnet)
 const IRIS_API_BASE = 'https://iris-api-sandbox.circle.com/v2/messages';
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc-node.thecanteenapp.com';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
 
 // ---------------------------------------------------------------------------
 // Circle SDK client
