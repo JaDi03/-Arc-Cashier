@@ -3,43 +3,22 @@
  *
  * Circle SDK and CCTP routes, extracted from core/routes.ts.
  *
- * Responsibility: everything related to Circle User-Controlled Wallets and
- * the Cross-Chain Transfer Protocol (CCTP) bridge to Arc Testnet.
+ * Responsibility: everything related to Circle User-Controlled Wallets.
+ * Cross-chain payments are handled client-side via the Circle Forwarding Service.
  *
- * External paths (unchanged after extraction):
+ * External paths:
  *   POST /api/core/circle/get-token
  *   POST /api/core/circle/get-wallet
  *   POST /api/core/circle/prepare-deposit
  *   POST /api/core/circle/poll-challenge
- *   POST /api/core/circle/cctp-finalize
- *   GET  /api/core/circle/cctp-status/:jobId
  */
 
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
-import {
-    isAddress,
-    createWalletClient,
-    createPublicClient,
-    http,
-    encodeFunctionData,
-} from 'viem';
+import { createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { arcTestnet } from 'viem/chains';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-// Arc Testnet CCTP contracts (verified from docs.arc.network official docs)
-const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`;
-
-// Iris attestation API (testnet)
-const IRIS_API_BASE = 'https://iris-api-sandbox.circle.com/v2/messages';
-
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
 
 // ---------------------------------------------------------------------------
 // Circle SDK client
@@ -47,12 +26,6 @@ const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network'
 
 const circleClient = initiateUserControlledWalletsClient({
     apiKey: process.env.CIRCLE_API_KEY || ''
-});
-
-// Arc Testnet public client — used for CCTP mint transaction receipt polling
-const arcPublicClient = createPublicClient({
-    chain: arcTestnet,
-    transport: http(ARC_RPC_URL)
 });
 
 // ---------------------------------------------------------------------------
@@ -74,131 +47,7 @@ const circleRateLimiter = rateLimit({
     message: { error: 'Too many requests, please try again later.' }
 });
 
-// ---------------------------------------------------------------------------
-// CCTP job store (in-memory, auto-pruned after 30 minutes)
-// ---------------------------------------------------------------------------
-interface CctpJob {
-    id: string;
-    status: 'pending' | 'complete' | 'failed';
-    mintTxHash?: string;
-    error?: string;
-    createdAt: number;
-}
 
-const cctpJobs = new Map<string, CctpJob>();
-
-function pruneCctpJobs() {
-    const now = Date.now();
-    const maxAge = 30 * 60 * 1000; // 30 minutes
-    for (const [id, job] of cctpJobs.entries()) {
-        if (now - job.createdAt > maxAge) {
-            cctpJobs.delete(id);
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// CCTP background finalizer
-// Polls Iris for the cross-chain attestation, then submits the receiveMessage
-// transaction to the Arc Testnet MessageTransmitter contract.
-// ---------------------------------------------------------------------------
-async function executeCctpFinalizationInBackground(
-    jobId: string,
-    sourceDomain: number,
-    transactionHash: string,
-    recipientAddress: string,
-    sellerKey: string
-) {
-    try {
-        console.log(`[CCTP] - Background job ${jobId} started. Polling Iris for attestation. Source domain: ${sourceDomain}, Tx: ${transactionHash}`);
-        const irisUrl = `${IRIS_API_BASE}/${sourceDomain}?transactionHash=${transactionHash}`;
-        let attestation: { message: string; attestation: string } | null = null;
-
-        for (let attempt = 0; attempt < 60; attempt++) { // 60 * 5s = 5 min max
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            // Exit early if the job was deleted from cache
-            if (!cctpJobs.has(jobId)) {
-                console.log(`[CCTP] - Background job ${jobId} was removed from memory. Stopping process.`);
-                return;
-            }
-
-            try {
-                const irisRes = await fetch(irisUrl);
-                if (!irisRes.ok) {
-                    console.log(`[CCTP] - Iris returned ${irisRes.status}, retrying...`);
-                    continue;
-                }
-                const irisData = await irisRes.json() as { messages?: Array<{ status: string; message: string; attestation: string }> };
-                const msg = irisData.messages?.[0];
-                if (msg?.status === 'complete') {
-                    attestation = { message: msg.message, attestation: msg.attestation };
-                    console.log(`[CCTP] - Job ${jobId}: Attestation ready after ${attempt + 1} attempts.`);
-                    break;
-                }
-                console.log(`[CCTP] - Job ${jobId} Attempt ${attempt + 1}: status = ${msg?.status ?? 'not found'}`);
-            } catch (fetchErr) {
-                console.warn(`[CCTP] - Job ${jobId} Iris fetch error (attempt ${attempt + 1}):`, fetchErr);
-            }
-        }
-
-        if (!attestation) {
-            console.error(`[CCTP] - Job ${jobId} failed: Attestation timed out.`);
-            const job = cctpJobs.get(jobId);
-            if (job) {
-                job.status = 'failed';
-                job.error = 'Attestation timed out';
-            }
-            return;
-        }
-
-        console.log(`[CCTP] - Job ${jobId}: Minting USDC on Arc Testnet for ${recipientAddress}...`);
-        const account = privateKeyToAccount(sellerKey as `0x${string}`);
-        const arcWalletClient = createWalletClient({
-            account,
-            chain: arcTestnet,
-            transport: http(),
-        });
-
-        const mintTxHash = await arcWalletClient.sendTransaction({
-            to: ARC_MESSAGE_TRANSMITTER,
-            data: encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'receiveMessage',
-                    stateMutability: 'nonpayable',
-                    inputs: [
-                        { name: 'message', type: 'bytes' },
-                        { name: 'attestation', type: 'bytes' },
-                    ],
-                    outputs: [],
-                }],
-                functionName: 'receiveMessage',
-                args: [
-                    attestation.message as `0x${string}`,
-                    attestation.attestation as `0x${string}`,
-                ],
-            }),
-        });
-
-        console.log(`[CCTP] - Job ${jobId}: Waiting for mint tx confirmation...`);
-        await arcPublicClient.waitForTransactionReceipt({ hash: mintTxHash });
-        console.log(`[CCTP] - Job ${jobId} completed successfully! USDC minted on Arc! Tx: ${mintTxHash}`);
-
-        const job = cctpJobs.get(jobId);
-        if (job) {
-            job.status = 'complete';
-            job.mintTxHash = mintTxHash;
-        }
-    } catch (error: any) {
-        console.error(`[CCTP] - Job ${jobId} execution failed:`, error?.message || error);
-        const job = cctpJobs.get(jobId);
-        if (job) {
-            job.status = 'failed';
-            job.error = error?.message || 'unknown error';
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Router
@@ -431,56 +280,6 @@ circleRouter.post('/circle/poll-challenge', circleRateLimiter, async (req: Reque
     }
 });
 
-// --- BUYER SIDE (Web2): Finalize CCTP Bridge ---
-// Triggers the background CCTP attestation check and Arc minting.
-// Returns a jobId immediately — poll /cctp-status/:jobId for progress.
-circleRouter.post('/circle/cctp-finalize', circleRateLimiter, async (req: Request, res: Response) => {
-    const { sourceDomain, transactionHash, recipientAddress } = req.body;
 
-    if (!sourceDomain && sourceDomain !== 0) {
-        return res.status(400).json({ error: 'Missing sourceDomain' });
-    }
-    if (!transactionHash || !recipientAddress) {
-        return res.status(400).json({ error: 'Missing transactionHash or recipientAddress' });
-    }
-    if (!isAddress(recipientAddress)) {
-        return res.status(400).json({ error: 'Invalid recipientAddress' });
-    }
-
-    const sellerKey = process.env.SELLER_PRIVATE_KEY;
-    if (!sellerKey) {
-        return res.status(500).json({ error: 'Backend wallet not configured (SELLER_PRIVATE_KEY missing)' });
-    }
-
-    try {
-        pruneCctpJobs();
-        const jobId = crypto.randomUUID();
-        cctpJobs.set(jobId, {
-            id: jobId,
-            status: 'pending',
-            createdAt: Date.now()
-        });
-
-        void executeCctpFinalizationInBackground(jobId, Number(sourceDomain), transactionHash, recipientAddress, sellerKey);
-
-        return res.status(202).json({ jobId, status: 'pending' });
-    } catch (error: any) {
-        console.error(`[CCTP] - Failed to trigger finalize job:`, error?.message || error);
-        return res.status(500).json({ error: 'Failed to initiate CCTP finalization' });
-    }
-});
-
-// --- Returns the status of a specific CCTP finalization job ---
-circleRouter.get('/circle/cctp-status/:jobId', circleRateLimiter, (req: Request, res: Response) => {
-    const { jobId } = req.params;
-    if (typeof jobId !== 'string') {
-        return res.status(400).json({ error: 'Invalid jobId format' });
-    }
-    const job = cctpJobs.get(jobId);
-    if (!job) {
-        return res.status(404).json({ error: 'CCTP finalization job not found' });
-    }
-    return res.json(job);
-});
 
 export default circleRouter;
