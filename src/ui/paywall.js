@@ -1,5 +1,5 @@
 // arc-paywall.js - Universal Paywall Engine (platform-agnostic)
-// Injected or embedded by any Tessera connector (Owncast, PeerTube, etc.)
+// Injected or embedded by any Tessera connector.
 
 import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 
@@ -8,11 +8,8 @@ import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 const SCRIPT_SRC = (document.currentScript && document.currentScript.src) ? document.currentScript.src : '';
 const SCRIPT_BASE_DIR = SCRIPT_SRC ? SCRIPT_SRC.substring(0, SCRIPT_SRC.lastIndexOf('/') + 1) : '/demo-assets/';
 // Derive the API base by stripping the asset-directory suffix from the script URL.
-// This works in both deployment modes:
-//   Sidecar-direct:  https://api.domain.com/peertube-assets/paywall.bundle.js → https://api.domain.com
-//   Plugin relay:    https://peertube.domain.com/.../router/assets/paywall.bundle.js → https://peertube.domain.com/.../router
 const ARC_API_BASE = SCRIPT_SRC
-    ? SCRIPT_SRC.replace(/\/(peertube-assets|assets)\/[^?#]*.*$/, '')
+    ? SCRIPT_SRC.replace(/\/[^/]*assets\/[^?#]*.*$/, '')
     : window.location.origin;
 
 console.log(
@@ -28,6 +25,14 @@ const ARC_CHAIN_ID_HEX = '0x' + ARC_CHAIN_ID.toString(16);
 
 // Arc Testnet — USDC native token address (verified from Circle docs)
 const ARC_USDC = '0x3600000000000000000000000000000000000000';
+
+// Maximum safe 32-bit signed integer. Used for every element that must float
+// above the page's own content. On its own this is NOT sufficient to beat a
+// real Fullscreen-API element (see mountFloatingElement below) — the browser
+// promotes a fullscreen element to a "top layer" that no z-index outside it
+// can ever cross. Reparenting handles that; this constant handles everything
+// else (regular in-page stacking contexts).
+const MAX_Z_INDEX = 2147483647;
 
 const LOCK_SVG = `
     <svg class="arc-btn-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; display:inline-block; vertical-align:middle;">
@@ -101,6 +106,53 @@ let tipCreatorWallet = null;
 let tipAmountVal = null;
 let isCheckingAutoUnlock = false;
 
+// Idempotency guard for lockMedia(). Null means no lock is active.
+let mediaLockController = null;
+
+// Floating elements are reparented into document.fullscreenElement on
+// every fullscreenchange so they stay visible above the top-layer.
+const floatingElements = new Set();
+
+// ─── Universal container / fullscreen mounting (no platform selectors) ───────
+
+/** Returns the connector-supplied container element, or null if none. */
+function resolveContainer(targetContainer) {
+    if (targetContainer instanceof HTMLElement) return targetContainer;
+    if (typeof targetContainer === 'string') {
+        const el = document.querySelector(targetContainer);
+        if (el) return el;
+    }
+    return null;
+}
+
+/** Returns document.fullscreenElement if active, otherwise document.body. */
+function getOverlayMountPoint() {
+    return document.fullscreenElement || document.body;
+}
+
+/**
+ * Appends `el` to `explicitContainer` (if given) or to the current fullscreen
+ * mount point. Elements without an explicit container are tracked in
+ * `floatingElements` and reparented automatically on fullscreenchange.
+ */
+function mountFloatingElement(el, explicitContainer) {
+    const container = explicitContainer || getOverlayMountPoint();
+    el.style.zIndex = String(MAX_Z_INDEX);
+    container.appendChild(el);
+    if (!explicitContainer) {
+        floatingElements.add(el);
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    const mountPoint = getOverlayMountPoint();
+    floatingElements.forEach((el) => {
+        if (el.isConnected && el.parentElement !== mountPoint) {
+            mountPoint.appendChild(el);
+        }
+    });
+});
+
 function getRequiredMinBalance() {
     if (isTipMode) {
         // Tipping mode: require at least the tip amount (e.g. 0.10 USDC)
@@ -158,10 +210,12 @@ async function checkAutoUnlock() {
                     if (regRes.ok) {
                         console.log('[Tessera] Auto-unlocked video using existing funded gateway session.');
                         setFundStatus('');
+                        unlockMedia();
                         document.body.classList.remove('arc-locked');
 
                         const overlay = document.getElementById('arc-paywall-overlay');
                         if (overlay) {
+                            overlay.style.pointerEvents = 'none';
                             overlay.style.opacity = '0';
                             setTimeout(() => overlay.remove(), 500);
                         }
@@ -232,18 +286,59 @@ function injectDependencies() {
     }
 }
 
+/**
+ * Pauses all media while arc-locked is active. Idempotent — safe to call
+ * multiple times across SPA navigations. Only elements paused by this function
+ * are tracked; unlockMedia() resumes exactly those and nothing else.
+ */
 function lockMedia() {
-    document.addEventListener('play', (e) => {
-        if (!isTipMode && document.body.classList.contains('arc-locked') &&
-            (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
-            e.target.pause();
+    if (mediaLockController) return;
+
+    const pausedByUs = new WeakSet();
+
+    const onPlayCapture = (e) => {
+        if (isTipMode) return;
+        if (!document.body.classList.contains('arc-locked')) return;
+        const target = e.target;
+        if (target.tagName === 'VIDEO' || target.tagName === 'AUDIO') {
+            target.pause();
+            pausedByUs.add(target);
         }
-    }, true);
-    setInterval(() => {
-        if (!isTipMode && document.body.classList.contains('arc-locked')) {
-            document.querySelectorAll('video, audio').forEach(m => { if (!m.paused) m.pause(); });
-        }
+    };
+
+    const intervalId = setInterval(() => {
+        if (isTipMode || !document.body.classList.contains('arc-locked')) return;
+        document.querySelectorAll('video, audio').forEach((m) => {
+            if (!m.paused) {
+                m.pause();
+                pausedByUs.add(m);
+            }
+        });
     }, 500);
+
+    document.addEventListener('play', onPlayCapture, true);
+
+    mediaLockController = {
+        pausedByUs,
+        teardown() {
+            document.removeEventListener('play', onPlayCapture, true);
+            clearInterval(intervalId);
+        },
+    };
+}
+
+/** Tears down the media lock and resumes exactly the elements lockMedia() paused. */
+function unlockMedia() {
+    if (!mediaLockController) return;
+    const { pausedByUs, teardown } = mediaLockController;
+    teardown();
+    mediaLockController = null;
+
+    document.querySelectorAll('video, audio').forEach((m) => {
+        if (pausedByUs.has(m)) {
+            m.play().catch(() => { /* autoplay policy may block; user can resume manually */ });
+        }
+    });
 }
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
@@ -275,8 +370,8 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                         </div>
     `;
     const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
-    const unlockBtnText = isTipMode 
-        ? `${UNLOCK_SVG} Enable Tipping` 
+    const unlockBtnText = isTipMode
+        ? `${UNLOCK_SVG} Enable Tipping`
         : `${UNLOCK_SVG} Unlock Video`;
 
     const overlay = document.createElement('div');
@@ -453,22 +548,23 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
             </div>
         </div>
     `;
-    let containerEl = targetContainer;
-    if (!containerEl && typeof targetContainer === 'string') {
-        containerEl = document.querySelector(targetContainer);
-    }
-    if (!containerEl) {
-        containerEl = document.querySelector('.peertube-player-container, .video-js, video-player') || document.body;
-    }
-    if (containerEl !== document.body) {
+
+    // Resolve an explicit container the connector may have passed. No
+    // platform class names are guessed here — if a connector wants the
+    // overlay embedded inside its own player wrapper it must pass that
+    // element explicitly (see CONNECTOR_SPEC.md).
+    const explicitContainer = resolveContainer(targetContainer);
+
+    if (explicitContainer && explicitContainer !== document.body) {
         overlay.classList.add('arc-contained-overlay');
         try {
-            if (window.getComputedStyle(containerEl).position === 'static') {
-                containerEl.style.position = 'relative';
+            if (window.getComputedStyle(explicitContainer).position === 'static') {
+                explicitContainer.style.position = 'relative';
             }
-        } catch (_) {}
+        } catch (_) { }
     }
-    containerEl.appendChild(overlay);
+
+    mountFloatingElement(overlay, explicitContainer);
 
     // Wire up events
     if (isTipMode) {
@@ -774,7 +870,7 @@ function getSelectedDepositAmount() {
 async function handleUnlock() {
     const btn = document.getElementById('arc-unlock-btn');
     btn.disabled = true;
-    btn.innerHTML = isTipMode 
+    btn.innerHTML = isTipMode
         ? '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Enabling…'
         : '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Unlocking…';
     setFundStatus('');
@@ -902,6 +998,7 @@ async function handleUnlock() {
 
         // ✅ Unlock stream or Enable Tipping
         if (!isTipMode) {
+            unlockMedia();
             document.body.classList.remove('arc-locked');
             const sm = document.getElementById('arc-session-manager');
             if (sm) sm.classList.remove('arc-hidden');
@@ -1162,10 +1259,10 @@ async function pollCctpForwarding(sourceDomain, txHash) {
 function setStepStatus(stepId, status) {
     const el = document.getElementById(stepId);
     if (!el) return;
-    el.innerHTML = status === 'pending' 
-        ? '<div class="arc-spinner-sm"></div>' 
-        : status === 'done' 
-            ? '<span style="color:#22c55e;font-weight:700;">✓</span>' 
+    el.innerHTML = status === 'pending'
+        ? '<div class="arc-spinner-sm"></div>'
+        : status === 'done'
+            ? '<span style="color:#22c55e;font-weight:700;">✓</span>'
             : '';
 }
 
@@ -1213,7 +1310,9 @@ function renderSessionManager() {
             <p style="margin:8px 0 0;font-size:10px;color:#ffffff;text-align:center;line-height:1.3;font-weight:500;">Leave keeps funds for next time. Cash Out withdraws to your wallet.</p>
         </div>
     `;
-    document.body.appendChild(sm);
+    // Always floats above everything, including a real fullscreen video —
+    // no explicit container, so it is fullscreen-aware (see mountFloatingElement).
+    mountFloatingElement(sm);
 
     // Draggable
     let isDragging = false, startX, startY, initialX, initialY;
@@ -1269,16 +1368,16 @@ function renderSessionManager() {
 // ─── Global Media Tracking ────────────────────────────────────────────────────
 let playingMediaCount = 0;
 
-// Expose manual control for dedicated plugins (like PeerTube) to override blind global tracking
+// Allows a connector to take control of media tracking instead of relying on global polling.
 if (window.arcManualMediaControl === undefined) {
     window.arcManualMediaControl = false;
 }
-window.arcSetMediaPlaying = function(isPlaying) {
+window.arcSetMediaPlaying = function (isPlaying) {
     playingMediaCount = isPlaying ? 1 : 0;
 };
 
 // Allow plugin to update rate when switching between videos with different prices
-window.arcSetRate = function(ratePerSec) {
+window.arcSetRate = function (ratePerSec) {
     if (ratePerSec && Number(ratePerSec) > 0) {
         currentRatePerSecond = Number(ratePerSec);
         // Paywall overlay rate display
@@ -1290,10 +1389,10 @@ window.arcSetRate = function(ratePerSec) {
     }
 };
 
-// Called by the PeerTube plugin (client.ts) when the user navigates to a new video.
-// Resets the per-video cost counter and updates the displayed rate without
-// touching the global session or the gateway balance.
-window.arcResetVideoSession = function(newRate) {
+// Called by the connector when the user navigates to a new resource.
+// Resets the per-resource cost counter and updates the displayed rate
+// without touching the global session or the gateway balance.
+window.arcResetVideoSession = function (newRate) {
     // Reset per-video counters
     secondsThisVideo = 0;
     initialGatewayBalance = null; // Will be re-captured on next heartbeat
@@ -1367,10 +1466,10 @@ function startSessionTimer() {
 
     // Fetch the initial gateway balance immediately so video cost is accurate and displayed from the start
     fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId)
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(data) {
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
             if (data) {
-                const withdrawable = Number(data.gatewayWithdrawable);
+                const withdrawable = Number(data.gatewayAvailable);
                 initialGatewayBalance = withdrawable;
                 lastWithdrawableBalance = withdrawable;
                 const balEl = document.getElementById('arc-sm-balance');
@@ -1379,7 +1478,7 @@ function startSessionTimer() {
                 if (videoCostEl) videoCostEl.textContent = '$0.0000 USDC';
             }
         })
-        .catch(function() {});
+        .catch(function () { });
 
     window.sessionTimer = setInterval(async () => {
         tickCount++;
@@ -1398,6 +1497,29 @@ function startSessionTimer() {
             secondsThisVideo++;
         }
 
+        const liveSpent = secondsThisVideo * currentRatePerSecond;
+        const videoCostEl = document.getElementById('arc-sm-video-cost');
+        if (videoCostEl) {
+            videoCostEl.textContent = '$' + liveSpent.toFixed(4) + ' USDC';
+        }
+        if (initialGatewayBalance !== null) {
+            const projectedBalance = Math.max(0, initialGatewayBalance - liveSpent);
+            const balEl = document.getElementById('arc-sm-balance');
+            if (balEl) balEl.textContent = '$' + projectedBalance.toFixed(4) + ' USDC';
+
+            const secondsLeft = projectedBalance / currentRatePerSecond;
+            const warningDiv = document.getElementById('arc-sm-warning');
+            if (warningDiv) {
+                if (secondsLeft <= 300 && secondsLeft > 0) {
+                    warningDiv.classList.remove('arc-hidden');
+                    const tl = document.getElementById('arc-sm-time-left');
+                    if (tl) tl.textContent = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
+                } else {
+                    warningDiv.classList.add('arc-hidden');
+                }
+            }
+        }
+
         if (tickCount % 5 === 0) {
             try {
                 const statusRes = await fetch(ARC_API_BASE + '/api/core/session-status?userId=' + viewerState.userId);
@@ -1410,33 +1532,15 @@ function startSessionTimer() {
                     const balanceRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
                     if (balanceRes.ok) {
                         const data = await balanceRes.json();
-                        const withdrawable = Number(data.gatewayWithdrawable);
-                        // Capture initial balance on first heartbeat if the immediate fetch above hadn't resolved yet
+                        const withdrawable = Number(data.gatewayAvailable);
                         if (initialGatewayBalance === null) {
                             initialGatewayBalance = withdrawable;
+                            lastWithdrawableBalance = withdrawable;
                         } else if (lastWithdrawableBalance !== null && withdrawable > lastWithdrawableBalance) {
-                            // Top-up detected! Adjust initial balance to keep spent calculation correct.
                             initialGatewayBalance += (withdrawable - lastWithdrawableBalance);
-                        }
-                        lastWithdrawableBalance = withdrawable;
-                        const balEl = document.getElementById('arc-sm-balance');
-                        if (balEl) balEl.textContent = '$' + withdrawable.toFixed(4) + ' USDC';
-                        // Display real cost: what the gateway actually deducted, not a client-side estimate
-                        const videoCostEl = document.getElementById('arc-sm-video-cost');
-                        if (videoCostEl) {
-                            const spent = Math.max(0, initialGatewayBalance - withdrawable);
-                            videoCostEl.textContent = '$' + spent.toFixed(4) + ' USDC';
-                        }
-                        const secondsLeft = withdrawable / currentRatePerSecond;
-                        const warningDiv = document.getElementById('arc-sm-warning');
-                        if (warningDiv) {
-                            if (secondsLeft <= 300 && secondsLeft > 0) {
-                                warningDiv.classList.remove('arc-hidden');
-                                const tl = document.getElementById('arc-sm-time-left');
-                                if (tl) tl.textContent = `${Math.floor(secondsLeft / 60)}m ${Math.floor(secondsLeft % 60)}s`;
-                            } else {
-                                warningDiv.classList.add('arc-hidden');
-                            }
+                            lastWithdrawableBalance = withdrawable;
+                        } else {
+                            lastWithdrawableBalance = withdrawable;
                         }
                     }
                 }
@@ -1549,7 +1653,7 @@ async function handleTopUp(depositAmount) {
 
 // ─── Leave / Cash-Out ─────────────────────────────────────────────────────────
 
-window.arcLeaveSession = async function() {
+window.arcLeaveSession = async function () {
     const leaveBtn = document.getElementById('arc-sm-leave-btn');
     if (leaveBtn) { leaveBtn.disabled = true; leaveBtn.innerText = 'Leaving…'; }
     clearInterval(window.sessionTimer);
@@ -1573,7 +1677,6 @@ window.arcLeaveSession = async function() {
             }
         }
     } else {
-        // Pay-per-second mode: lock video and show paused session card with explicit Resume button
         const sm = document.getElementById('arc-session-manager');
         if (sm) {
             sm.innerHTML = `
@@ -1585,10 +1688,54 @@ window.arcLeaveSession = async function() {
             `;
         }
         document.body.classList.add('arc-locked');
+        lockMedia();
     }
 };
 
-window.arcResumeSession = async function() {
+window.arcTeardownOnNavigate = async function () {
+    const hadActiveUnlockedSession = !isTipMode
+        && !document.body.classList.contains('arc-locked')
+        && document.getElementById('arc-session-manager') !== null;
+
+    clearInterval(window.sessionTimer);
+    window.sessionTimer = null;
+    if (window.arcPingInterval) {
+        clearInterval(window.arcPingInterval);
+        window.arcPingInterval = null;
+    }
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+
+    if (hadActiveUnlockedSession) {
+        try {
+            await fetch(ARC_API_BASE + '/api/core/end-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: viewerState.userId }),
+            });
+        } catch (_) { }
+    }
+
+    if (hadActiveUnlockedSession) {
+        document.body.classList.add('arc-locked');
+        lockMedia();
+    }
+
+    const sm = document.getElementById('arc-session-manager');
+    if (sm) sm.remove();
+
+    const tipContainer = document.getElementById('arc-tip-btn-container');
+    if (tipContainer) tipContainer.remove();
+
+    const overlay = document.getElementById('arc-paywall-overlay');
+    if (overlay) overlay.remove();
+
+    document.body.classList.remove('arc-locked');
+};
+
+window.arcResumeSession = async function () {
     const resumeBtn = document.getElementById('arc-resume-btn');
     if (resumeBtn) {
         resumeBtn.disabled = true;
@@ -1616,6 +1763,7 @@ window.arcResumeSession = async function() {
 
         if (regRes.ok) {
             console.log('[Tessera] Session resumed successfully.');
+            unlockMedia();
             document.body.classList.remove('arc-locked');
             renderSessionManager();
             const sm = document.getElementById('arc-session-manager');
@@ -1631,7 +1779,7 @@ window.arcResumeSession = async function() {
     await checkAutoUnlock();
 };
 
-window.arcEndSession = async function() {
+window.arcEndSession = async function () {
     const endBtn = document.getElementById('arc-sm-end-btn');
     if (endBtn) {
         endBtn.disabled = true;
@@ -1647,7 +1795,7 @@ window.arcEndSession = async function() {
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.timeout = 15000;
 
-    xhr.onload = function() {
+    xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
             viewerState.ephemeralPk = null;
@@ -1665,10 +1813,10 @@ window.arcEndSession = async function() {
             try {
                 const resData = JSON.parse(xhr.responseText);
                 txHash = resData.txHash || '';
-            } catch (_) {}
+            } catch (_) { }
 
-            const scanUrl = txHash 
-                ? `https://testnet.arcscan.app/tx/${txHash}` 
+            const scanUrl = txHash
+                ? `https://testnet.arcscan.app/tx/${txHash}`
                 : `https://testnet.arcscan.app/address/${walletAddress}`;
 
             const scanText = txHash
@@ -1700,7 +1848,7 @@ window.arcEndSession = async function() {
         document.body.classList.add('arc-locked');
     };
 
-    xhr.onerror = xhr.ontimeout = function() {
+    xhr.onerror = xhr.ontimeout = function () {
         if (endBtn) { endBtn.disabled = false; endBtn.innerText = 'Network Error - Retry'; }
     };
 
@@ -1738,7 +1886,7 @@ async function fetchTipBalance() {
         const res = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + userId);
         if (!res.ok) return null;
         const data = await res.json();
-        return Number(data.gatewayWithdrawable) || 0;
+        return Number(data.gatewayAvailable) || 0;
     } catch (_) { return null; }
 }
 
@@ -1761,7 +1909,7 @@ function openTipOnboarding() {
     }
 }
 
-window.arcShowTipButton = function(creatorWallet, tipAmount) {
+window.arcShowTipButton = function (creatorWallet, tipAmount) {
     if (creatorWallet) tipCreatorWallet = creatorWallet;
     if (tipAmount) tipAmountVal = tipAmount;
 
@@ -1821,12 +1969,14 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
         </div>
     `;
 
-    document.body.appendChild(container);
+    // Always floats above everything, including a real fullscreen video —
+    // no explicit container, so it is fullscreen-aware (see mountFloatingElement).
+    mountFloatingElement(container);
 
     // Draggable & Minimizable
     let isTipDragging = false, tipStartX, tipStartY, tipInitialX, tipInitialY;
     const tipHeaderEl = document.getElementById('arc-tip-header');
-    
+
     tipHeaderEl.addEventListener('mousedown', (e) => {
         if (e.target.id === 'arc-tip-minimize-btn' || e.target.closest('button') || e.target.closest('input')) return;
         e.preventDefault(); // Prevent text selection and cursor updates while dragging
@@ -1842,8 +1992,8 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
         container.style.left = `${tipInitialX + e.clientX - tipStartX}px`;
         container.style.top = `${tipInitialY + e.clientY - tipStartY}px`;
     });
-    document.addEventListener('mouseup', () => { 
-        isTipDragging = false; 
+    document.addEventListener('mouseup', () => {
+        isTipDragging = false;
         tipHeaderEl.style.cursor = 'grab';
     });
 
@@ -1926,21 +2076,21 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
             if (res.ok) {
                 const walletAddress = viewerState.walletAddress || '';
-                
+
                 // Parse transaction hash from response
                 let txHash = '';
                 try {
                     const resData = await res.json();
                     txHash = resData.txHash || '';
-                } catch (_) {}
+                } catch (_) { }
 
                 localStorage.removeItem('arc_ephemeral_pk');
                 viewerState.ephemeralPk = null;
                 // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
                 // These stay persistent for subsequent sessions or top-ups.
 
-                const scanUrl = txHash 
-                    ? `https://testnet.arcscan.app/tx/${txHash}` 
+                const scanUrl = txHash
+                    ? `https://testnet.arcscan.app/tx/${txHash}`
                     : `https://testnet.arcscan.app/address/${walletAddress}`;
 
                 const scanText = txHash
@@ -1987,12 +2137,12 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 
         const sendTip = async (attempt = 1) => {
             try {
-                const res = await fetch(ARC_API_BASE + '/api/core/tip', {
+                const res = await fetch(ARC_API_BASE + '/api/core/v1/tips', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: viewerState.userId,
-                        creatorWallet: creatorWallet,
+                        payoutAddress: creatorWallet,
                         amount: amount.toFixed(6),
                     }),
                 });
@@ -2068,11 +2218,10 @@ window.arcShowTipButton = function(creatorWallet, tipAmount) {
 };
 
 
-// ─── Tip Mode (Free Videos) ──────────────────────────────────────────────────
+// ─── Tip Mode (Free Resources) ───────────────────────────────────────────────
 //
-// Called by the PeerTube plugin when the current video is in 'free' mode.
-// Does NOT lock the video. Only renders the session manager (hidden) and
-// shows the tip button so the viewer can optionally support the creator.
+// Called by the connector for free resources.
+// Does NOT lock media. Only renders the session manager and the tip button.
 
 function initTipMode(creatorWallet, tipAmount) {
     isTipMode = true;
@@ -2113,15 +2262,11 @@ function initTipMode(creatorWallet, tipAmount) {
 
 // ─── Bootstrap & SPA API ─────────────────────────────────────────────────────
 //
-// paywall.js does NOT auto-initialize on load.
-// The PeerTube plugin (client.ts) reads the video's tessera-mode from the
-// backend FIRST, then calls the appropriate method:
+// paywall.js does NOT auto-initialize on load. The connector calls the
+// appropriate method after resolving the resource's billing mode:
 //
-//   window.ArcCashier.initPaywall()              → pay-per-second (blocks video)
-//   window.ArcCashier.initTipMode(wallet, amount) → free video (tip button only)
-//
-// This prevents free videos from being incorrectly blocked before the ping
-// response arrives, which was the root cause of the reported bug.
+//   window.ArcCashier.initPaywall()               → pay-per-second (locks media)
+//   window.ArcCashier.initTipMode(wallet, amount)  → free resource (tip button only)
 
 window.ArcCashier = {
     initPaywall,

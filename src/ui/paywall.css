@@ -10,17 +10,17 @@
     --bg-base: #0b0c10;
     --bg-card: #0f111a;
     --border-color: rgba(255, 255, 255, 0.08);
-    
+
     /* Warm Amber Accent Color */
     --accent-color: #ffb300;
     --accent-hover: #ffc107;
     --accent-glow: rgba(255, 179, 0, 0.2);
-    
+
     /* Typography */
     --text-primary: #ffffff;
     --text-muted: #94a3b8;
     --text-dark: #4b5563;
-    
+
     --transition-premium: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -28,9 +28,15 @@
 
 #arc-paywall-overlay {
     position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    z-index: 1000;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    /* Maximum safe 32-bit z-index. Necessary but NOT sufficient against a
+       real Fullscreen-API element on its own — reparenting into
+       document.fullscreenElement (done in paywall.js's mountFloatingElement)
+       is what actually makes this render above a fullscreen video. */
+    z-index: 2147483647;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -41,24 +47,18 @@
     color: var(--text-primary);
 }
 
-/* Container-constrained overlay (scoped to video player element) */
-#arc-paywall-overlay.arc-contained-overlay,
-.peertube-player-container #arc-paywall-overlay,
-.video-js #arc-paywall-overlay,
-video-player #arc-paywall-overlay {
+/* Container-constrained overlay: applied only when a connector explicitly
+   passed its own player wrapper as targetContainer (see resolveContainer()
+   in paywall.js). No platform-specific selectors are referenced here — the
+   connector is the only party that knows its own DOM structure. */
+#arc-paywall-overlay.arc-contained-overlay {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    z-index: 50 !important;
+    z-index: 2147483647 !important;
     border-radius: inherit;
-}
-
-.peertube-player-container,
-.video-js,
-video-player {
-    position: relative !important;
 }
 
 #arc-paywall-overlay.arc-hidden-initially {
@@ -157,10 +157,12 @@ body.arc-locked {
     margin-bottom: 8px;
 }
 
-.arc-pricing-row:last-of-type { margin-bottom: 0; }
+.arc-pricing-row:last-of-type {
+    margin-bottom: 0;
+}
 
-.arc-accent { 
-    color: #ffffff; 
+.arc-accent {
+    color: #ffffff;
     font-weight: 700;
     font-family: 'Outfit', sans-serif;
     font-size: 13.5px;
@@ -239,7 +241,9 @@ body.arc-locked {
     text-align: center;
 }
 
-.arc-status-error { color: #fc8181 !important; }
+.arc-status-error {
+    color: #fc8181 !important;
+}
 
 /* -- Wallet address box ----------------------------- */
 
@@ -408,10 +412,11 @@ body.arc-locked {
 /* -- Spinners -------------------------------------- */
 
 .arc-spinner {
-    border: 3px solid rgba(255,255,255,0.1);
+    border: 3px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
     border-top: 3px solid #00f2fe;
-    width: 20px; height: 20px;
+    width: 20px;
+    height: 20px;
     animation: arc-spin 0.9s linear infinite;
     display: inline-block;
     flex-shrink: 0;
@@ -421,14 +426,17 @@ body.arc-locked {
     border: 2px solid rgba(255, 255, 255, 0.05);
     border-radius: 50%;
     border-top: 2px solid var(--accent-color);
-    width: 14px; height: 14px;
+    width: 14px;
+    height: 14px;
     animation: arc-spin 0.8s linear infinite;
     display: inline-block;
     flex-shrink: 0;
 }
 
 @keyframes arc-spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ── CCTP Modal & Stepper Progress ───────────────── */
@@ -487,13 +495,15 @@ body.arc-locked {
     transition: var(--transition-premium);
 }
 
-.arc-modal-close:hover { 
-    color: white; 
-    background: rgba(255, 255, 255, 0.08); 
+.arc-modal-close:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.25);
 }
 
-.arc-modal-body { padding: 20px 24px 24px; }
+.arc-modal-body {
+    padding: 20px 24px 24px;
+}
 
 .arc-modal-label {
     font-size: 12.5px !important;
@@ -601,7 +611,9 @@ body.arc-locked {
     transition: var(--transition-premium);
 }
 
-.arc-info-icon:hover { opacity: 1; }
+.arc-info-icon:hover {
+    opacity: 1;
+}
 
 .arc-info-popup {
     position: absolute;
@@ -614,11 +626,15 @@ body.arc-locked {
     font-size: 11.5px;
     color: var(--text-primary);
     width: 220px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     z-index: 10;
 }
 
-.arc-info-popup strong { display: block; margin-bottom: 6px; color: var(--accent-color); }
+.arc-info-popup strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--accent-color);
+}
 
 .arc-info-popup ul {
     margin: 0 0 8px 0;
@@ -654,7 +670,8 @@ body.arc-locked {
 }
 
 .arc-step-num {
-    width: 20px; height: 20px;
+    width: 20px;
+    height: 20px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 50%;
@@ -667,7 +684,10 @@ body.arc-locked {
     flex-shrink: 0;
 }
 
-.arc-step-status { margin-left: auto; font-size: 13px; }
+.arc-step-status {
+    margin-left: auto;
+    font-size: 13px;
+}
 
 .arc-cctp-note {
     font-size: 11px !important;
@@ -692,8 +712,13 @@ body.arc-locked {
 
 #arc-session-manager {
     position: fixed;
-    bottom: 20px; right: 20px;
-    z-index: 999;
+    bottom: 20px;
+    right: 20px;
+    /* Maximum safe 32-bit z-index. Necessary but NOT sufficient against a
+       real Fullscreen-API element on its own — reparenting into
+       document.fullscreenElement (done in paywall.js's mountFloatingElement)
+       is what actually makes this render above a fullscreen video. */
+    z-index: 2147483647;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 20px;
@@ -708,8 +733,19 @@ body.arc-locked {
     box-sizing: border-box;
 }
 
-.arc-sm-minimized { height: 48px !important; overflow: hidden; padding-top: 13px !important; padding-bottom: 0 !important; }
-.arc-tip-minimized { height: 48px !important; overflow: hidden; padding-top: 13px !important; padding-bottom: 0 !important; }
+.arc-sm-minimized {
+    height: 48px !important;
+    overflow: hidden;
+    padding-top: 13px !important;
+    padding-bottom: 0 !important;
+}
+
+.arc-tip-minimized {
+    height: 48px !important;
+    overflow: hidden;
+    padding-top: 13px !important;
+    padding-bottom: 0 !important;
+}
 
 #arc-sm-header {
     display: flex;
@@ -719,7 +755,9 @@ body.arc-locked {
     margin-bottom: 14px;
 }
 
-#arc-sm-header:active { cursor: grabbing; }
+#arc-sm-header:active {
+    cursor: grabbing;
+}
 
 #arc-session-manager h3 {
     font-family: 'Outfit', 'Inter', system-ui, sans-serif;
@@ -733,16 +771,19 @@ body.arc-locked {
 }
 
 .arc-pulse-dot {
-    width: 8px; height: 8px;
+    width: 8px;
+    height: 8px;
     background: #22c55e;
     border-radius: 50%;
     display: inline-block;
-    box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
     animation: arc-pulse 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
 }
 
 @keyframes arc-pulse {
-    to { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    to {
+        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    }
 }
 
 #arc-sm-minimize-btn {
@@ -771,7 +812,7 @@ body.arc-locked {
 }
 
 .arc-sm-stats div:last-child {
-    border-top: 1px solid rgba(255,255,255,0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     padding-top: 8px;
     color: white;
     font-weight: 700;
@@ -1004,8 +1045,9 @@ body.arc-locked {
 /* ── Tipping Widget Styles ───────────────────────── */
 #arc-tip-btn-container.arc-tip-connected {
     position: fixed;
-    bottom: 20px; right: 20px;
-    z-index: 9999;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483647;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 20px;
@@ -1025,8 +1067,9 @@ body.arc-locked {
 
 #arc-tip-btn-container.arc-tip-unconnected {
     position: fixed;
-    bottom: 20px; right: 20px;
-    z-index: 9999;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483647;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -1151,4 +1194,3 @@ body.arc-locked {
     line-height: 1;
     padding: 0 4px;
 }
-

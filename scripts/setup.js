@@ -17,15 +17,18 @@ function askPlatform() {
     console.log('Select your streaming platform:');
     console.log('1) Owncast');
     console.log('2) PeerTube');
+    console.log('3) Jellyfin');
     
-    rl.question('\nEnter 1 or 2: ', (answer) => {
+    rl.question('\nEnter 1, 2, or 3: ', (answer) => {
         const choice = answer.trim();
         if (choice === '1') {
             askUpstreamUrl('owncast', 'http://127.0.0.1:8080');
         } else if (choice === '2') {
             askUpstreamUrl('peertube', 'http://localhost:9000');
+        } else if (choice === '3') {
+            askUpstreamUrl('jellyfin', 'http://localhost:8096');
         } else {
-            console.log('Invalid selection. Please enter 1 or 2.');
+            console.log('Invalid selection. Please enter 1, 2, or 3.');
             askPlatform();
         }
     });
@@ -41,70 +44,47 @@ function askUpstreamUrl(platformName, defaultUrl) {
 function configureProject(platformName, defaultUrl) {
     console.log(`\nConfiguring Tessera for ${platformName}...`);
 
-    // 1. Update tessera.config.ts
-    const configPath = path.join(__dirname, '..', 'src', 'tessera.config.ts');
-    
-    try {
-        let configContent = fs.readFileSync(configPath, 'utf-8');
-        
-        // Regex to replace the connectors array block completely
-        const connectorsRegex = /connectors:\s*\[[\s\S]*?\],/m;
-        
-        const newConnectorsBlock = `connectors: [\n        {\n            name: '${platformName}',\n            upstreamUrl: '${defaultUrl}',\n            ratePerSecond: 0.0001,\n        },\n    ],`;
-
-        if (connectorsRegex.test(configContent)) {
-            configContent = configContent.replace(connectorsRegex, newConnectorsBlock);
-            fs.writeFileSync(configPath, configContent);
-            console.log(`✅ Updated src/tessera.config.ts with ${platformName} connector.`);
-        } else {
-            console.warn(`⚠️  Could not automatically locate the connectors block in tessera.config.ts. Please configure it manually.`);
-        }
-    } catch (error) {
-        console.error(`❌ Failed to read or update tessera.config.ts:`, error.message);
-    }
-
-    // 2. Generate .env file securely
+    // 1. Generate/update .env file securely
     const envPath = path.join(__dirname, '..', '.env');
     const envExamplePath = path.join(__dirname, '..', '.env.example');
 
     try {
-        if (!fs.existsSync(envPath)) {
-            if (fs.existsSync(envExamplePath)) {
-                let envContent = fs.readFileSync(envExamplePath, 'utf-8');
-                
-                // If platform is peertube, generate a webhook secret automatically
-                const crypto = require('crypto');
-                if (platformName === 'peertube') {
-                    const secret = crypto.randomBytes(32).toString('hex');
-                    envContent = envContent.replace(
-                        /# PEERTUBE_WEBHOOK_SECRET=your_generated_secret_here/g,
-                        `PEERTUBE_WEBHOOK_SECRET=${secret}`
-                    );
-                }
-
-                // Generate a secure random MASTER_KEY automatically for session encryption at rest
-                const masterKey = crypto.randomBytes(32).toString('hex');
-                envContent = envContent.replace(
-                    /MASTER_KEY=your_secure_master_key_here/g,
-                    `MASTER_KEY=${masterKey}`
-                );
-
-                fs.writeFileSync(envPath, envContent);
-                console.log(`✅ Generated .env file securely from .env.example.`);
-            } else {
-                console.warn(`⚠️  .env.example not found. Skipping .env generation.`);
-            }
-        } else {
-            console.log(`ℹ️  .env file already exists. Skipping generation.`);
+        let envContent = '';
+        if (fs.existsSync(envPath)) {
+            envContent = fs.readFileSync(envPath, 'utf-8');
+        } else if (fs.existsSync(envExamplePath)) {
+            envContent = fs.readFileSync(envExamplePath, 'utf-8');
+            const crypto = require('crypto');
+            const masterKey = crypto.randomBytes(32).toString('hex');
+            envContent = envContent.replace(
+                /MASTER_KEY=your_secure_master_key_here/g,
+                `MASTER_KEY=${masterKey}`
+            );
         }
+
+        // Set or update ACTIVE_CONNECTOR and UPSTREAM_URL
+        if (envContent.includes('ACTIVE_CONNECTOR=')) {
+            envContent = envContent.replace(/ACTIVE_CONNECTOR=.*/g, `ACTIVE_CONNECTOR=${platformName}`);
+        } else {
+            envContent = `ACTIVE_CONNECTOR=${platformName}\n` + envContent;
+        }
+
+        if (envContent.includes('UPSTREAM_URL=')) {
+            envContent = envContent.replace(/UPSTREAM_URL=.*/g, `UPSTREAM_URL=${defaultUrl}`);
+        } else {
+            envContent = `UPSTREAM_URL=${defaultUrl}\n` + envContent;
+        }
+
+        fs.writeFileSync(envPath, envContent);
+        console.log(`✅ Configured .env with ACTIVE_CONNECTOR=${platformName} and UPSTREAM_URL=${defaultUrl}`);
     } catch (error) {
-        console.error(`❌ Failed to copy .env file:`, error.message);
+        console.error(`❌ Failed to update .env:`, error.message);
     }
 
-    finishSetup(platformName);
+    finishSetup(platformName, defaultUrl);
 }
 
-function finishSetup(platformName) {
+function finishSetup(platformName, upstreamUrl) {
     console.log(`
 =========================================
  🎉 SETUP COMPLETE! 🎉
@@ -115,14 +95,11 @@ For security reasons, this script does NOT ask for your API Keys.
 Please manually open the '.env' file in your code editor and configure:
  - CIRCLE_API_KEY
  - CIRCLE_APP_ID
- - SELLER_PRIVATE_KEY
  - SELLER_ADDRESS
 `);
     console.log(`✅ MASTER_KEY was automatically generated in your .env file to encrypt session keys at rest.`);
-    if (platformName === 'peertube') {
-        console.log(`✅ PEERTUBE_WEBHOOK_SECRET was automatically generated in your .env file.`);
-        console.log(`Copy this secret into the PeerTube Plugin Settings so they can communicate securely.\n`);
-    }
+    console.log(`✅ Configured for ${platformName} (upstream: ${upstreamUrl}).`);
+    console.log(`Point the Webhook plugin to: http://localhost:7878/api/connectors/${platformName}/webhook\n`);
 
     console.log(`Once your .env is configured, compile and start the sidecar with:
   npm run build

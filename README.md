@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
 ---
 
 ## Table of Contents
-- [The Self-Hosted Monetization Layer](#the-self-hosted-monetization-layer)
+- [The Self-Hosted Sustainability Layer](#the-self-hosted-Sustainability-layer)
 - [Why Arc Network?](#why-arc-network)
 - [How It Works](#how-it-works)
 - [Supported Platforms](#supported-platforms)
@@ -47,19 +47,19 @@ https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
 
 ---
 
-## The Self-Hosted Monetization Layer
+## The Self-Hosted Sustainability Layer
 
 Self-hosted platforms empower creators with independent communities, but traditional payment gateways fail to support micro-contributions. High minimum fees make it impossible for viewers to tip a few cents or pay tiny rates per second without losing most of the value to transaction fees.
 
 Tessera solves this by **bringing frictionless, sub-penny payment options directly to where the creators and audiences already live.**
 
-By integrating as a lightweight, non-intrusive payment sidecar, Tessera attaches payments to events that these platforms naturally emit (webhook events, presence events, or access logs). Creators gain access to seamless monetization, and viewers pay only for what they consume - all without requiring complex payment configurations from the host.
+By integrating as a lightweight, non-intrusive payment sidecar, Tessera attaches payments to events that these platforms naturally emit (webhook events, presence events, or access logs). Creators gain access to seamless Sustainability, and viewers pay only for what they consume - all without requiring complex payment configurations from the host.
 
 ---
 
 ## Why Arc Network?
 
-Implementing micro-billing or per-second streaming payments is economically impossible on traditional fiat rails (where Stripe or PayPal transaction fees impose a high floor, e.g., 30¢ + 2.9%). Other decentralized networks also struggle because users must acquire and hold separate, volatile native tokens just to pay for network transaction fees.
+Implementing micro-billing or per-second streaming payments is economically impossible on traditional fiat rails (where Stripe or PayPal transaction fees impose a high floor, e.g., 30� + 2.9%). Other decentralized networks also struggle because users must acquire and hold separate, volatile native tokens just to pay for network transaction fees.
 
 Tessera solves this by running its settlement core on the **Arc Network**:
 
@@ -132,16 +132,16 @@ For detailed installation, configuration, and deployment guides, see the [Quick 
 
 ```text
 tessera/
-├── docs/                    # MkDocs documentation site source files
-├── scripts/                 # Setup and deployment helper scripts
-├── src/
-│   ├── connectors/          # Platform-specific webhook and integration adapters
-│   ├── core/                # Core settlement engine and gateway integration
-│   ├── ui/                  # Injected client paywall interface assets
-│   ├── server.ts            # Express server configuration and routing
-│   └── tessera.config.ts    # Main sidecar configuration registry
-├── package.json             # Engine dependencies and execution scripts
-└── tsconfig.json            # TypeScript configuration
++-- docs/                    # MkDocs documentation site source files
++-- scripts/                 # Setup and deployment helper scripts
++-- src/
+�   +-- connectors/          # Platform-specific webhook and integration adapters
+�   +-- core/                # Core settlement engine and gateway integration
+�   +-- ui/                  # Injected client paywall interface assets
+�   +-- server.ts            # Express server configuration and routing
+�   +-- tessera.config.ts    # Main sidecar configuration registry
++-- package.json             # Engine dependencies and execution scripts
++-- tsconfig.json            # TypeScript configuration
 ```
 
 ---
