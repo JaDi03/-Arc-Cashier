@@ -8,39 +8,23 @@ Here is a step-by-step guide on how viewers create their wallet, fund it, and wi
 
 ## 1. Creating Your Wallet
 
-When you visit a premium stream or click the tipping button, the Tessera paywall will ask you to sign in with a PIN. If you do not have a wallet yet, the system will automatically guide you through the quick process of creating one.
+When you visit a premium stream or click the tipping button, the Tessera paywall asks you to sign in with **Email OTP** or **Google** (Facebook if the instance enables it). If you do not have a wallet yet, the system guides you through a quick one-time setup.
 
 Follow these steps to set up your wallet in seconds:
 
-=== "Step 1: Sign in with PIN"
-    ![Step 1 - Sign in with PIN](../assets/ucw_step1.png)
-    
-    Click **Sign in with PIN** (or **Enable Tipping**). This will automatically initialize a secure connection to Circle's wallet system.
+=== "Step 1: Sign in"
+    Click **Sign in** (or **Enable Tipping**) and choose Email or Google. This initializes a secure connection to Circle's wallet system. No extensions or seed phrases needed.
 
-=== "Step 2: Create a PIN"
-    ![Step 2 - Create PIN](../assets/ucw_step2.png)
-    
-    Choose a secure 6-digit PIN. This PIN encrypts your wallet and is required to approve sessions, deposits, or cashing out. *Do not lose this PIN, as it cannot be reset.*
+=== "Step 2: Verify"
+    If you used email, enter the one-time code Circle sends you. If you used Google, approve the Google sign-in window.
 
-=== "Step 3: Confirm PIN"
-    ![Step 3 - Confirm PIN](../assets/ucw_step3.png)
-    
-    Re-enter the 6-digit PIN you just created to verify and confirm it matches.
+=== "Step 3: Confirm wallet creation"
+    ![Wallet confirmation](../assets/ucw_step6.png)
 
-=== "Step 4: Set Recovery Method"
-    ![Step 4 - Recovery Method](../assets/ucw_step4.png)
-    
-    Configure your wallet recovery method. This allows you to restore access to your wallet if you switch browsers or devices.
+    Circle shows a confirmation window to create your wallet. Read the terms, confirm, and your Arc wallet is created automatically.
 
-=== "Step 5: Recovery Questions"
-    ![Step 5 - Recovery Questions](../assets/ucw_step5.png)
-    
-    Set and answer your security recovery questions. Keep these answers in a safe place.
-
-=== "Step 6: Accept & Complete"
-    ![Step 6 - Accept and Complete](../assets/ucw_step6.png)
-    
-    Read the terms, type **"I agree"** in the input field, and click the confirmation button to complete the wallet setup.
+=== "Step 4: Recovery"
+    Circle manages recovery for your account (email / social provider). You can sign back in from any browser with the same method.
 
 ---
 
