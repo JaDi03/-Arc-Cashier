@@ -409,6 +409,82 @@ body.arc-locked {
     font-variant-numeric: tabular-nums;
 }
 
+.arc-ucw-balance-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.arc-icon-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-premium);
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.arc-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+.arc-icon-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
+.arc-btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+}
+
+.arc-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.arc-withdraw-review-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arc-withdraw-review-box > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.arc-withdraw-review-box strong {
+    color: #fff;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-all;
+}
+
+.arc-withdraw-review-addr {
+    font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+    font-size: 12px;
+}
+
 .arc-address-text {
     flex: 1;
     background: rgba(255, 255, 255, 0.02);
