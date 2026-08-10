@@ -1,8 +1,17 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import owncastRouter from './webhooks';
 import { setupOwncastProxy } from './proxy';
 import type { Connector, ConnectorConfig } from '../../core/types';
+
+function resolveUiAssetsDir(): string {
+    const distUi = path.join(process.cwd(), 'dist', 'ui');
+    const srcUi = path.join(process.cwd(), 'src', 'ui');
+    if (fs.existsSync(distUi)) return distUi;
+    if (fs.existsSync(srcUi)) return srcUi;
+    return path.join(__dirname, '..', '..', 'ui');
+}
 
 /**
  * Owncast Connector
@@ -20,7 +29,7 @@ const owncastConnector: Connector = {
 
     register(app: express.Express, config: ConnectorConfig): void {
         // 1. Serve shared paywall UI assets from the platform-agnostic src/ui/ directory
-        app.use('/owncast-assets', express.static(path.join(__dirname, '..', '..', 'ui')));
+        app.use('/owncast-assets', express.static(resolveUiAssetsDir()));
 
         // 2. Register webhook handler
         app.use('/api/connectors/owncast', owncastRouter);

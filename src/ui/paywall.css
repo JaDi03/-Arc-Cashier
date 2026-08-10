@@ -24,6 +24,110 @@
     --transition-premium: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ===================================================
+   Host isolation
+   Every Tessera widget root in paywall.js uses
+   class="arc-tessera-root" so host platforms (Jellyfin,
+   etc.) cannot override modal typography or layout.
+   =================================================== */
+
+.arc-tessera-root {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    line-height: 1.5 !important;
+    letter-spacing: normal !important;
+    text-align: left !important;
+    text-transform: none !important;
+    color: var(--text-primary) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.arc-tessera-root,
+.arc-tessera-root *,
+.arc-tessera-root *::before,
+.arc-tessera-root *::after {
+    box-sizing: border-box !important;
+}
+
+.arc-tessera-root * {
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    float: none !important;
+}
+
+.arc-tessera-root a {
+    text-decoration: none !important;
+}
+
+.arc-tessera-root button,
+.arc-tessera-root input,
+.arc-tessera-root select,
+.arc-tessera-root textarea {
+    font-family: inherit !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.arc-tessera-root img,
+.arc-tessera-root svg {
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+.arc-tessera-root h1,
+.arc-tessera-root h2,
+.arc-tessera-root h3,
+.arc-tessera-root h4,
+.arc-tessera-root p,
+.arc-tessera-root span,
+.arc-tessera-root label,
+.arc-tessera-root div {
+    font-family: inherit;
+}
+
+/* Label / value rows — grid beats host flex + long-text wrap bugs */
+.arc-tessera-root .arc-pricing-row,
+.arc-tessera-root .arc-amount-row,
+.arc-tessera-root .arc-sm-stats > div {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: start !important;
+    width: 100% !important;
+}
+
+.arc-tessera-root .arc-pricing-row > span:first-child {
+    white-space: nowrap !important;
+    color: var(--text-muted, #94a3b8) !important;
+}
+
+.arc-tessera-root .arc-pricing-row > .arc-accent,
+.arc-tessera-root .arc-pricing-row > span:last-child,
+.arc-tessera-root .arc-sm-stats > div > span:last-child {
+    min-width: 0 !important;
+    text-align: right !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+}
+
+.arc-tessera-root .arc-amount-row > label {
+    white-space: nowrap !important;
+}
+
+.arc-tessera-root .arc-amount-row > .arc-amount-input-wrap {
+    min-width: 0 !important;
+    justify-self: end;
+}
+
+.arc-tessera-root .arc-sm-stats > div > span:first-child {
+    white-space: nowrap !important;
+}
+
 /* -- Overlay --------------------------------------- */
 
 #arc-paywall-overlay {
@@ -149,9 +253,6 @@ body.arc-locked {
 }
 
 .arc-pricing-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     font-size: 13px;
     color: #ffffff;
     margin-bottom: 8px;
@@ -553,10 +654,6 @@ body.arc-locked {
 /* ── Amount input ────────────────────────────────── */
 
 .arc-amount-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     margin-bottom: 6px;
 }
 
@@ -803,9 +900,6 @@ body.arc-locked {
 }
 
 .arc-sm-stats div {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 6px;
     font-size: 12px;
     color: #ffffff;
