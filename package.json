@@ -63,5 +63,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "ip-address": "10.3.1"
   }
 }
