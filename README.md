@@ -1,8 +1,8 @@
 <div align="center">
   <img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="400">
-  <br>
-  
-  **Payment Sidecar for Self-Hosted Platforms**
+  <br><br>
+
+  <strong>Support sidecar for self-hosted open-source platforms</strong>
   <br><br>
 
   <!-- Row 1: Status Badges -->
@@ -14,20 +14,24 @@
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://developers.circle.com/gateway/nanopayments"><img src="https://img.shields.io/badge/Circle_x402-2B3139?style=for-the-badge&logo=web3dotjs&logoColor=white" alt="Circle x402"></a>
-  <a href="https://docs.arc.network"><img src="https://img.shields.io/badge/Arc_Testnet-5042002-6C63FF?style=for-the-badge" alt="Arc Testnet"></a>
+  <a href="https://docs.arc.network"><img src="https://img.shields.io/badge/Arc_Testnet-6C63FF?style=for-the-badge" alt="Arc Testnet"></a>
+  <br><br>
+
+  <a href="https://jadi03.github.io/tessera/">Documentation</a>
+  Â·
+  <a href="https://try-tessera.xyz">Live Playground</a>
 </div>
 
 ---
 
-**Documentation**: [https://jadi03.github.io/tessera/](https://jadi03.github.io/tessera/)
+## In one sentence
 
-**Live Playground**: [https://try-tessera.xyz](https://try-tessera.xyz)
+Tessera is a support sidecar for open content (video, podcasts, posts, and more). Your audience can support creators and instance admins in USDC without forking the platform.
 
----
+- **Free content stays free**: optional tip.
+- **Exclusive content** (tutorial, course, masterclass): support **by the second watched**. If someone watches 10 minutes and leaves, they only support those 10 minutes. No full-course purchase. No fixed subscription.
 
-*Payment sidecar for self-hosted platforms enabling instant, per-second streaming payments and direct tipping.*
-
-> **TL;DR:** Point Tessera at your self-hosted platform and your users start paying in USDC - by the second, by the action, or as a tip - without modifying a single line of your platform's source code.
+Free stays free. Support is optional and fair to the time watched.
 
 ---
 
@@ -35,87 +39,81 @@ https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
 
 ---
 
-## Table of Contents
-- [The Self-Hosted Sustainability Layer](#the-self-hosted-Sustainability-layer)
-- [Why Arc Network?](#why-arc-network)
-- [How It Works](#how-it-works)
-- [Supported Platforms](#supported-platforms)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
+## Contents
+
+- [Why it exists](#why-it-exists)
+- [How audiences can support](#how-audiences-can-support)
+- [Platforms today](#platforms-today)
+- [Beyond video](#beyond-video)
+- [Why Arc](#why-arc)
+- [Quick start](#quick-start)
 - [License](#license)
 
 ---
 
-## The Self-Hosted Sustainability Layer
+## Why it exists
 
-Self-hosted platforms empower creators with independent communities, but traditional payment gateways fail to support micro-contributions. High minimum fees make it impossible for viewers to tip a few cents or pay tiny rates per second without losing most of the value to transaction fees.
+Self-hosted platforms give you freedom, but keeping servers online is expensive. Supporting a creator with the usual options often means high fees or getting locked into a payment SaaS.
 
-Tessera solves this by **bringing frictionless, sub-penny payment options directly to where the creators and audiences already live.**
+Tessera is not a tollbooth. It is a **support layer** for the free software ecosystem: optional tips, time-based support on exclusives, and a way for instances and creators to sustain what they publish.
 
-By integrating as a lightweight, non-intrusive payment sidecar, Tessera attaches payments to events that these platforms naturally emit (webhook events, presence events, or access logs). Creators gain access to seamless Sustainability, and viewers pay only for what they consume - all without requiring complex payment configurations from the host.
-
----
-
-## Why Arc Network?
-
-Implementing micro-billing or per-second streaming payments is economically impossible on traditional fiat rails (where Stripe or PayPal transaction fees impose a high floor, e.g., 30¢ + 2.9%). Other decentralized networks also struggle because users must acquire and hold separate, volatile native tokens just to pay for network transaction fees.
-
-Tessera solves this by running its settlement core on the **Arc Network**:
-
-*   **USDC-Native Gas:** Viewers and creators interact entirely with USDC. Gas fees are paid directly in USDC, removing the friction of holding separate native gas tokens.
-*   **Frictionless Micropayments:** With an average transaction cost of **~$0.01 USDC**, the economic floor is removed. A creator can collect micro-tips or per-second watch royalties without fees consuming their revenue.
-*   **Decentralized Self-Hosting:** Fiat alternatives (like Liberapay) must centralize their deployments to pool donations and bypass payment processor fees. Because Arc's fees are sub-penny, every instance administrator can run their own self-hosted Tessera sidecar independently, keeping the federated web truly decentralized.
+| Who | What they get |
+|---|---|
+| **Admins** | Help keep the lights on (configurable split on exclusive / time-based mode) |
+| **Creators** | Direct audience support (tips or by time) |
+| **Audience** | Support only what they consume; leave anytime |
 
 ---
 
-## How It Works
+## How audiences can support
 
-Tessera is a payment sidecar that integrates with your self-hosted platforms via native APIs, plugins, or webhook events.
+### 1. Tips on free content
 
-```mermaid
-flowchart LR
-    subgraph Client
-        V((Viewer / Fan))
-    end
+The resource **stays open**. Tessera only offers an optional USDC tip. Works for free videos, posts, photos, wikis, podcastsâ€¦
 
-    subgraph Server
-        T{Tessera Sidecar}
-        P[Self-Hosted Platform]
-    end
+![Optional tip on free content](docs/assets/support-tip.png)
 
-    subgraph Financial Layer
-        C[Circle x402 Gateway]
-        W((Creator's Wallet))
-    end
+*Tips go to the creator.*
 
-    V -- "1. Consumes Content" --> P
-    P -- "2. Emits Native Events" --> T
-    V -. "3. Approves Nanopayments" .-> T
-    T -- "4. Batches & Settles" --> C
-    C -- "5. Final Payout (USDC)" --> W
+### 2. Time-based support on exclusive content
 
-    style T fill:#ffb300,stroke:#333,stroke-width:2px,color:#000
-    style W fill:#6C63FF,stroke:#fff,stroke-width:2px,color:#fff
-```
+For tutorials, courses, or premieres: the audience supports **while watching** and can leave anytime. Ten minutes watched means ten minutes of support.
 
-1.  **Client Connection:** The platform or its native plugin loads Tessera's lightweight frontend paywall overlay (`paywall.js`) for the viewer.
-2.  **Wallet & Gateway Deposit:** The viewer funds a session. Circle's User-Controlled Wallets (UCW) SDK creates a non-custodial Smart Contract Account (SCA) on the Arc Network, and deposits USDC into the Circle Gateway.
-3.  **Off-Chain Streaming:** While watching, the client signs off-chain EIP-3009 payment signatures every second. This enables gasless streaming: no blockchain transactions are executed while playing.
-4.  **Batch Settlement:** When the viewer leaves, Tessera stops billing. The client calls `/end-session`, triggering the Circle Gateway to batch-settle the accumulated balance to the creator and refund any unused balance to the viewer.
+When the creator and the instance admin are **not the same person**, the default split is about **~90% creator / ~10% instance** (configurable; helps cover hosting).
+
+![Time-based support on exclusive content](docs/assets/support-time.png)
 
 ---
 
-## Supported Platforms
+## Platforms today
 
-| Platform | Integration Type | Status |
+| Platform | Integration | Status |
 |---|---|---|
-| [PeerTube](https://joinpeertube.org/) | Plugin + Webhook Connector | Live |
-| [Owncast](https://owncast.online/) | Webhook Connector | Soon (In Development) |
+| [PeerTube](https://joinpeertube.org/) | Plugin | Live |
+| [Owncast](https://owncast.online/) | Connector | In development |
+| [Jellyfin](https://jellyfin.org/) | Connector | In development |
+
+Tessera runs **alongside** your platform (sidecar + thin connector). It does not modify the platform's source code.
 
 ---
 
-## Quick Start
+## Beyond video
+
+With tips, any FOSS content can ask for support without locking the page: blogs (Ghost, WriteFreely), wikis (BookStack), photos (Immich), audio (Funkwhale, Castopod, Navidrome), and more.
+
+Platform not listed yet? A connector is usually on the order of ~100 lines. Guide: [Building a Connector](docs/connectors/building-a-connector.md).
+
+---
+
+## Why Arc
+
+On traditional rails, a small tip dies in fees. On **Arc**, gas is USDC and network costs are on the order of cents. With Circle Gateway, support runs **off-chain** while people consume, so you are not paying a network fee for every tip or every second.
+
+More detail: [Documentation](https://jadi03.github.io/tessera/) Â· [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
+## Quick start
 
 ```bash
 git clone https://github.com/JaDi03/tessera.git
@@ -124,37 +122,7 @@ npm install
 npm run setup
 ```
 
-For detailed installation, configuration, and deployment guides, see the [Quick Start Guide](https://jadi03.github.io/tessera/getting-started/).
-
----
-
-## Project Structure
-
-```text
-tessera/
-+-- docs/                    # MkDocs documentation site source files
-+-- scripts/                 # Setup and deployment helper scripts
-+-- src/
-¦   +-- connectors/          # Platform-specific webhook and integration adapters
-¦   +-- core/                # Core settlement engine and gateway integration
-¦   +-- ui/                  # Injected client paywall interface assets
-¦   +-- server.ts            # Express server configuration and routing
-¦   +-- tessera.config.ts    # Main sidecar configuration registry
-+-- package.json             # Engine dependencies and execution scripts
-+-- tsconfig.json            # TypeScript configuration
-```
-
----
-
-## Tech Stack
-
-- [Circle x402 Gateway](https://developers.circle.com/gateway/nanopayments): Protocol for batched off-chain micropayments.
-- [Circle UCW SDK](https://developers.circle.com/wallets/user-controlled): User-controlled wallets on Arc Testnet.
-- [Circle CCTP Forwarding](https://www.circle.com/cross-chain-transfer-protocol): Cross-chain USDC deposits from other EVM networks.
-- [Arc Testnet](https://docs.arc.network): USDC-native gas fee layer.
-- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009): Off-chain transfer signatures.
-- [viem](https://viem.sh/): EVM interaction library.
-- [Express](https://expressjs.com/): Web server serving sidecar APIs and static web assets.
+Install, env, and deploy: [Getting started](https://jadi03.github.io/tessera/getting-started/).
 
 ---
 
