@@ -12,7 +12,13 @@
  *   POST /api/core/circle/social/device-token
  *   POST /api/core/circle/get-wallet
  *   POST /api/core/circle/prepare-deposit
+ *   POST /api/core/circle/quote-external-withdraw
+ *   POST /api/core/circle/prepare-external-withdraw
  *   POST /api/core/circle/poll-challenge
+ *   POST /api/core/circle/auth/session
+ *   POST /api/core/circle/auth/handoff
+ *   POST /api/core/circle/auth/handoff/redeem
+ *   DELETE /api/core/circle/auth/session
  *
  * Email OTP requires SMTP configured in the Circle Developer Console.
  * Circle sends the OTP via that SMTP; Tessera does not send mail itself.
@@ -21,7 +27,7 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
-import { createPublicClient, http } from 'viem';
+import { parse as parseCookie, serialize as serializeCookie } from 'cookie';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
 
@@ -32,6 +38,113 @@ import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled
 const circleClient = initiateUserControlledWalletsClient({
     apiKey: process.env.CIRCLE_API_KEY || ''
 });
+
+/** Arc Testnet native USDC (Circle docs / Tessera paywall). */
+export const ARC_TESTNET_USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
+const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+const EXTERNAL_WITHDRAW_AMOUNT_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/;
+
+export type CircleTokenBalanceRow = {
+    amount?: string;
+    token?: {
+        id?: string;
+        symbol?: string;
+        tokenAddress?: string;
+        name?: string;
+    };
+};
+
+export function isValidEvmAddress(address: unknown): address is string {
+    return typeof address === 'string' && EVM_ADDRESS_RE.test(address);
+}
+
+/**
+ * Parse a positive decimal USDC amount string for external withdraw.
+ * Rejects scientific notation, negatives, and empty values.
+ */
+export function parseExternalWithdrawAmount(raw: unknown): { ok: true; amount: string; value: number } | { ok: false; error: string } {
+    if (typeof raw !== 'string' && typeof raw !== 'number') {
+        return { ok: false, error: 'Invalid withdraw amount' };
+    }
+    const amount = String(raw).trim();
+    if (!amount || !EXTERNAL_WITHDRAW_AMOUNT_RE.test(amount)) {
+        return { ok: false, error: 'Invalid withdraw amount' };
+    }
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+        return { ok: false, error: 'Withdraw amount must be greater than zero' };
+    }
+    return { ok: true, amount, value };
+}
+
+/** Prefer USDC by symbol, then by known Arc Testnet USDC token address. Never tokens[0]. */
+export function findUsdcTokenBalance(tokenBalances: CircleTokenBalanceRow[] | undefined | null): CircleTokenBalanceRow | null {
+    const rows = Array.isArray(tokenBalances) ? tokenBalances : [];
+    const bySymbol = rows.find((row) => (row.token?.symbol || '').toUpperCase() === 'USDC');
+    if (bySymbol?.token?.id) return bySymbol;
+    const target = ARC_TESTNET_USDC_ADDRESS.toLowerCase();
+    const byAddress = rows.find((row) => (row.token?.tokenAddress || '').toLowerCase() === target);
+    if (byAddress?.token?.id) return byAddress;
+    return null;
+}
+
+type ExternalWithdrawResolved = {
+    amount: string;
+    amountValue: number;
+    destinationAddress: string;
+    tokenId: string;
+    usdcBalance: string;
+    usdcBalanceValue: number;
+};
+
+async function resolveExternalWithdrawRequest(body: {
+    userToken?: unknown;
+    walletId?: unknown;
+    destinationAddress?: unknown;
+    amount?: unknown;
+}): Promise<{ ok: true; data: ExternalWithdrawResolved } | { ok: false; status: number; error: string }> {
+    const { userToken, walletId, destinationAddress, amount: rawAmount } = body;
+    if (!userToken || typeof userToken !== 'string' || !walletId || typeof walletId !== 'string') {
+        return { ok: false, status: 400, error: 'Missing userToken or walletId' };
+    }
+    if (!isValidEvmAddress(destinationAddress)) {
+        return { ok: false, status: 400, error: 'Invalid destination address' };
+    }
+    const parsed = parseExternalWithdrawAmount(rawAmount);
+    if (!parsed.ok) {
+        return { ok: false, status: 400, error: parsed.error };
+    }
+
+    const balancesRes = await circleClient.getWalletTokenBalance({
+        walletId,
+        userToken,
+    });
+    const usdc = findUsdcTokenBalance(balancesRes.data?.tokenBalances as CircleTokenBalanceRow[] | undefined);
+    if (!usdc?.token?.id) {
+        return { ok: false, status: 400, error: 'USDC token not found in wallet' };
+    }
+    const usdcBalance = String(usdc.amount ?? '0');
+    const usdcBalanceValue = Number(usdcBalance);
+    if (!Number.isFinite(usdcBalanceValue) || usdcBalanceValue < parsed.value) {
+        return {
+            ok: false,
+            status: 400,
+            error: `Insufficient USDC balance: wallet has ${usdcBalance}, requested ${parsed.amount}`,
+        };
+    }
+
+    return {
+        ok: true,
+        data: {
+            amount: parsed.amount,
+            amountValue: parsed.value,
+            destinationAddress,
+            tokenId: usdc.token.id,
+            usdcBalance,
+            usdcBalanceValue,
+        },
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Per-userId lock to prevent concurrent createWallet calls from creating
@@ -67,6 +180,151 @@ circleRouter.get('/circle/app-id', circleRateLimiter, (_req: Request, res: Respo
         googleClientId: process.env.CIRCLE_GOOGLE_CLIENT_ID || '',
         facebookAppId: process.env.CIRCLE_FACEBOOK_APP_ID || '',
     });
+});
+
+// ---------------------------------------------------------------------------
+// Persistent Circle session secrets remain httpOnly. The encryption key is
+// delivered to the Web SDK only through a short-lived, one-time handoff.
+// ---------------------------------------------------------------------------
+
+const COOKIE_USER_TOKEN = 'tessera_circle_user_token';
+const COOKIE_REFRESH_TOKEN = 'tessera_circle_refresh_token';
+const COOKIE_HANDOFF = 'tessera_circle_handoff';
+const LEGACY_COOKIE_ENCRYPTION_KEY = 'tessera_circle_encryption_key';
+const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 days
+const HANDOFF_MAX_AGE_SEC = 2 * 60;
+
+interface CircleAuthHandoff {
+    userToken: string;
+    encryptionKey: string;
+    expiresAt: number;
+}
+
+const circleAuthHandoffs = new Map<string, CircleAuthHandoff>();
+
+function circleCookieSecure(): boolean {
+    if (process.env.COOKIE_SECURE === 'true') return true;
+    if (process.env.COOKIE_SECURE === 'false') return false;
+    const publicUrl = process.env.PUBLIC_URL || '';
+    return process.env.NODE_ENV === 'production' || publicUrl.startsWith('https://');
+}
+
+function appendAuthCookie(res: Response, name: string, value: string, maxAge = COOKIE_MAX_AGE_SEC): void {
+    res.append(
+        'Set-Cookie',
+        serializeCookie(name, value, {
+            httpOnly: true,
+            secure: circleCookieSecure(),
+            sameSite: 'lax',
+            path: '/',
+            maxAge,
+        }),
+    );
+}
+
+function clearAuthCookie(res: Response, name: string): void {
+    res.append(
+        'Set-Cookie',
+        serializeCookie(name, '', {
+            httpOnly: true,
+            secure: circleCookieSecure(),
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 0,
+        }),
+    );
+}
+
+function disableSensitiveResponseCaching(res: Response): void {
+    res.set('Cache-Control', 'no-store, max-age=0');
+    res.set('Pragma', 'no-cache');
+}
+
+function readAuthCookies(req: Request): {
+    userToken: string | null;
+    refreshToken: string | null;
+} {
+    const jar = parseCookie(req.headers.cookie || '');
+    return {
+        userToken: jar[COOKIE_USER_TOKEN] || null,
+        refreshToken: jar[COOKIE_REFRESH_TOKEN] || null,
+    };
+}
+
+function readHandoffId(req: Request): string | null {
+    const jar = parseCookie(req.headers.cookie || '');
+    return jar[COOKIE_HANDOFF] || null;
+}
+
+circleRouter.post('/circle/auth/session', circleRateLimiter, (req: Request, res: Response) => {
+    const { userToken, refreshToken } = req.body as {
+        userToken?: string;
+        refreshToken?: string;
+    };
+    disableSensitiveResponseCaching(res);
+    if (!userToken || !refreshToken) {
+        return res.status(400).json({ error: 'Missing userToken or refreshToken' });
+    }
+    appendAuthCookie(res, COOKIE_USER_TOKEN, String(userToken));
+    appendAuthCookie(res, COOKIE_REFRESH_TOKEN, String(refreshToken));
+    clearAuthCookie(res, LEGACY_COOKIE_ENCRYPTION_KEY);
+    return res.json({ ok: true });
+});
+
+circleRouter.post('/circle/auth/handoff', circleRateLimiter, (req: Request, res: Response) => {
+    const { userToken, encryptionKey } = req.body as {
+        userToken?: string;
+        encryptionKey?: string;
+    };
+    const session = readAuthCookies(req);
+    disableSensitiveResponseCaching(res);
+    if (!userToken || !encryptionKey || session.userToken !== userToken) {
+        return res.status(401).json({ error: 'Invalid Circle auth handoff' });
+    }
+
+    const now = Date.now();
+    for (const [id, handoff] of circleAuthHandoffs) {
+        if (handoff.expiresAt <= now) circleAuthHandoffs.delete(id);
+    }
+
+    const handoffId = crypto.randomUUID();
+    circleAuthHandoffs.set(handoffId, {
+        userToken: String(userToken),
+        encryptionKey: String(encryptionKey),
+        expiresAt: now + (HANDOFF_MAX_AGE_SEC * 1000),
+    });
+    appendAuthCookie(res, COOKIE_HANDOFF, handoffId, HANDOFF_MAX_AGE_SEC);
+    return res.json({ ok: true });
+});
+
+circleRouter.post('/circle/auth/handoff/redeem', circleRateLimiter, (req: Request, res: Response) => {
+    const handoffId = readHandoffId(req);
+    disableSensitiveResponseCaching(res);
+    clearAuthCookie(res, COOKIE_HANDOFF);
+    if (!handoffId) {
+        return res.status(404).json({ error: 'No Circle auth handoff' });
+    }
+
+    const handoff = circleAuthHandoffs.get(handoffId);
+    circleAuthHandoffs.delete(handoffId);
+    if (!handoff || handoff.expiresAt <= Date.now()) {
+        return res.status(404).json({ error: 'Circle auth handoff expired' });
+    }
+    return res.json({
+        userToken: handoff.userToken,
+        encryptionKey: handoff.encryptionKey,
+    });
+});
+
+circleRouter.delete('/circle/auth/session', circleRateLimiter, (req: Request, res: Response) => {
+    const handoffId = readHandoffId(req);
+    if (handoffId) circleAuthHandoffs.delete(handoffId);
+    disableSensitiveResponseCaching(res);
+    clearAuthCookie(res, COOKIE_USER_TOKEN);
+    clearAuthCookie(res, COOKIE_REFRESH_TOKEN);
+    clearAuthCookie(res, COOKIE_HANDOFF);
+    clearAuthCookie(res, LEGACY_COOKIE_ENCRYPTION_KEY);
+    return res.json({ ok: true });
 });
 
 // --- BUYER SIDE (Web2): Start Email OTP login ---
@@ -138,14 +396,14 @@ circleRouter.post('/circle/social/device-token', circleRateLimiter, async (req: 
 });
 
 circleRouter.post('/circle/email-otp/refresh', circleRateLimiter, async (req: Request, res: Response) => {
-    const { userToken, refreshToken, deviceId } = req.body as {
-        userToken?: string
-        refreshToken?: string
+    const { deviceId } = req.body as {
         deviceId?: string
     };
+    const { userToken, refreshToken } = readAuthCookies(req);
+    disableSensitiveResponseCaching(res);
 
     if (!userToken || !refreshToken || !deviceId) {
-        return res.status(400).json({ error: 'Missing userToken, refreshToken, or deviceId' });
+        return res.status(401).json({ error: 'Circle session expired. Sign in again.' });
     }
 
     try {
@@ -155,10 +413,18 @@ circleRouter.post('/circle/email-otp/refresh', circleRateLimiter, async (req: Re
             deviceId: String(deviceId),
             idempotencyKey: crypto.randomUUID(),
         });
+        const nextUserToken = response.data?.userToken;
+        const nextEncryptionKey = response.data?.encryptionKey;
+        const nextRefreshToken = response.data?.refreshToken || refreshToken;
+        if (!nextUserToken || !nextEncryptionKey) {
+            return res.status(401).json({ error: 'Circle session refresh returned incomplete credentials.' });
+        }
+        appendAuthCookie(res, COOKIE_USER_TOKEN, nextUserToken);
+        appendAuthCookie(res, COOKIE_REFRESH_TOKEN, nextRefreshToken);
+        clearAuthCookie(res, LEGACY_COOKIE_ENCRYPTION_KEY);
         return res.json({
-            userToken: response.data?.userToken,
-            encryptionKey: response.data?.encryptionKey,
-            refreshToken: response.data?.refreshToken,
+            userToken: nextUserToken,
+            encryptionKey: nextEncryptionKey,
             appId: process.env.CIRCLE_APP_ID,
         });
     } catch (error: any) {
@@ -338,6 +604,76 @@ circleRouter.post('/circle/prepare-deposit', circleRateLimiter, async (req: Requ
     } catch (error: any) {
         console.error(`[Circle] ❌ Failed to prepare deposit:`, error?.response?.data || error.message);
         const circleMessage = error?.response?.data?.message || error?.message || 'Failed to prepare deposit challenge';
+        return res.status(500).json({ error: circleMessage });
+    }
+});
+
+// --- BUYER SIDE (Web2): Quote UCW → external Arc address withdraw ---
+// Same-chain Arc Testnet USDC only. Does not create a challenge.
+circleRouter.post('/circle/quote-external-withdraw', circleRateLimiter, async (req: Request, res: Response) => {
+    try {
+        const resolved = await resolveExternalWithdrawRequest(req.body || {});
+        if (!resolved.ok) {
+            return res.status(resolved.status).json({ error: resolved.error });
+        }
+        const { userToken, walletId } = req.body;
+        const feeRes = await circleClient.estimateTransferFee({
+            userToken,
+            walletId,
+            tokenId: resolved.data.tokenId,
+            destinationAddress: resolved.data.destinationAddress,
+            amount: [resolved.data.amount],
+        });
+        const feeData = feeRes.data || {};
+        return res.json({
+            network: 'ARC-TESTNET',
+            token: 'USDC',
+            destinationAddress: resolved.data.destinationAddress,
+            amount: resolved.data.amount,
+            usdcBalance: resolved.data.usdcBalance,
+            feeLevel: 'HIGH',
+            estimatedFee: feeData.high || null,
+            feeEstimates: {
+                low: feeData.low || null,
+                medium: feeData.medium || null,
+                high: feeData.high || null,
+            },
+        });
+    } catch (error: any) {
+        console.error(`[Circle] ❌ Failed to quote external withdraw:`, error?.response?.data || error.message);
+        const circleMessage = error?.response?.data?.message || error?.message || 'Failed to quote external withdraw';
+        return res.status(500).json({ error: circleMessage });
+    }
+});
+
+// --- BUYER SIDE (Web2): Prepare UCW → external Arc address withdraw challenge ---
+circleRouter.post('/circle/prepare-external-withdraw', circleRateLimiter, async (req: Request, res: Response) => {
+    try {
+        const resolved = await resolveExternalWithdrawRequest(req.body || {});
+        if (!resolved.ok) {
+            return res.status(resolved.status).json({ error: resolved.error });
+        }
+        const { userToken, walletId } = req.body;
+        const transferRes = await circleClient.createTransaction({
+            userToken,
+            walletId,
+            tokenId: resolved.data.tokenId,
+            idempotencyKey: crypto.randomUUID(),
+            destinationAddress: resolved.data.destinationAddress,
+            amounts: [resolved.data.amount],
+            fee: { type: 'level', config: { feeLevel: 'HIGH' } },
+        });
+        console.log(`[Circle] 📤 External withdraw challenge created for wallet ${walletId}`);
+        return res.json({
+            challengeId: transferRes.data?.challengeId,
+            network: 'ARC-TESTNET',
+            token: 'USDC',
+            destinationAddress: resolved.data.destinationAddress,
+            amount: resolved.data.amount,
+        });
+    } catch (error: any) {
+        console.error(`[Circle] ❌ Failed to prepare external withdraw:`, error?.response?.data || error.message);
+        const circleMessage = error?.response?.data?.message || error?.message || 'Failed to prepare external withdraw';
         return res.status(500).json({ error: circleMessage });
     }
 });

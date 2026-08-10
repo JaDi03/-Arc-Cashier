@@ -3,6 +3,7 @@
 
 import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 import { initCreatorEarnings } from './creator-earnings.js';
+import { wireCctpBridgeModal } from './cctp-bridge.js';
 
 // Circle W3S SocialLoginProvider string values (enum not re-exported from package entry).
 const SOCIAL_GOOGLE = 'Google';
@@ -68,43 +69,6 @@ const GOOGLE_G_SVG = `
 
 const GOOGLE_CONTINUE_HTML = `${GOOGLE_G_SVG} Continue with Google`;
 
-// CCTP — Source chains supported in testnet (verified from Circle docs)
-// TokenMessengerV2 is the same address on all EVM testnets
-const TOKEN_MESSENGER_V2 = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
-
-const CCTP_CHAINS = [
-    {
-        name: 'Ethereum Sepolia',
-        chainId: 11155111,
-        chainIdHex: '0xaa36a7',
-        domain: 0,
-        usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-        rpcUrl: 'https://rpc.sepolia.org',
-        blockExplorer: 'https://sepolia.etherscan.io',
-        icon: '🔷',
-    },
-    {
-        name: 'Base Sepolia',
-        chainId: 84532,
-        chainIdHex: '0x14a34',
-        domain: 6,
-        usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-        rpcUrl: 'https://sepolia.base.org',
-        blockExplorer: 'https://base-sepolia.blockscout.com',
-        icon: '🔵',
-    },
-    {
-        name: 'Arbitrum Sepolia',
-        chainId: 421614,
-        chainIdHex: '0x66eee',
-        domain: 3,
-        usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
-        rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
-        blockExplorer: 'https://sepolia.arbiscan.io',
-        icon: '🔶',
-    },
-];
-
 // Minimum balance required in the Arc wallet before enabling the unlock button
 const MIN_ARC_BALANCE_WEI = BigInt('10000000000000000'); // 0.01 USDC (18 decimals)
 
@@ -113,11 +77,13 @@ const MIN_ARC_BALANCE_WEI = BigInt('10000000000000000'); // 0.01 USDC (18 decima
 let arcSdk = null;
 /** Shared in-flight promise so module bootstrap + initPaywall do not double-resume. */
 let socialResumeInFlight = null;
+/** Resolves when a one-time Circle handoff or server-side refresh is loaded into memory. */
+let circleAuthHydratePromise = null;
 let viewerState = {
     userId: localStorage.getItem('arc_cashier_user_id'),
-    userToken: localStorage.getItem('arc_cashier_user_token'),
-    encryptionKey: localStorage.getItem('arc_cashier_encryption_key'),
-    refreshToken: localStorage.getItem('arc_cashier_refresh_token'),
+    // Circle SDK credentials exist in memory only. The refresh token remains httpOnly.
+    userToken: null,
+    encryptionKey: null,
     appId: null,
     authMethod: localStorage.getItem('arc_cashier_auth_method') || 'email',
     email: localStorage.getItem('arc_cashier_email') || null,
@@ -141,28 +107,130 @@ const CIRCLE_AUTH_LS_KEYS = [
     'arc_circle_wallet_address',
 ];
 
-/** Persist Circle email/social session fields required for refresh + execute. */
+const CIRCLE_TOKEN_LS_KEYS = [
+    'arc_cashier_user_token',
+    'arc_cashier_encryption_key',
+    'arc_cashier_refresh_token',
+];
+
+function clearCircleTokenLocalStorage() {
+    CIRCLE_TOKEN_LS_KEYS.forEach((key) => {
+        try { localStorage.removeItem(key); } catch (_) { /* ignore */ }
+    });
+}
+
+async function persistCircleServerSession(userToken, refreshToken) {
+    if (!userToken || !refreshToken) {
+        throw new Error('Circle login did not return a refresh token');
+    }
+    const res = await fetch(ARC_API_BASE + '/api/core/circle/auth/session', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userToken, refreshToken }),
+    });
+    if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to persist Circle session');
+    }
+}
+
+async function createCircleAuthHandoff() {
+    if (!viewerState.userToken || !viewerState.encryptionKey) {
+        throw new Error('Missing Circle credentials for redirect handoff');
+    }
+    const res = await fetch(ARC_API_BASE + '/api/core/circle/auth/handoff', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            userToken: viewerState.userToken,
+            encryptionKey: viewerState.encryptionKey,
+        }),
+    });
+    if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to create Circle auth handoff');
+    }
+}
+
+async function clearCircleServerSession() {
+    try {
+        await fetch(ARC_API_BASE + '/api/core/circle/auth/session', {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+    } catch (_) { /* ignore */ }
+}
+
+/**
+ * Load Circle SDK credentials once after OAuth redirect. On normal reloads, the
+ * backend refreshes from httpOnly session cookies without exposing refreshToken.
+ */
+function ensureCircleAuthHydrated() {
+    if (circleAuthHydratePromise) return circleAuthHydratePromise;
+    circleAuthHydratePromise = (async () => {
+        const legacyToken = localStorage.getItem('arc_cashier_user_token');
+        const legacyEnc = localStorage.getItem('arc_cashier_encryption_key');
+        const legacyRefresh = localStorage.getItem('arc_cashier_refresh_token');
+        if (legacyToken && legacyEnc) {
+            viewerState.userToken = legacyToken;
+            viewerState.encryptionKey = legacyEnc;
+            try {
+                if (legacyRefresh) {
+                    await persistCircleServerSession(legacyToken, legacyRefresh);
+                }
+            } catch (err) {
+                console.warn(
+                    '[Tessera] Failed to migrate Circle server session:',
+                    err && err.message ? err.message : err,
+                );
+            }
+            clearCircleTokenLocalStorage();
+            return;
+        }
+        clearCircleTokenLocalStorage();
+        try {
+            const res = await fetch(ARC_API_BASE + '/api/core/circle/auth/handoff/redeem', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.userToken && data.encryptionKey) {
+                    viewerState.userToken = data.userToken;
+                    viewerState.encryptionKey = data.encryptionKey;
+                    return;
+                }
+            }
+            if (viewerState.userId) {
+                await refreshCircleAuthFromServer();
+            }
+        } catch (err) {
+            console.warn(
+                '[Tessera] Failed to hydrate Circle session:',
+                err && err.message ? err.message : err,
+            );
+        }
+    })();
+    return circleAuthHydratePromise;
+}
+
+/** Persist non-secret identity only. Circle credentials remain in memory/server cookies. */
 function persistCircleAuthSession() {
     if (viewerState.userId) localStorage.setItem('arc_cashier_user_id', viewerState.userId);
     if (viewerState.email) localStorage.setItem('arc_cashier_email', viewerState.email);
     if (viewerState.authMethod) localStorage.setItem('arc_cashier_auth_method', viewerState.authMethod);
-    if (viewerState.userToken) localStorage.setItem('arc_cashier_user_token', viewerState.userToken);
-    else localStorage.removeItem('arc_cashier_user_token');
-    if (viewerState.encryptionKey) localStorage.setItem('arc_cashier_encryption_key', viewerState.encryptionKey);
-    else localStorage.removeItem('arc_cashier_encryption_key');
-    if (viewerState.refreshToken) localStorage.setItem('arc_cashier_refresh_token', viewerState.refreshToken);
-    else localStorage.removeItem('arc_cashier_refresh_token');
     if (viewerState.walletId) localStorage.setItem('arc_circle_wallet_id', viewerState.walletId);
     if (viewerState.walletAddress) localStorage.setItem('arc_circle_wallet_address', viewerState.walletAddress);
+    clearCircleTokenLocalStorage();
 }
 
 function clearCircleAuthTokens() {
     viewerState.userToken = null;
     viewerState.encryptionKey = null;
-    viewerState.refreshToken = null;
-    localStorage.removeItem('arc_cashier_user_token');
-    localStorage.removeItem('arc_cashier_encryption_key');
-    localStorage.removeItem('arc_cashier_refresh_token');
+    clearCircleTokenLocalStorage();
+    void clearCircleServerSession();
 }
 
 /** True when Unlock/deposit can resume without a fresh email/social login. */
@@ -172,7 +240,6 @@ function hasResumableCircleSession() {
         && viewerState.walletAddress
         && viewerState.userToken
         && viewerState.encryptionKey
-        && viewerState.refreshToken
     );
 }
 
@@ -190,10 +257,7 @@ if (viewerState.userId
     clearCircleAuthTokens();
 }
 
-// Incomplete session from older builds (refreshToken without userToken) cannot refresh.
-if (viewerState.refreshToken && (!viewerState.userToken || !viewerState.encryptionKey)) {
-    clearCircleAuthTokens();
-}
+// Incomplete session check runs after cookie hydrate (see ensureCircleAuthHydrated).
 let pendingEmailOtp = null; // { deviceToken, deviceEncryptionKey, otpToken, email, appId }
 let socialAuthConfig = { googleClientId: '', facebookAppId: '' };
 
@@ -362,6 +426,7 @@ async function registerViewerSession(ratePerSecond) {
 }
 
 async function checkAutoUnlock() {
+    await ensureCircleAuthHydrated();
     if (isCheckingAutoUnlock) return;
     if (!hasResumableCircleSession()) return;
 
@@ -543,12 +608,20 @@ function initPaywall(targetContainer) {
     // #endregion
 
     void (async () => {
+        await ensureCircleAuthHydrated();
         const resumed = await tryResumeSocialLogin();
         if (resumed) return;
         // Only skip login when Circle session can actually refresh + sign deposits.
         if (hasResumableCircleSession()) {
             transitionToFundPhase();
             void checkAutoUnlock();
+        } else {
+            // Reveal login card if we hid it during hydrate (returning-wallet cover).
+            const overlay = document.getElementById('arc-paywall-overlay');
+            if (overlay) {
+                overlay.classList.remove('arc-session-check');
+                overlay.classList.remove('arc-hidden-initially');
+            }
         }
     })();
 }
@@ -573,6 +646,19 @@ function lockMedia() {
 
     const pausedByUs = new WeakSet();
 
+    const pausePlayingMedia = () => {
+        if (isTipMode || !document.body.classList.contains('arc-locked')) return;
+        document.querySelectorAll('video, audio').forEach((m) => {
+            if (!m.paused) {
+                m.pause();
+                pausedByUs.add(m);
+            }
+        });
+    };
+
+    // Pause immediately: do not wait for the next play event or 500ms poll.
+    pausePlayingMedia();
+
     const onPlayCapture = (e) => {
         if (isTipMode) return;
         if (!document.body.classList.contains('arc-locked')) return;
@@ -583,15 +669,7 @@ function lockMedia() {
         }
     };
 
-    const intervalId = setInterval(() => {
-        if (isTipMode || !document.body.classList.contains('arc-locked')) return;
-        document.querySelectorAll('video, audio').forEach((m) => {
-            if (!m.paused) {
-                m.pause();
-                pausedByUs.add(m);
-            }
-        });
-    }, 500);
+    const intervalId = setInterval(pausePlayingMedia, 500);
 
     document.addEventListener('play', onPlayCapture, true);
 
@@ -655,10 +733,11 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
         overlay.style.background = 'rgba(6, 7, 10, 0.92)';
     }
 
-    // Logged-in paid: keep dark cover opaque; hide only the modal card while
-    // auto-unlock resolves (never opacity:0 on the whole overlay).
-    const isLoggedIn = hasResumableCircleSession();
-    if (isLoggedIn && hideInitially && !isTipMode) {
+    // Paid hideInitially: opaque cover + hide modal card while auth hydrate/auto-unlock
+    // runs. Do not require in-memory tokens (httpOnly hydrate is async); userId+wallet
+    // from localStorage is enough to treat as returning viewer for cover purposes.
+    const mayResumeSession = Boolean(viewerState.userId && viewerState.walletAddress);
+    if ((mayResumeSession || hasResumableCircleSession()) && hideInitially && !isTipMode) {
         overlay.classList.add('arc-session-check');
     }
     overlay.innerHTML = `
@@ -713,7 +792,15 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                         </div>
                         <div class="arc-ucw-balance-row">
                             <span class="arc-info-label" style="margin:0;">Wallet balance</span>
-                            <span id="arc-ucw-balance" class="arc-accent">…</span>
+                            <div class="arc-ucw-balance-actions">
+                                <span id="arc-ucw-balance" class="arc-accent">…</span>
+                                <button id="arc-withdraw-btn" type="button" class="arc-icon-btn" title="Withdraw" aria-label="Withdraw">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M7 17L17 7"></path>
+                                        <path d="M7 7h10v10"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -773,7 +860,57 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                            style="font-size:13px;color:#22c55e;text-decoration:none;font-weight:700;display:inline-block;margin-bottom:20px;font-family:'Plus Jakarta Sans',sans-serif;">
                             View Balance on Arcscan ↗
                         </a>
-                        <button id="arc-success-done-btn" class="arc-btn arc-btn-primary" style="width:100%;">Return to Home</button>
+                        <button id="arc-success-withdraw-btn" class="arc-btn arc-btn-primary" type="button" style="width:100%;margin-bottom:10px;">Withdraw</button>
+                        <button id="arc-success-done-btn" class="arc-btn arc-btn-secondary" type="button" style="width:100%;">Return to Home</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- External withdraw modal (UCW → Arc address) -->
+        <div id="arc-withdraw-modal" class="arc-modal-backdrop" style="display:none;">
+            <div class="arc-modal-box">
+                <div class="arc-modal-header">
+                    <h3>Withdraw USDC</h3>
+                    <button id="arc-withdraw-close" class="arc-modal-close" type="button">✕</button>
+                </div>
+                <div class="arc-modal-body">
+                    <div id="arc-withdraw-step-form">
+                        <div class="arc-amount-row">
+                            <label for="arc-withdraw-address">Destination address</label>
+                            <input id="arc-withdraw-address" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" class="arc-amount-input" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;" />
+                        </div>
+                        <div class="arc-amount-row" style="margin-top:12px;">
+                            <label for="arc-withdraw-amount">Amount (USDC)</label>
+                            <div class="arc-amount-input-wrap">
+                                <input id="arc-withdraw-amount" type="number" min="0.000001" step="any" placeholder="0.00" class="arc-amount-input" />
+                                <span class="arc-amount-suffix">USDC</span>
+                            </div>
+                        </div>
+                        <p id="arc-withdraw-form-status" class="arc-status-text" style="display:none;margin-top:10px;"></p>
+                        <button id="arc-withdraw-review-btn" class="arc-btn arc-btn-primary" type="button" style="margin-top:16px;width:100%;">
+                            Review withdraw
+                        </button>
+                    </div>
+                    <div id="arc-withdraw-step-confirm" style="display:none;">
+                        <p class="arc-modal-label">Confirm this transfer</p>
+                        <div class="arc-withdraw-review-box">
+                            <div><span>Network</span><strong>Arc Testnet</strong></div>
+                            <div><span>Token</span><strong>USDC</strong></div>
+                            <div><span>To</span><strong id="arc-withdraw-review-to" class="arc-withdraw-review-addr">—</strong></div>
+                            <div><span>Amount</span><strong id="arc-withdraw-review-amount">—</strong></div>
+                            <div><span>Est. fee</span><strong id="arc-withdraw-review-fee">—</strong></div>
+                        </div>
+                        <p id="arc-withdraw-confirm-status" class="arc-status-text" style="display:none;margin-top:10px;"></p>
+                        <div style="display:flex;gap:8px;margin-top:16px;">
+                            <button id="arc-withdraw-back-btn" class="arc-btn arc-btn-secondary" type="button" style="flex:1;">Back</button>
+                            <button id="arc-withdraw-confirm-btn" class="arc-btn arc-btn-primary" type="button" style="flex:1;">Confirm &amp; approve</button>
+                        </div>
+                    </div>
+                    <div id="arc-withdraw-step-done" style="display:none;text-align:center;">
+                        <p class="arc-status-text" style="display:block;color:#22c55e;">Withdraw complete</p>
+                        <a id="arc-withdraw-tx-link" href="#" target="_blank" rel="noopener" style="font-size:13px;color:#22c55e;font-weight:700;display:inline-block;margin:12px 0 16px;">View on Arcscan ↗</a>
+                        <button id="arc-withdraw-done-btn" class="arc-btn arc-btn-primary" type="button" style="width:100%;">Done</button>
                     </div>
                 </div>
             </div>
@@ -912,8 +1049,6 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     const facebookBtn = document.getElementById('arc-facebook-btn');
     if (facebookBtn) facebookBtn.addEventListener('click', () => { void handleSocialLogin(SOCIAL_FACEBOOK); });
     void refreshSocialLoginButtons();
-    document.getElementById('arc-bridge-btn').addEventListener('click', openCctpModal);
-    document.getElementById('arc-cctp-close').addEventListener('click', closeCctpModal);
     document.getElementById('arc-unlock-btn').addEventListener('click', (event) => {
         // #region agent log
         const btn = document.getElementById('arc-unlock-btn');
@@ -932,8 +1067,14 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
         // #endregion
         return handleUnlock(event);
     });
-    document.getElementById('arc-cctp-info-btn').addEventListener('click', toggleCctpInfo);
     document.getElementById('arc-copy-btn').addEventListener('click', copyWalletAddress);
+    const withdrawBtn = document.getElementById('arc-withdraw-btn');
+    if (withdrawBtn) withdrawBtn.addEventListener('click', () => { void openExternalWithdrawModal(); });
+    const successWithdrawBtn = document.getElementById('arc-success-withdraw-btn');
+    if (successWithdrawBtn) successWithdrawBtn.addEventListener('click', () => { void openExternalWithdrawModal(); });
+    const successDoneBtn = document.getElementById('arc-success-done-btn');
+    if (successDoneBtn) successDoneBtn.addEventListener('click', handleSuccessReturnHome);
+    wireExternalWithdrawModal();
     const signoutBtn = document.getElementById('arc-signout-btn');
     if (signoutBtn) signoutBtn.addEventListener('click', handleLogout);
 
@@ -978,58 +1119,56 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
         });
     }
 
-    // Build network list inside CCTP modal
-    buildCctpNetworkList();
+    // CCTP modal: Bridge Kit (extracted module)
+    wireCctpBridgeModal({
+        getRecipientAddress: () => viewerState.walletAddress,
+        setFundStatus,
+        onBridgeSubmitted: () => {
+            if (balancePollingInterval) clearInterval(balancePollingInterval);
+            startBalancePolling();
+        },
+    });
 }
 
-/** Keep Circle session alive via refreshToken (email OTP and social logins). */
-async function ensureCircleAuthSession() {
+/** Refresh SDK credentials while refreshToken remains server-side in httpOnly cookies. */
+async function refreshCircleAuthFromServer() {
     if (!viewerState.appId) {
         await loadCircleClientConfig();
     }
-
-    if (!viewerState.userToken || !viewerState.encryptionKey || !viewerState.refreshToken) {
-        clearCircleAuthTokens();
-        const err = new Error('Sign in with Google or email to continue.');
-        err.code = 'AUTH_REQUIRED';
-        throw err;
-    }
-
     ensureArcSdk();
     const deviceId = await arcSdk.getDeviceId();
-    if (!deviceId) {
-        clearCircleAuthTokens();
-        const err = new Error('Could not identify this device. Sign in again.');
-        err.code = 'AUTH_REQUIRED';
-        throw err;
-    }
+    if (!deviceId) return false;
 
     const refreshRes = await fetch(ARC_API_BASE + '/api/core/circle/email-otp/refresh', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            userToken: viewerState.userToken,
-            refreshToken: viewerState.refreshToken,
-            deviceId,
-        }),
+        body: JSON.stringify({ deviceId }),
     });
     const refreshData = await refreshRes.json().catch(() => ({}));
     if (!refreshRes.ok || !refreshData.userToken || !refreshData.encryptionKey) {
-        clearCircleAuthTokens();
-        const err = new Error(refreshData.error || 'Session expired. Sign in with Google or email again.');
-        err.code = 'AUTH_REQUIRED';
-        throw err;
+        return false;
     }
 
     viewerState.userToken = refreshData.userToken;
     viewerState.encryptionKey = refreshData.encryptionKey;
-    if (refreshData.refreshToken) viewerState.refreshToken = refreshData.refreshToken;
     if (refreshData.appId) viewerState.appId = refreshData.appId;
-    persistCircleAuthSession();
     arcSdk.setAuthentication({
         userToken: viewerState.userToken,
         encryptionKey: viewerState.encryptionKey,
     });
+    return true;
+}
+
+/** Ensure a fresh Circle session before creating a wallet challenge. */
+async function ensureCircleAuthSession() {
+    await ensureCircleAuthHydrated();
+    if (await refreshCircleAuthFromServer()) return;
+
+    clearCircleAuthTokens();
+    const err = new Error('Session expired. Sign in with Google or email again.');
+    err.code = 'AUTH_REQUIRED';
+    throw err;
 }
 
 // ─── Phase 1: Email OTP login (Circle UCW) ───────────────────────────────────
@@ -1292,6 +1431,7 @@ async function tryResumeSocialLogin() {
 }
 
 async function doTryResumeSocialLogin() {
+    await ensureCircleAuthHydrated();
     const pending = readSocialPending();
     if (!pending?.deviceToken || !pending?.appId) return false;
 
@@ -1363,12 +1503,14 @@ async function doTryResumeSocialLogin() {
                 try {
                     await onAuthLoginComplete(error, result, 'social');
                     const returnUrl = pending.returnUrl;
-                    clearSocialPending();
                     if (returnUrl && returnUrl !== window.location.href) {
+                        await createCircleAuthHandoff();
+                        clearSocialPending();
                         // Cover survives navigation until paywall mounts on the video page.
                         setOpaqueCoverFlag(pending.provider);
                         window.location.replace(returnUrl);
                     } else {
+                        clearSocialPending();
                         hideSocialResumeSplash();
                     }
                     resolve(true);
@@ -1538,7 +1680,6 @@ async function onAuthLoginComplete(error, result, authMethod) {
 
         viewerState.userToken = result.userToken;
         viewerState.encryptionKey = result.encryptionKey;
-        viewerState.refreshToken = result.refreshToken || null;
         viewerState.authMethod = authMethod === 'social' ? 'social' : 'email';
 
         const oauthEmail = result.oAuthInfo?.socialUserInfo?.email
@@ -1554,6 +1695,7 @@ async function onAuthLoginComplete(error, result, authMethod) {
             viewerState.userId = 'email:' + viewerState.email;
         }
 
+        await persistCircleServerSession(result.userToken, result.refreshToken);
         persistCircleAuthSession();
 
         // Fresh SDK with auth tokens; the old singleton may never resolve getDeviceId.
@@ -1578,6 +1720,8 @@ async function onAuthLoginComplete(error, result, authMethod) {
             verifyBtn.innerHTML = 'Verify code';
         }
         setLoginStatus('Error: ' + (err.message || 'Wallet setup failed'), true);
+        // Social OAuth navigates away after this; do not swallow or cookies never land.
+        if (authMethod === 'social') throw err;
     }
 }
 
@@ -1766,6 +1910,247 @@ function copyWalletAddress() {
         btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
         setTimeout(() => { btn.innerHTML = oldHtml; }, 2000);
     });
+}
+
+let withdrawQuoteCache = null;
+
+function setWithdrawStatus(elId, message, isError) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!message) {
+        el.style.display = 'none';
+        el.textContent = '';
+        return;
+    }
+    el.style.display = 'block';
+    el.textContent = message;
+    el.style.color = isError ? '#f87171' : 'rgba(255,255,255,0.7)';
+}
+
+function showWithdrawStep(step) {
+    const form = document.getElementById('arc-withdraw-step-form');
+    const confirm = document.getElementById('arc-withdraw-step-confirm');
+    const done = document.getElementById('arc-withdraw-step-done');
+    if (form) form.style.display = step === 'form' ? 'block' : 'none';
+    if (confirm) confirm.style.display = step === 'confirm' ? 'block' : 'none';
+    if (done) done.style.display = step === 'done' ? 'block' : 'none';
+}
+
+function closeExternalWithdrawModal() {
+    const modal = document.getElementById('arc-withdraw-modal');
+    if (modal) modal.style.display = 'none';
+    withdrawQuoteCache = null;
+    setWithdrawStatus('arc-withdraw-form-status', '');
+    setWithdrawStatus('arc-withdraw-confirm-status', '');
+    showWithdrawStep('form');
+}
+
+async function openExternalWithdrawModal() {
+    try {
+        await ensureCircleAuthSession();
+        await resolveAndBindArcWallet();
+    } catch (err) {
+        console.error('[Tessera] Withdraw open failed auth/wallet bind:', err);
+        setFundStatus((err && err.message) || 'Sign in required to withdraw', true);
+        return;
+    }
+    const modal = document.getElementById('arc-withdraw-modal');
+    if (!modal) return;
+    withdrawQuoteCache = null;
+    setWithdrawStatus('arc-withdraw-form-status', '');
+    setWithdrawStatus('arc-withdraw-confirm-status', '');
+    showWithdrawStep('form');
+    const reviewBtn = document.getElementById('arc-withdraw-review-btn');
+    const confirmBtn = document.getElementById('arc-withdraw-confirm-btn');
+    const backBtn = document.getElementById('arc-withdraw-back-btn');
+    if (reviewBtn) reviewBtn.disabled = false;
+    if (confirmBtn) confirmBtn.disabled = false;
+    if (backBtn) backBtn.disabled = false;
+    modal.style.display = 'flex';
+    void refreshUcwBalanceDisplay();
+}
+
+function formatWithdrawFee(fee) {
+    if (!fee) return 'Unavailable';
+    if (typeof fee.networkFee === 'string' && fee.networkFee) {
+        const n = Number(fee.networkFee);
+        if (Number.isFinite(n)) {
+            // Compact UI: 6 decimals max, trim trailing zeros (estimate only).
+            const rounded = n.toFixed(6).replace(/\.?0+$/, '');
+            return `~${rounded}`;
+        }
+        return fee.networkFee;
+    }
+    if (typeof fee.gasLimit === 'string') return 'gas ' + fee.gasLimit;
+    return 'See Circle approval';
+}
+
+async function reviewExternalWithdraw() {
+    const addrInput = document.getElementById('arc-withdraw-address');
+    const amountInput = document.getElementById('arc-withdraw-amount');
+    const reviewBtn = document.getElementById('arc-withdraw-review-btn');
+    const destinationAddress = (addrInput && addrInput.value ? addrInput.value : '').trim();
+    const amount = (amountInput && amountInput.value ? amountInput.value : '').trim();
+    setWithdrawStatus('arc-withdraw-form-status', '');
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(destinationAddress)) {
+        setWithdrawStatus('arc-withdraw-form-status', 'Enter a valid 0x destination address', true);
+        return;
+    }
+    if (!amount || !(Number(amount) > 0)) {
+        setWithdrawStatus('arc-withdraw-form-status', 'Enter a positive USDC amount', true);
+        return;
+    }
+
+    if (reviewBtn) reviewBtn.disabled = true;
+    try {
+        await ensureCircleAuthSession();
+        await resolveAndBindArcWallet();
+        setWithdrawStatus('arc-withdraw-form-status', 'Estimating fee…');
+        const quoteRes = await fetch(ARC_API_BASE + '/api/core/circle/quote-external-withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userToken: viewerState.userToken,
+                walletId: viewerState.walletId,
+                destinationAddress,
+                amount,
+            }),
+        });
+        const quoteData = await quoteRes.json().catch(() => ({}));
+        if (!quoteRes.ok) {
+            throw new Error(quoteData.error || 'Failed to quote withdraw');
+        }
+        withdrawQuoteCache = quoteData;
+        const toEl = document.getElementById('arc-withdraw-review-to');
+        const amtEl = document.getElementById('arc-withdraw-review-amount');
+        const feeEl = document.getElementById('arc-withdraw-review-fee');
+        if (toEl) toEl.textContent = destinationAddress;
+        if (amtEl) amtEl.textContent = amount + ' USDC';
+        if (feeEl) feeEl.textContent = formatWithdrawFee(quoteData.estimatedFee);
+        setWithdrawStatus('arc-withdraw-form-status', '');
+        showWithdrawStep('confirm');
+    } catch (err) {
+        setWithdrawStatus('arc-withdraw-form-status', (err && err.message) || 'Quote failed', true);
+    } finally {
+        if (reviewBtn) reviewBtn.disabled = false;
+    }
+}
+
+async function confirmExternalWithdraw() {
+    if (!withdrawQuoteCache) {
+        showWithdrawStep('form');
+        return;
+    }
+    const confirmBtn = document.getElementById('arc-withdraw-confirm-btn');
+    const backBtn = document.getElementById('arc-withdraw-back-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (backBtn) backBtn.disabled = true;
+    setWithdrawStatus('arc-withdraw-confirm-status', 'Preparing Circle approval…');
+
+    try {
+        await ensureCircleAuthSession();
+        await resolveAndBindArcWallet();
+        const prepRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-external-withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userToken: viewerState.userToken,
+                walletId: viewerState.walletId,
+                destinationAddress: withdrawQuoteCache.destinationAddress,
+                amount: withdrawQuoteCache.amount,
+            }),
+        });
+        const prepData = await prepRes.json().catch(() => ({}));
+        if (!prepRes.ok || !prepData.challengeId) {
+            throw new Error(prepData.error || 'Failed to prepare withdraw');
+        }
+
+        setWithdrawStatus('arc-withdraw-confirm-status', 'Approve in the Circle popup…');
+        await new Promise((resolve, reject) => {
+            arcSdk.execute(prepData.challengeId, (error, result) => {
+                if (error) reject(new Error('Withdraw cancelled or failed'));
+                else resolve(result);
+            });
+        });
+
+        setWithdrawStatus('arc-withdraw-confirm-status', 'Confirming on-chain…');
+        let txHash = '';
+        let confirmed = false;
+        for (let i = 0; i < 30; i++) {
+            const pollRes = await fetch(ARC_API_BASE + '/api/core/circle/poll-challenge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userToken: viewerState.userToken, challengeId: prepData.challengeId }),
+            });
+            const pollData = await pollRes.json().catch(() => ({}));
+            if (pollData.status === 'COMPLETE') {
+                confirmed = true;
+                txHash = pollData.txHash || '';
+                break;
+            }
+            if (pollData.status === 'FAILED' || pollData.status === 'EXPIRED') {
+                throw new Error('Withdraw transaction failed on-chain');
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+        }
+        if (!confirmed) throw new Error('Withdraw timed out. Please try again.');
+
+        const link = document.getElementById('arc-withdraw-tx-link');
+        if (link) {
+            link.href = txHash
+                ? `https://testnet.arcscan.app/tx/${txHash}`
+                : `https://testnet.arcscan.app/address/${viewerState.walletAddress || ''}`;
+            link.textContent = txHash ? 'View Transaction on Arcscan ↗' : 'View Wallet on Arcscan ↗';
+        }
+        showWithdrawStep('done');
+        void refreshUcwBalanceDisplay();
+    } catch (err) {
+        setWithdrawStatus('arc-withdraw-confirm-status', (err && err.message) || 'Withdraw failed', true);
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (backBtn) backBtn.disabled = false;
+    }
+}
+
+function wireExternalWithdrawModal() {
+    const modal = document.getElementById('arc-withdraw-modal');
+    if (!modal || modal.dataset.wired === '1') return;
+    modal.dataset.wired = '1';
+
+    const closeBtn = document.getElementById('arc-withdraw-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeExternalWithdrawModal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeExternalWithdrawModal();
+    });
+    const reviewBtn = document.getElementById('arc-withdraw-review-btn');
+    if (reviewBtn) reviewBtn.addEventListener('click', () => { void reviewExternalWithdraw(); });
+    const backBtn = document.getElementById('arc-withdraw-back-btn');
+    if (backBtn) backBtn.addEventListener('click', () => {
+        setWithdrawStatus('arc-withdraw-confirm-status', '');
+        showWithdrawStep('form');
+    });
+    const confirmBtn = document.getElementById('arc-withdraw-confirm-btn');
+    if (confirmBtn) confirmBtn.addEventListener('click', () => { void confirmExternalWithdraw(); });
+    const doneBtn = document.getElementById('arc-withdraw-done-btn');
+    if (doneBtn) doneBtn.addEventListener('click', closeExternalWithdrawModal);
+}
+
+function handleSuccessReturnHome() {
+    removeSessionManagerWidget();
+    const successPhase = document.getElementById('arc-phase-success');
+    if (successPhase) successPhase.style.display = 'none';
+
+    const hasSession = Boolean(
+        viewerState.userToken
+        || localStorage.getItem('arc_circle_user_token')
+        || localStorage.getItem('arc_cashier_user_id')
+    );
+    if (hasSession && (viewerState.walletAddress || localStorage.getItem('arc_circle_wallet_address'))) {
+        transitionToFundPhase();
+        return;
+    }
+    const loginPhase = document.getElementById('arc-phase-login');
+    if (loginPhase) loginPhase.style.display = 'block';
 }
 
 // Local sign-out only. The server keeps the canonical session for this userId,
@@ -2000,240 +2385,7 @@ async function handleUnlock() {
     }
 }
 
-// ─── CCTP Bridge Modal ────────────────────────────────────────────────────────
-
-let selectedChain = null;
-
-function buildCctpNetworkList() {
-    const list = document.getElementById('arc-cctp-network-list');
-    CCTP_CHAINS.forEach(chain => {
-        const btn = document.createElement('button');
-        btn.className = 'arc-network-btn';
-        btn.dataset.chainId = chain.chainId;
-        btn.innerHTML = `<span>${chain.name}</span>`;
-        btn.addEventListener('click', () => selectCctpChain(chain, btn));
-        list.appendChild(btn);
-    });
-}
-
-function selectCctpChain(chain, btnEl) {
-    selectedChain = chain;
-    document.querySelectorAll('.arc-network-btn').forEach(b => b.classList.remove('arc-network-btn-selected'));
-    btnEl.classList.add('arc-network-btn-selected');
-    const bridgeBtn = document.getElementById('arc-cctp-bridge-btn');
-    bridgeBtn.disabled = false;
-    bridgeBtn.textContent = `Bridge to Arc via ${chain.name}`;
-    bridgeBtn.onclick = () => executeCctpBridge(chain);
-}
-
-function openCctpModal() {
-    document.getElementById('arc-cctp-modal').style.display = 'flex';
-}
-
-function closeCctpModal() {
-    document.getElementById('arc-cctp-modal').style.display = 'none';
-}
-
-function toggleCctpInfo() {
-    const popup = document.getElementById('arc-cctp-info-popup');
-    popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
-}
-
-async function executeCctpBridge(chain) {
-    if (!window.ethereum) {
-        alert('MetaMask is not installed. Please install MetaMask to use the bridge.');
-        return;
-    }
-
-    const amountInput = document.getElementById('arc-cctp-amount');
-    const amountFloat = parseFloat(amountInput.value);
-    if (!amountFloat || amountFloat < 0.1) {
-        alert('Please enter a valid amount (min 0.1 USDC).');
-        return;
-    }
-
-    // USDC has 6 decimals on EVM chains (except Arc which uses 18 for native gas)
-    const amountUnits = BigInt(Math.round(amountFloat * 1_000_000));
-
-    // Switch to progress view
-    document.getElementById('arc-cctp-step-select').style.display = 'none';
-    document.getElementById('arc-cctp-step-progress').style.display = 'block';
-    setCctpProgress('Connecting wallet…');
-
-    try {
-        // Step 1: Connect MetaMask
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-        // Switch to the selected source chain
-        try {
-            await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: chain.chainIdHex }],
-            });
-        } catch (switchErr) {
-            // Chain not added yet — add it
-            if (switchErr.code === 4902) {
-                await window.ethereum.request({
-                    method: 'wallet_addEthereumChain',
-                    params: [{
-                        chainId: chain.chainIdHex,
-                        chainName: chain.name,
-                        rpcUrls: [chain.rpcUrl],
-                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                        blockExplorerUrls: [chain.blockExplorer],
-                    }],
-                });
-            } else throw switchErr;
-        }
-
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        const fromAddress = accounts[0];
-
-        // ── Step 1: Approve USDC -> TokenMessengerV2 ──────────────────────────
-        setStepStatus('arc-step-approve-status', 'pending');
-        setCctpProgress('Approving USDC…<br>Confirm in your wallet.');
-
-        const bridgeAmount = amountUnits;
-        const forwardingFee = BigInt(200000); // 0.20 USDC fee for Circle Forwarding Service
-        const totalAmount = bridgeAmount + forwardingFee;
-
-        const approveData = '0x095ea7b3' +
-            TOKEN_MESSENGER_V2.slice(2).padStart(64, '0') +
-            totalAmount.toString(16).padStart(64, '0');
-
-        const approveTx = await window.ethereum.request({
-            method: 'eth_sendTransaction',
-            params: [{ from: fromAddress, to: chain.usdc, data: approveData }],
-        });
-        await waitForTx(approveTx, chain.chainId);
-        setStepStatus('arc-step-approve-status', 'done');
-
-        // ── Step 2: depositForBurnWithHook -> burn USDC with Forwarding hook ──
-        setStepStatus('arc-step-burn-status', 'pending');
-        setCctpProgress('Burning USDC on source chain…<br>Confirm in your wallet.');
-
-        // mintRecipient must be bytes32 (padded Arc wallet address)
-        const recipient = viewerState.walletAddress;
-        const recipientBytes32 = '0x000000000000000000000000' + recipient.slice(2);
-
-        // ARC_TESTNET_DOMAIN = 26
-        const ARC_DOMAIN = 26;
-        const minFinalityThreshold = 1000; // enables Fast Transfer
-
-        // depositForBurnWithHook(uint256,uint32,bytes32,address,bytes32,uint256,uint32,bytes)
-        // selector: 0xe0a17441
-        // offset of hookData (8th parameter) = 256 bytes (8 slots * 32 bytes)
-        // length of hookData = 32 bytes
-        // hookData = 0x636374702d666f72776172640000000000000000000000000000000000000000
-        const selector = '0xe0a17441';
-        const offset = BigInt(256);
-        const hookDataLength = BigInt(32);
-        const hookDataValue = '636374702d666f72776172640000000000000000000000000000000000000000';
-
-        const burnData = selector
-            + totalAmount.toString(16).padStart(64, '0')
-            + ARC_DOMAIN.toString(16).padStart(64, '0')
-            + recipientBytes32.slice(2).padStart(64, '0')
-            + chain.usdc.slice(2).padStart(64, '0')
-            + '0'.padStart(64, '0') // destinationCaller = zero (any relayer)
-            + forwardingFee.toString(16).padStart(64, '0')
-            + minFinalityThreshold.toString(16).padStart(64, '0')
-            + offset.toString(16).padStart(64, '0')
-            + hookDataLength.toString(16).padStart(64, '0')
-            + hookDataValue;
-
-        const burnTx = await window.ethereum.request({
-            method: 'eth_sendTransaction',
-            params: [{ from: fromAddress, to: TOKEN_MESSENGER_V2, data: burnData }],
-        });
-        await waitForTx(burnTx, chain.chainId);
-        setStepStatus('arc-step-burn-status', 'done');
-
-        // ── Step 3: Poll Circle Forwarding status on frontend ─────────────────
-        setStepStatus('arc-step-mint-status', 'pending');
-        setCctpProgress('Minting on Arc via Circle Relayer…<br>This takes ~1-2 minutes. You can close this modal.');
-        closeCctpModal();
-
-        // Show waiting indicator on funding panel
-        document.getElementById('arc-waiting-balance').style.display = 'flex';
-        if (balancePollingInterval) clearInterval(balancePollingInterval);
-
-        // Poll Iris API for forwardTxHash
-        try {
-            const forwardTxHash = await pollCctpForwarding(chain.domain, burnTx);
-            setStepStatus('arc-step-mint-status', 'done');
-            console.log(`[CCTP] Forwarded mint transaction detected on Arc: ${forwardTxHash}`);
-            startBalancePolling();
-        } catch (err) {
-            console.error('[Tessera] CCTP forwarding error:', err && err.message ? err.message : err);
-            setFundStatus('Bridge submitted but confirmation timed out. Polling wallet balance...', true);
-            startBalancePolling(); // Still poll as the mint might succeed eventually
-        }
-
-    } catch (error) {
-        console.error('[Tessera] CCTP bridge error:', error && error.message ? error.message : error);
-        setCctpProgress('Error: ' + (error.message || 'Bridge failed. Please retry.'));
-        // Reset to select step
-        document.getElementById('arc-cctp-step-select').style.display = 'block';
-        document.getElementById('arc-cctp-step-progress').style.display = 'none';
-    }
-}
-
-async function waitForTx(txHash, chainId) {
-    // Poll eth_getTransactionReceipt until mined
-    const rpc = CCTP_CHAINS.find(c => c.chainId === chainId)?.rpcUrl || 'https://rpc.sepolia.org';
-    for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        try {
-            const res = await fetch(rpc, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [txHash] }),
-            });
-            const data = await res.json();
-            if (data.result && data.result.status === '0x1') return;
-            if (data.result && data.result.status === '0x0') throw new Error('Transaction reverted on-chain');
-        } catch (e) {
-            if (e.message.includes('reverted')) throw e;
-        }
-    }
-    throw new Error('Transaction confirmation timed out');
-}
-
-async function pollCctpForwarding(sourceDomain, txHash) {
-    const irisUrl = `https://iris-api-sandbox.circle.com/v2/messages/${sourceDomain}?transactionHash=${txHash}`;
-    for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise(r => setTimeout(r, 5000));
-        try {
-            const res = await fetch(irisUrl);
-            if (!res.ok) continue;
-
-            const data = await res.json();
-            const msg = data?.messages?.[0];
-            if (msg?.forwardTxHash) {
-                return msg.forwardTxHash;
-            }
-        } catch (e) {
-            console.warn('[CCTP] Error polling Iris:', e && e.message ? e.message : e);
-        }
-    }
-    throw new Error('CCTP forwarding timed out');
-}
-
-function setStepStatus(stepId, status) {
-    const el = document.getElementById(stepId);
-    if (!el) return;
-    el.innerHTML = status === 'pending'
-        ? '<div class="arc-spinner-sm"></div>'
-        : status === 'done'
-            ? '<span style="color:#22c55e;font-weight:700;">✓</span>'
-            : '';
-}
-
-function setCctpProgress(msg) {
-    const el = document.getElementById('arc-cctp-progress-msg');
-    if (el) el.innerHTML = msg;
-}
+// CCTP bridge UI + Bridge Kit live in ./cctp-bridge.js (wired in initPaywall).
 
 // ─── Session Manager (post-unlock) ───────────────────────────────────────────
 
@@ -2796,11 +2948,11 @@ window.arcEndSession = async function () {
                 }
                 const doneBtn = document.getElementById('arc-success-done-btn');
                 if (doneBtn) {
-                    doneBtn.onclick = () => {
-                        removeSessionManagerWidget();
-                        successPhase.style.display = 'none';
-                        document.getElementById('arc-phase-login').style.display = 'block';
-                    };
+                    doneBtn.onclick = handleSuccessReturnHome;
+                }
+                const withdrawBtn = document.getElementById('arc-success-withdraw-btn');
+                if (withdrawBtn) {
+                    withdrawBtn.onclick = () => { void openExternalWithdrawModal(); };
                 }
             }
         } else {
@@ -2994,18 +3146,26 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
             return;
         }
 
+        const balance = await fetchTipBalance();
+        // No Gateway session / zero balance: do not show connected tip manager or cash-out.
+        if (balance === null || balance <= 0) {
+            container.classList.remove('arc-tip-connected');
+            container.classList.add('arc-tip-unconnected');
+            header.style.display = 'none';
+            statusCard.style.display = 'none';
+            walletActions.style.display = 'none';
+            statusPill.style.display = 'block';
+            statusPill.style.color = '#718096';
+            statusPill.textContent = 'Fund wallet to tip';
+            return;
+        }
+
         updateContainerStyle();
         header.style.display = 'flex';
         statusCard.style.display = 'block';
         walletActions.style.display = 'flex';
         statusPill.style.display = 'none';
-
-        const balance = await fetchTipBalance();
-        if (balance === null) {
-            balanceVal.textContent = `$0.0000 USDC`;
-        } else {
-            balanceVal.textContent = `$${balance.toFixed(4)} USDC`;
-        }
+        balanceVal.textContent = `$${balance.toFixed(4)} USDC`;
     };
     void refreshStatus();
 
@@ -3091,11 +3251,24 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
 
     // ── Click handler ─────────────────────────────────────────────────────
     btn.addEventListener('click', async () => {
-        if (!viewerState.ephemeralPk && hasResumableCircleSession()) {
+        await ensureCircleAuthHydrated();
+
+        // No Circle session / no funds: go straight to deposit onboarding (no tip POST).
+        if (!viewerState.userId || !hasResumableCircleSession()) {
+            openTipOnboarding();
+            return;
+        }
+
+        const tipBalance = await fetchTipBalance();
+        if (tipBalance === null || tipBalance < amount) {
+            openTipOnboarding();
+            return;
+        }
+
+        if (!viewerState.ephemeralPk) {
             try { await ensureEphemeralKey(); } catch (_) { /* ignore */ }
         }
-        // No userId or no ephemeralPk (active session) -> trigger full wallet onboarding
-        if (!viewerState.userId || !viewerState.ephemeralPk) {
+        if (!viewerState.ephemeralPk) {
             openTipOnboarding();
             return;
         }
@@ -3126,25 +3299,9 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                 } else {
                     console.error('[Tessera] Tip failed: HTTP ' + res.status);
 
-                    if (res.status === 404) {
-                        if (attempt === 1 && viewerState.walletAddress) {
-                            console.log('[Tessera] Attempting silent session registration...');
-                            try {
-                                const { regRes } = await registerViewerSession(getRequiredMinBalance());
-                                if (regRes.ok) {
-                                    console.log('[Tessera] Silent session registration succeeded. Retrying tip.');
-                                    await sendTip(2);
-                                    return;
-                                }
-                            } catch (regErr) {
-                                console.error('[Tessera] Silent registration error:', regErr && regErr.message ? regErr.message : regErr);
-                            }
-                        }
-
-                        btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
-                        void refreshStatus();
-                        openTipOnboarding();
-                    } else if (res.status === 402) {
+                    // 404/402: need deposit or session. Do not silent-register here
+                    // (that delayed the deposit modal by seconds when unfunded).
+                    if (res.status === 404 || res.status === 402) {
                         btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
                         void refreshStatus();
                         openTipOnboarding();
@@ -3186,6 +3343,7 @@ function initTipMode(creatorWallet, tipAmount) {
     tipCreatorWallet = creatorWallet;
     tipAmountVal = tipAmount;
     injectDependencies();
+    void ensureCircleAuthHydrated();
 
     // Clear any active pay-per-second timers from previous premium videos
     if (window.sessionTimer) {
@@ -3206,6 +3364,10 @@ function initTipMode(creatorWallet, tipAmount) {
 
     // Guarantee video is never locked in tip mode
     document.body.classList.remove('arc-locked');
+    // OAuth cover/splash is for paid paywall resume only. Free tip videos must
+    // keep playback visible while the user funds/enables tips.
+    consumeOpaqueCoverFlag();
+    hideSocialResumeSplash();
     // Remove any lingering paywall overlay from previous videos
     const overlay = document.getElementById('arc-paywall-overlay');
     if (overlay) overlay.remove();
