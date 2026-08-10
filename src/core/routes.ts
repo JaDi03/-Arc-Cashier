@@ -5,6 +5,9 @@ import { walletService } from './wallet';
 import { sessionService } from './session';
 import { statsService } from './stats';
 import { GATEWAY_FEE_BUFFER } from './gateway-utils';
+import creatorRouter from './creator-routes';
+import { verifyCircleWalletOwnership } from './circle-routes';
+import { addressesEqual, isValidPrivateKeyHex, isValidViewerUserId } from './session-key-auth';
 import rateLimit from 'express-rate-limit';
 import { isAddress, isHex, verifyMessage, createPublicClient, http, formatUnits, parseUnits } from 'viem';
 import { arcTestnet } from 'viem/chains';
@@ -22,6 +25,15 @@ const sessionLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
+});
+
+/** Stricter limit: sync-session returns a private key after Circle auth. */
+const syncSessionLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many session sync requests, please try again later.' }
 });
 
 const coreRouter = Router();
@@ -59,9 +71,16 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
 }, (req: Request & { payment?: Record<string, unknown> }, res: Response) => {
     const userId = req.headers['x-user-id'] as string;
     const sellerAddress = req.headers['x-seller-address'] as string;
-    const amount = Number(req.payment?.amount || 0);
-    if (userId && sellerAddress && amount > 0) {
-        statsService.recordPayment(userId, sellerAddress, amount);
+    // x402-batching parsePrice stores amount in micro-USDC (1e6 = $1).
+    const amountMicro = Number(req.payment?.amount || 0);
+    const amountUsdc = amountMicro / 1e6;
+    if (userId && sellerAddress && amountUsdc > 0) {
+        try {
+            statsService.recordPayment(userId, sellerAddress, amountUsdc);
+        } catch (err) {
+            // Settlement already completed in x402 middleware. Stats must never turn a paid tick into HTTP 500.
+            console.error('[Core] Failed to record payment stats after settle:', err);
+        }
     }
     res.json({ access: true, payment: req.payment });
 });
@@ -161,17 +180,94 @@ coreRouter.post('/recover-session', sessionLimiter, async (req: Request, res: Re
     }
 });
 
-coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId, privateKey, returnAddress, ratePerSecond } = req.body;
+/**
+ * Return the canonical ephemeral privateKey for a viewer after proving Circle
+ * UCW ownership. Never accepts userId alone.
+ */
+coreRouter.post('/sync-session', syncSessionLimiter, async (req: Request, res: Response) => {
+    const { userId, userToken, returnAddress } = req.body;
 
-    if (!userId || !privateKey || !returnAddress) return res.status(400).json({ error: 'Missing userId, privateKey, or returnAddress' });
-    if (!isHex(privateKey)) return res.status(400).json({ error: 'Invalid privateKey format' });
+    if (!userId || !userToken || !returnAddress) {
+        return res.status(400).json({ error: 'Missing userId, userToken, or returnAddress' });
+    }
+    if (!isValidViewerUserId(userId)) {
+        return res.status(400).json({ error: 'Invalid userId' });
+    }
+    if (!isAddress(returnAddress)) {
+        return res.status(400).json({ error: 'Invalid returnAddress' });
+    }
+    if (typeof userToken !== 'string' || userToken.length < 20 || userToken.length > 8192) {
+        return res.status(400).json({ error: 'Invalid userToken' });
+    }
+
+    try {
+        const ownership = await verifyCircleWalletOwnership(String(userToken), returnAddress);
+        if (ownership === 'unauthorized') {
+            return res.status(401).json({ error: 'Circle session does not own this wallet.' });
+        }
+        if (ownership === 'error') {
+            return res.status(503).json({ error: 'Unable to verify Circle wallet ownership. Try again.' });
+        }
+
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'No active session found for this user.' });
+        }
+
+        const record = walletService.getSessionRecord(userId);
+        if (!addressesEqual(record.returnAddress, returnAddress)) {
+            return res.status(401).json({ error: 'Return address does not match existing session.' });
+        }
+
+        return res.json({ status: 'synced', privateKey: record.privateKey });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error('[Core] sync-session failed:', err.message);
+        return res.status(500).json({ error: 'Failed to sync session' });
+    }
+});
+
+coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: Response) => {
+    const { userId, privateKey, returnAddress, ratePerSecond, userToken } = req.body;
+
+    if (!userId || !privateKey || !returnAddress || !userToken) {
+        return res.status(400).json({ error: 'Missing userId, privateKey, returnAddress, or userToken' });
+    }
+    if (!isValidViewerUserId(userId)) {
+        return res.status(400).json({ error: 'Invalid userId' });
+    }
+    if (!isValidPrivateKeyHex(privateKey) || !isHex(privateKey)) {
+        return res.status(400).json({ error: 'Invalid privateKey format' });
+    }
     if (!isAddress(returnAddress)) return res.status(400).json({ error: 'Invalid returnAddress' });
+    if (typeof userToken !== 'string' || userToken.length < 20 || userToken.length > 8192) {
+        return res.status(400).json({ error: 'Invalid userToken' });
+    }
 
     const stringifyBigInt = (_key: string, value: unknown) => typeof value === 'bigint' ? value.toString() : value;
 
     try {
-        const gatewayClient = new GatewayClient({ privateKey: privateKey as `0x${string}`, chain: 'arcTestnet', rpcUrl: ARC_RPC_URL });
+        const ownership = await verifyCircleWalletOwnership(String(userToken), returnAddress);
+        if (ownership === 'unauthorized') {
+            return res.status(401).json({ error: 'Circle session does not own this wallet.' });
+        }
+        if (ownership === 'error') {
+            return res.status(503).json({ error: 'Unable to verify Circle wallet ownership. Try again.' });
+        }
+
+        // Canonical key wins: never orphan Gateway funds by overwriting with a new ephemeral.
+        let privateKeyToUse = privateKey as `0x${string}`;
+        if (walletService.hasSessionRecord(userId)) {
+            const existing = walletService.getSessionRecord(userId);
+            if (!addressesEqual(existing.returnAddress, returnAddress)) {
+                return res.status(401).json({ error: 'Return address does not match existing session.' });
+            }
+            if (existing.privateKey.toLowerCase() !== privateKeyToUse.toLowerCase()) {
+                console.log(`[Core] Reusing canonical ephemeral for ${userId}; ignoring client key.`);
+            }
+            privateKeyToUse = existing.privateKey as `0x${string}`;
+        }
+
+        const gatewayClient = new GatewayClient({ privateKey: privateKeyToUse, chain: 'arcTestnet', rpcUrl: ARC_RPC_URL });
         let balances = await gatewayClient.getBalances();
         let gatewayBalanceNum = Number(balances.gateway.formattedAvailable);
         let walletUsdc = Number(balances.wallet.formatted);
@@ -215,10 +311,15 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
         }
 
         const finalBalances = await gatewayClient.getBalances();
-        walletService.registerSessionKey(userId, privateKey, returnAddress);
+        walletService.registerSessionKey(userId, privateKeyToUse, returnAddress);
 
         return res.setHeader('Content-Type', 'application/json').send(
-            JSON.stringify({ status: 'session_registered', deposit: { txHash: depositTxHash, amount: depositedAmount }, remainingBalance: finalBalances.gateway.formattedAvailable }, stringifyBigInt)
+            JSON.stringify({
+                status: 'session_registered',
+                deposit: { txHash: depositTxHash, amount: depositedAmount },
+                remainingBalance: finalBalances.gateway.formattedAvailable,
+                privateKey: privateKeyToUse,
+            }, stringifyBigInt)
         );
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
@@ -343,5 +444,8 @@ coreRouter.get('/wallet-balance', async (req: Request, res: Response) => {
         return res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
+
+// Creator earnings: Gateway balance + MetaMask BurnIntent withdraw (platform-agnostic).
+coreRouter.use(creatorRouter);
 
 export default coreRouter;

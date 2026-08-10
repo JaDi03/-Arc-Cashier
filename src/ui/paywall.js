@@ -4,6 +4,13 @@
 import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 import { initCreatorEarnings } from './creator-earnings.js';
 
+// Circle W3S SocialLoginProvider string values (enum not re-exported from package entry).
+const SOCIAL_GOOGLE = 'Google';
+const SOCIAL_FACEBOOK = 'Facebook';
+const SOCIAL_PENDING_KEY = 'tessera_social_login_pending';
+/** Survives OAuth location.replace so the video page stays covered until paywall mounts. */
+const OPAQUE_COVER_KEY = 'tessera_opaque_cover';
+
 // ─── Constants (all values verified from official docs) ──────────────────────
 
 const SCRIPT_SRC = (document.currentScript && document.currentScript.src) ? document.currentScript.src : '';
@@ -49,6 +56,18 @@ const UNLOCK_SVG = `
     </svg>
 `;
 
+// Official multicolor "G" from Google Identity branding (Sign in with Google).
+const GOOGLE_G_SVG = `
+    <svg class="arc-btn-svg arc-google-g" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false" style="margin-right:8px; display:inline-block; vertical-align:middle;">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+    </svg>
+`;
+
+const GOOGLE_CONTINUE_HTML = `${GOOGLE_G_SVG} Continue with Google`;
+
 // CCTP — Source chains supported in testnet (verified from Circle docs)
 // TokenMessengerV2 is the same address on all EVM testnets
 const TOKEN_MESSENGER_V2 = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -92,15 +111,92 @@ const MIN_ARC_BALANCE_WEI = BigInt('10000000000000000'); // 0.01 USDC (18 decima
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let arcSdk = null;
+/** Shared in-flight promise so module bootstrap + initPaywall do not double-resume. */
+let socialResumeInFlight = null;
 let viewerState = {
     userId: localStorage.getItem('arc_cashier_user_id'),
-    userToken: null,
-    encryptionKey: null,
+    userToken: localStorage.getItem('arc_cashier_user_token'),
+    encryptionKey: localStorage.getItem('arc_cashier_encryption_key'),
+    refreshToken: localStorage.getItem('arc_cashier_refresh_token'),
     appId: null,
+    authMethod: localStorage.getItem('arc_cashier_auth_method') || 'email',
+    email: localStorage.getItem('arc_cashier_email') || null,
     walletId: localStorage.getItem('arc_circle_wallet_id'),
     walletAddress: localStorage.getItem('arc_circle_wallet_address'),
-    ephemeralPk: localStorage.getItem('arc_ephemeral_pk'),
+    // Memory only. Never persist private keys in localStorage (XSS surface).
+    ephemeralPk: null,
 };
+
+// Migrate away from legacy persisted ephemeral keys.
+try { localStorage.removeItem('arc_ephemeral_pk'); } catch (_) { /* ignore */ }
+
+const CIRCLE_AUTH_LS_KEYS = [
+    'arc_cashier_user_id',
+    'arc_cashier_email',
+    'arc_cashier_auth_method',
+    'arc_cashier_user_token',
+    'arc_cashier_encryption_key',
+    'arc_cashier_refresh_token',
+    'arc_circle_wallet_id',
+    'arc_circle_wallet_address',
+];
+
+/** Persist Circle email/social session fields required for refresh + execute. */
+function persistCircleAuthSession() {
+    if (viewerState.userId) localStorage.setItem('arc_cashier_user_id', viewerState.userId);
+    if (viewerState.email) localStorage.setItem('arc_cashier_email', viewerState.email);
+    if (viewerState.authMethod) localStorage.setItem('arc_cashier_auth_method', viewerState.authMethod);
+    if (viewerState.userToken) localStorage.setItem('arc_cashier_user_token', viewerState.userToken);
+    else localStorage.removeItem('arc_cashier_user_token');
+    if (viewerState.encryptionKey) localStorage.setItem('arc_cashier_encryption_key', viewerState.encryptionKey);
+    else localStorage.removeItem('arc_cashier_encryption_key');
+    if (viewerState.refreshToken) localStorage.setItem('arc_cashier_refresh_token', viewerState.refreshToken);
+    else localStorage.removeItem('arc_cashier_refresh_token');
+    if (viewerState.walletId) localStorage.setItem('arc_circle_wallet_id', viewerState.walletId);
+    if (viewerState.walletAddress) localStorage.setItem('arc_circle_wallet_address', viewerState.walletAddress);
+}
+
+function clearCircleAuthTokens() {
+    viewerState.userToken = null;
+    viewerState.encryptionKey = null;
+    viewerState.refreshToken = null;
+    localStorage.removeItem('arc_cashier_user_token');
+    localStorage.removeItem('arc_cashier_encryption_key');
+    localStorage.removeItem('arc_cashier_refresh_token');
+}
+
+/** True when Unlock/deposit can resume without a fresh email/social login. */
+function hasResumableCircleSession() {
+    return Boolean(
+        viewerState.userId
+        && viewerState.walletAddress
+        && viewerState.userToken
+        && viewerState.encryptionKey
+        && viewerState.refreshToken
+    );
+}
+
+// Auth is email OTP or social login only. Legacy PIN-era identities (arc_*)
+// cannot resume a session, so drop them: the viewer signs in with email/social.
+if (viewerState.userId
+    && !viewerState.userId.startsWith('email:')
+    && !viewerState.userId.startsWith('social:')) {
+    CIRCLE_AUTH_LS_KEYS.forEach((key) => localStorage.removeItem(key));
+    viewerState.userId = null;
+    viewerState.authMethod = 'email';
+    viewerState.email = null;
+    viewerState.walletId = null;
+    viewerState.walletAddress = null;
+    clearCircleAuthTokens();
+}
+
+// Incomplete session from older builds (refreshToken without userToken) cannot refresh.
+if (viewerState.refreshToken && (!viewerState.userToken || !viewerState.encryptionKey)) {
+    clearCircleAuthTokens();
+}
+let pendingEmailOtp = null; // { deviceToken, deviceEncryptionKey, otpToken, email, appId }
+let socialAuthConfig = { googleClientId: '', facebookAppId: '' };
+
 let balancePollingInterval = null;
 let isTipMode = false;
 let tipCreatorWallet = null;
@@ -110,22 +206,8 @@ let isCheckingAutoUnlock = false;
 // Idempotency guard for lockMedia(). Null means no lock is active.
 let mediaLockController = null;
 
-// #region agent log
-function agentDebugLog(hypothesisId, message, data = {}) {
-    try {
-        const parts = ['[TesseraDebug]', 'h=' + hypothesisId, 'msg=' + message];
-        Object.keys(data).forEach((key) => {
-            let value = data[key];
-            if (value === null || value === undefined) value = 'null';
-            else if (typeof value === 'object') value = String(value);
-            else value = String(value);
-            value = value.replace(/\s+/g, '_').slice(0, 120);
-            parts.push(key + '=' + value);
-        });
-        console.log(parts.join(' | '));
-    } catch (_) { }
-}
-// #endregion
+/** Debug helper kept as a no-op so call sites stay harmless in production. */
+function agentDebugLog(_hypothesisId, _message, _data) { }
 
 // Floating elements are reparented into document.fullscreenElement on
 // every fullscreenchange so they stay visible above the top-layer.
@@ -186,9 +268,102 @@ function getRequiredMinBalance() {
     }
 }
 
+function isValidEphemeralPrivateKey(pk) {
+    return typeof pk === 'string' && /^0x[0-9a-fA-F]{64}$/.test(pk);
+}
+
+/**
+ * Prefer the server-canonical ephemeral (sync-session) when Circle auth is
+ * available so web and mobile share the same Gateway balance. Only mint a
+ * new key when sync returns 404 / no session.
+ */
+async function ensureEphemeralKey() {
+    const memoryPk = viewerState.ephemeralPk;
+
+    if (viewerState.userId && viewerState.userToken && viewerState.walletAddress) {
+        try {
+            const syncRes = await fetch(ARC_API_BASE + '/api/core/sync-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: viewerState.userId,
+                    userToken: viewerState.userToken,
+                    returnAddress: viewerState.walletAddress,
+                }),
+            });
+            if (syncRes.ok) {
+                const data = await syncRes.json();
+                if (isValidEphemeralPrivateKey(data.privateKey)) {
+                    viewerState.ephemeralPk = data.privateKey;
+                    return data.privateKey;
+                }
+            } else if (syncRes.status !== 404) {
+                console.warn('[Tessera] sync-session status=' + syncRes.status);
+            }
+        } catch (err) {
+            console.warn('[Tessera] sync-session error:', err && err.message ? err.message : err);
+        }
+    }
+
+    if (isValidEphemeralPrivateKey(memoryPk)) {
+        viewerState.ephemeralPk = memoryPk;
+        return memoryPk;
+    }
+
+    const generated = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    viewerState.ephemeralPk = generated;
+    return generated;
+}
+
+function applyCanonicalEphemeralFromRegister(regData) {
+    if (regData && isValidEphemeralPrivateKey(regData.privateKey)) {
+        viewerState.ephemeralPk = regData.privateKey;
+    }
+}
+
+async function registerViewerSession(ratePerSecond) {
+    await ensureEphemeralKey();
+    if (!viewerState.userToken) {
+        throw new Error('Circle session required to register billing session');
+    }
+    // #region agent log
+    const regStart = Date.now();
+    agentDebugLog('H4', 'register-session start', {
+        userId: viewerState.userId,
+        hasEphemeral: !!viewerState.ephemeralPk,
+        ratePerSecond,
+    });
+    // #endregion
+    const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            userId: viewerState.userId,
+            privateKey: viewerState.ephemeralPk,
+            returnAddress: viewerState.walletAddress,
+            ratePerSecond: ratePerSecond,
+            userToken: viewerState.userToken,
+        }),
+    });
+    const regData = await regRes.json().catch(() => ({}));
+    if (regRes.ok) {
+        applyCanonicalEphemeralFromRegister(regData);
+    }
+    // #region agent log
+    agentDebugLog('H4', 'register-session end', {
+        status: regRes.status,
+        ok: regRes.ok,
+        elapsedMs: Date.now() - regStart,
+        error: regData.error || null,
+    });
+    // #endregion
+    return { regRes, regData };
+}
+
 async function checkAutoUnlock() {
     if (isCheckingAutoUnlock) return;
-    if (!viewerState.userId || !viewerState.walletAddress) return;
+    if (!hasResumableCircleSession()) return;
 
     isCheckingAutoUnlock = true;
     // Paid init uses hideInitially (pointer-events:none). Free tip modal does not.
@@ -197,14 +372,39 @@ async function checkAutoUnlock() {
     let hasFundsResult = null;
     let sessionBalanceStatus = null;
     let autoUnlockBranch = 'start';
+    // #region agent log
+    const autoUnlockStart = Date.now();
+    agentDebugLog('H3', 'checkAutoUnlock enter', {
+        userId: viewerState.userId,
+        hasToken: !!viewerState.userToken,
+        hasWallet: !!viewerState.walletAddress,
+    });
+    // #endregion
     try {
         // Unlock/billing is funded from Gateway (same source the tip widget shows).
         // Wallet SCA balance only matters later, when the user needs to deposit into Gateway.
         setFundStatus('Checking Gateway balance…');
         const minReq = getRequiredMinBalance();
 
-        const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+        // First try: existing session record (returning user / already registered).
+        let balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
         sessionBalanceStatus = balRes.status;
+        // #region agent log
+        agentDebugLog('H3', 'session-balance first', { status: balRes.status });
+        // #endregion
+
+        // 404 = no session record. Do NOT register here: register-session waits
+        // ~18s for ephemeral funds that do not exist yet. Show deposit UI instead.
+        if (balRes.status === 404) {
+            // #region agent log
+            agentDebugLog('H3', 'session-balance 404 -> skip register, show deposit', { minReq });
+            // #endregion
+            autoUnlockBranch = 'no-session-show-deposit';
+            setFundStatus('');
+            enableUnlockButton();
+            return;
+        }
+
         let gatewayAvailable = 0;
         if (balRes.ok) {
             const balData = await balRes.json();
@@ -222,28 +422,10 @@ async function checkAutoUnlock() {
             }
 
             setFundStatus('Auto-unlocking session…');
-            // Ensure we have an ephemeral key
-            viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
-            if (!viewerState.ephemeralPk) {
-                viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('');
-                localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
-            }
-
-            // Register session with backend
-            const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: viewerState.userId,
-                    privateKey: viewerState.ephemeralPk,
-                    returnAddress: viewerState.walletAddress,
-                    ratePerSecond: getRequiredMinBalance(),
-                }),
-            });
+            const { regRes } = await registerViewerSession(getRequiredMinBalance());
 
             if (regRes.ok) {
-                console.log('[Tessera] Auto-unlocked video using existing funded gateway session.');
+                console.log('[Tessera] Auto-unlocked using existing Gateway session.');
                 autoUnlocked = true;
                 autoUnlockBranch = 'paid-auto-unlocked';
                 setFundStatus('');
@@ -285,7 +467,7 @@ async function checkAutoUnlock() {
             startBalancePolling();
         }
     } catch (error) {
-        console.error('[Tessera] Auto-unlock check failed:', error);
+        console.error('[Tessera] Auto-unlock check failed:', error && error.message ? error.message : error);
         autoUnlockBranch = 'catch';
         setFundStatus('');
         startBalancePolling();
@@ -293,7 +475,10 @@ async function checkAutoUnlock() {
         isCheckingAutoUnlock = false;
         if (!autoUnlocked) {
             const overlay = document.getElementById('arc-paywall-overlay');
-            if (overlay) overlay.classList.remove('arc-hidden-initially');
+            if (overlay) {
+                overlay.classList.remove('arc-hidden-initially');
+                overlay.classList.remove('arc-session-check');
+            }
         }
         // #region agent log
         const overlay = document.getElementById('arc-paywall-overlay');
@@ -321,6 +506,7 @@ async function checkAutoUnlock() {
             parentTag: overlay && overlay.parentElement ? overlay.parentElement.tagName : null,
             topAtCenterTag: topAtCenter ? topAtCenter.tagName : null,
             topAtCenterId: topAtCenter ? topAtCenter.id : null,
+            elapsedMs: Date.now() - autoUnlockStart,
         });
         // #endregion
     }
@@ -348,10 +534,23 @@ function initPaywall(targetContainer) {
     renderPaywallOverlay(true, targetContainer);
     renderSessionManager();
 
-    if (viewerState.userId && viewerState.walletAddress) {
-        transitionToFundPhase();
-        void checkAutoUnlock();
-    }
+    // #region agent log
+    agentDebugLog('H1', 'initPaywall start', {
+        hasResumable: hasResumableCircleSession(),
+        hideInitially: true,
+        overlayHidden: document.getElementById('arc-paywall-overlay')?.classList.contains('arc-hidden-initially'),
+    });
+    // #endregion
+
+    void (async () => {
+        const resumed = await tryResumeSocialLogin();
+        if (resumed) return;
+        // Only skip login when Circle session can actually refresh + sign deposits.
+        if (hasResumableCircleSession()) {
+            transitionToFundPhase();
+            void checkAutoUnlock();
+        }
+    })();
 }
 
 function injectDependencies() {
@@ -426,7 +625,7 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     if (existing) existing.remove();
 
     const title = isTipMode ? "Support Creator" : "Premium Stream";
-    const subtitle = isTipMode ? "Set up your wallet to send tips." : "Pay only for the seconds you watch.<br>No subscriptions.";
+    const subtitle = isTipMode ? "Set up your wallet to send tips." : "Pay only for the seconds you watch.";
     const pricingBox = isTipMode ? `
                         <div class="arc-pricing-row">
                             <span>Action</span>
@@ -436,15 +635,10 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                             <span>Min. deposit</span>
                             <span class="arc-accent">1.00 USDC</span>
                         </div>
-                        <p class="arc-pricing-note">Deposit funds to tip. Unused funds can be withdrawn anytime.</p>
     ` : `
                         <div class="arc-pricing-row">
                             <span>Rate</span>
-                            <span class="arc-accent" id="arc-display-rate">From $0.0001 USDC / sec (varies by video)</span>
-                        </div>
-                        <div class="arc-pricing-row">
-                            <span>Min. deposit</span>
-                            <span class="arc-accent">1.00 USDC</span>
+                            <span class="arc-accent" id="arc-display-rate">From $0.0001 / sec</span>
                         </div>
     `;
     const fundLabel = isTipMode ? "Fund your wallet to tip:" : "Fund your wallet to watch:";
@@ -455,11 +649,17 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     const overlay = document.createElement('div');
     overlay.id = 'arc-paywall-overlay';
     overlay.classList.add('arc-tessera-root');
+    // Critical cover styles inline so the video is hidden even if paywall.css
+    // has not finished loading yet (avoids a one-frame flash).
+    if (!isTipMode) {
+        overlay.style.background = 'rgba(6, 7, 10, 0.92)';
+    }
 
-    // Check if user is logged in to hide initially and prevent flicker
-    const isLoggedIn = viewerState.userId && viewerState.walletAddress;
-    if (isLoggedIn && hideInitially) {
-        overlay.classList.add('arc-hidden-initially');
+    // Logged-in paid: keep dark cover opaque; hide only the modal card while
+    // auto-unlock resolves (never opacity:0 on the whole overlay).
+    const isLoggedIn = hasResumableCircleSession();
+    if (isLoggedIn && hideInitially && !isTipMode) {
+        overlay.classList.add('arc-session-check');
     }
     overlay.innerHTML = `
         <div id="arc-paywall-modal" style="position:relative;">
@@ -476,8 +676,25 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                     <div class="arc-pricing-box">
                         ${pricingBox}
                     </div>
-                    <button id="arc-login-btn" class="arc-btn arc-btn-primary">
-                        ${LOCK_SVG} Sign in with PIN
+                    <button id="arc-google-btn" class="arc-btn arc-btn-primary arc-btn-google" type="button" style="width:100%;display:none;">
+                        ${GOOGLE_CONTINUE_HTML}
+                    </button>
+                    <button id="arc-facebook-btn" class="arc-btn arc-btn-primary" type="button" style="width:100%;margin-top:10px;display:none;">
+                        Continue with Facebook
+                    </button>
+                    <div id="arc-social-email-divider" style="display:none;align-items:center;gap:10px;margin:10px 0;color:#718096;font-size:12px;">
+                        <span style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></span>
+                        or
+                        <span style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></span>
+                    </div>
+                    <label for="arc-email-input" class="arc-info-label" style="display:block;margin:0 0 6px 0;text-align:left;">Email</label>
+                    <input id="arc-email-input" type="email" autocomplete="email" placeholder="you@example.com" value="${viewerState.email || ''}"
+                        style="width:100%;box-sizing:border-box;margin:0 0 10px 0;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.35);color:#fff;font-size:14px;" />
+                    <button id="arc-login-btn" class="arc-btn arc-btn-primary" type="button">
+                        ${LOCK_SVG} Send email code
+                    </button>
+                    <button id="arc-verify-otp-btn" class="arc-btn arc-btn-primary" type="button" style="display:none;margin-top:10px;">
+                        Verify code
                     </button>
                     <p id="arc-login-status" class="arc-status-text" style="display:none;"></p>
                 </div>
@@ -493,6 +710,10 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
                             </button>
+                        </div>
+                        <div class="arc-ucw-balance-row">
+                            <span class="arc-info-label" style="margin:0;">Wallet balance</span>
+                            <span id="arc-ucw-balance" class="arc-accent">…</span>
                         </div>
                     </div>
 
@@ -535,6 +756,7 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
                         ${unlockBtnText}
                     </button>
                     <p id="arc-fund-status" class="arc-status-text" style="display:none;"></p>
+                    <button id="arc-signout-btn" type="button" style="background:none;border:none;color:rgba(255,255,255,0.45);font-size:12px;margin-top:10px;cursor:pointer;text-decoration:underline;width:100%;">Sign out</button>
                 </div>
 
                 <div id="arc-phase-success" class="arc-phase" style="display:none;">
@@ -633,6 +855,9 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     // videoOsdPage) that sit outside the player stacking context. Connectors may
     // still pass targetContainer for API compatibility; it is ignored for mount.
     mountFloatingElement(overlay);
+    // Paywall is up: drop OAuth/early cover so we do not stack two full-screen layers.
+    consumeOpaqueCoverFlag();
+    hideSocialResumeSplash();
 
     // #region agent log
     const unlockBtnForMountLog = document.getElementById('arc-unlock-btn');
@@ -679,7 +904,14 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
             });
         }
     }
-    document.getElementById('arc-login-btn').addEventListener('click', handleEmailLogin);
+    document.getElementById('arc-login-btn').addEventListener('click', handleRequestEmailOtp);
+    const verifyOtpBtn = document.getElementById('arc-verify-otp-btn');
+    if (verifyOtpBtn) verifyOtpBtn.addEventListener('click', handleVerifyEmailOtp);
+    const googleBtn = document.getElementById('arc-google-btn');
+    if (googleBtn) googleBtn.addEventListener('click', () => { void handleSocialLogin(SOCIAL_GOOGLE); });
+    const facebookBtn = document.getElementById('arc-facebook-btn');
+    if (facebookBtn) facebookBtn.addEventListener('click', () => { void handleSocialLogin(SOCIAL_FACEBOOK); });
+    void refreshSocialLoginButtons();
     document.getElementById('arc-bridge-btn').addEventListener('click', openCctpModal);
     document.getElementById('arc-cctp-close').addEventListener('click', closeCctpModal);
     document.getElementById('arc-unlock-btn').addEventListener('click', (event) => {
@@ -702,6 +934,8 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     });
     document.getElementById('arc-cctp-info-btn').addEventListener('click', toggleCctpInfo);
     document.getElementById('arc-copy-btn').addEventListener('click', copyWalletAddress);
+    const signoutBtn = document.getElementById('arc-signout-btn');
+    if (signoutBtn) signoutBtn.addEventListener('click', handleLogout);
 
     // #region agent log
     overlay.addEventListener('click', (event) => {
@@ -748,136 +982,669 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     buildCctpNetworkList();
 }
 
-// ─── Phase 1: Email Login → Arc Wallet ───────────────────────────────────────
+/** Keep Circle session alive via refreshToken (email OTP and social logins). */
+async function ensureCircleAuthSession() {
+    if (!viewerState.appId) {
+        await loadCircleClientConfig();
+    }
 
-async function handleEmailLogin() {
-    const btn = document.getElementById('arc-login-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Connecting…';
-    setLoginStatus('');
+    if (!viewerState.userToken || !viewerState.encryptionKey || !viewerState.refreshToken) {
+        clearCircleAuthTokens();
+        const err = new Error('Sign in with Google or email to continue.');
+        err.code = 'AUTH_REQUIRED';
+        throw err;
+    }
 
-    try {
-        // Persist userId in localStorage so returning users skip wallet creation
-        viewerState.userId = localStorage.getItem('arc_cashier_user_id');
-        if (!viewerState.userId) {
-            viewerState.userId = 'arc_' + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem('arc_cashier_user_id', viewerState.userId);
-        }
+    ensureArcSdk();
+    const deviceId = await arcSdk.getDeviceId();
+    if (!deviceId) {
+        clearCircleAuthTokens();
+        const err = new Error('Could not identify this device. Sign in again.');
+        err.code = 'AUTH_REQUIRED';
+        throw err;
+    }
 
-        // Step 1: Get Circle session token
-        setLoginStatus('Initializing Circle session…');
-        const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/get-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
-        });
-        if (!tokenRes.ok) throw new Error('Failed to initialize Circle session');
-        const tokenData = await tokenRes.json();
-        if (!tokenData.userToken) throw new Error('Circle token not received');
+    const refreshRes = await fetch(ARC_API_BASE + '/api/core/circle/email-otp/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            userToken: viewerState.userToken,
+            refreshToken: viewerState.refreshToken,
+            deviceId,
+        }),
+    });
+    const refreshData = await refreshRes.json().catch(() => ({}));
+    if (!refreshRes.ok || !refreshData.userToken || !refreshData.encryptionKey) {
+        clearCircleAuthTokens();
+        const err = new Error(refreshData.error || 'Session expired. Sign in with Google or email again.');
+        err.code = 'AUTH_REQUIRED';
+        throw err;
+    }
 
-        viewerState.userToken = tokenData.userToken;
-        viewerState.encryptionKey = tokenData.encryptionKey;
-        viewerState.appId = tokenData.appId;
+    viewerState.userToken = refreshData.userToken;
+    viewerState.encryptionKey = refreshData.encryptionKey;
+    if (refreshData.refreshToken) viewerState.refreshToken = refreshData.refreshToken;
+    if (refreshData.appId) viewerState.appId = refreshData.appId;
+    persistCircleAuthSession();
+    arcSdk.setAuthentication({
+        userToken: viewerState.userToken,
+        encryptionKey: viewerState.encryptionKey,
+    });
+}
 
-        // Step 2: Initialize Circle Web SDK
-        arcSdk = new W3SSdk({
-            appSettings: { appId: viewerState.appId }
-        });
-        // REQUIRED per Circle UCW docs: establishes session with Circle's service via iframe.
-        // Without this call, sdk.execute() silently fails and no PIN popup appears.
-        arcSdk.getDeviceId();
-        arcSdk.setAuthentication({
+// ─── Phase 1: Email OTP login (Circle UCW) ───────────────────────────────────
+
+function ensureArcSdk(onLoginComplete) {
+    const appId = viewerState.appId || pendingEmailOtp?.appId;
+    if (!appId) throw new Error('Missing Circle appId');
+
+    if (!arcSdk) {
+        arcSdk = new W3SSdk(
+            { appSettings: { appId } },
+            onLoginComplete || undefined
+        );
+    } else if (onLoginComplete) {
+        arcSdk.updateConfigs({ appSettings: { appId } }, onLoginComplete);
+    }
+    return arcSdk;
+}
+
+/** Create a fresh W3SSdk with auth tokens pre-set (bypasses stale singleton). */
+function ensureArcSdkWithAuth() {
+    const appId = viewerState.appId || pendingEmailOtp?.appId;
+    if (!appId) throw new Error('Missing Circle appId');
+    const sdk = new W3SSdk({ appSettings: { appId } });
+    if (viewerState.userToken && viewerState.encryptionKey) {
+        sdk.setAuthentication({
             userToken: viewerState.userToken,
             encryptionKey: viewerState.encryptionKey,
         });
+    }
+    return sdk;
+}
 
-        // Step 3: Get or create Arc SCA wallet
-        setLoginStatus('Setting up your Arc wallet…');
-        const walletData = await getOrCreateArcWallet();
+async function loadCircleClientConfig() {
+    const appRes = await fetch(ARC_API_BASE + '/api/core/circle/app-id');
+    const appData = await appRes.json();
+    if (!appRes.ok || !appData.appId) throw new Error(appData.error || 'Missing Circle appId');
+    viewerState.appId = appData.appId;
+    socialAuthConfig.googleClientId = appData.googleClientId || '';
+    socialAuthConfig.facebookAppId = appData.facebookAppId || '';
+    return appData;
+}
 
-        viewerState.walletId = walletData.walletId;
-        viewerState.walletAddress = walletData.walletAddress;
+async function refreshSocialLoginButtons() {
+    try {
+        if (!viewerState.appId || (!socialAuthConfig.googleClientId && !socialAuthConfig.facebookAppId)) {
+            await loadCircleClientConfig();
+        }
+    } catch (err) {
+        console.warn('[Tessera] Could not load social login config:', err && err.message ? err.message : err);
+    }
+    const googleBtn = document.getElementById('arc-google-btn');
+    const facebookBtn = document.getElementById('arc-facebook-btn');
+    const divider = document.getElementById('arc-social-email-divider');
+    const showGoogle = Boolean(socialAuthConfig.googleClientId);
+    const showFacebook = Boolean(socialAuthConfig.facebookAppId);
+    if (googleBtn) {
+        googleBtn.style.display = showGoogle ? 'flex' : 'none';
+    }
+    if (facebookBtn) {
+        facebookBtn.style.display = showFacebook ? 'block' : 'none';
+    }
+    if (divider) {
+        divider.style.display = (showGoogle || showFacebook) ? 'flex' : 'none';
+    }
+}
 
-        // Cache for session recovery
-        localStorage.setItem('arc_circle_wallet_id', viewerState.walletId);
-        localStorage.setItem('arc_circle_wallet_address', viewerState.walletAddress);
+function socialRedirectUri() {
+    return window.location.origin;
+}
 
-        // Step 4: Check if Arc wallet already has funds
-        setLoginStatus('Checking wallet balance…');
-        const hasFunds = await checkArcBalance(viewerState.walletAddress);
+function saveSocialPending(payload) {
+    try {
+        sessionStorage.setItem(SOCIAL_PENDING_KEY, JSON.stringify(payload));
+    } catch (_) { /* ignore */ }
+}
 
-        if (hasFunds) {
-            // User already has USDC — go straight to unlock button
-            transitionToFundPhase();
-            enableUnlockButton();
-        } else {
-            // Show funding panel
-            transitionToFundPhase();
-            startBalancePolling();
+function readSocialPending() {
+    try {
+        const raw = sessionStorage.getItem(SOCIAL_PENDING_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function clearSocialPending() {
+    try {
+        sessionStorage.removeItem(SOCIAL_PENDING_KEY);
+    } catch (_) { /* ignore */ }
+}
+
+const SOCIAL_RESUME_SPLASH_ID = 'arc-social-resume-splash';
+
+function setOpaqueCoverFlag(provider) {
+    try {
+        sessionStorage.setItem(OPAQUE_COVER_KEY, provider || 'Google');
+    } catch (_) { /* ignore */ }
+}
+
+function consumeOpaqueCoverFlag() {
+    try {
+        const v = sessionStorage.getItem(OPAQUE_COVER_KEY);
+        sessionStorage.removeItem(OPAQUE_COVER_KEY);
+        return v;
+    } catch (_) {
+        return null;
+    }
+}
+
+function peekOpaqueCoverFlag() {
+    try {
+        return sessionStorage.getItem(OPAQUE_COVER_KEY);
+    } catch (_) {
+        return null;
+    }
+}
+
+/** Fullscreen cover while Circle OAuth returns (hides PeerTube browse flash). */
+function showSocialResumeSplash(provider) {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById(SOCIAL_RESUME_SPLASH_ID)) return;
+    const label = provider === SOCIAL_FACEBOOK
+        ? 'Signing you in with Facebook…'
+        : 'Signing you in with Google…';
+    if (!document.getElementById('arc-social-resume-style')) {
+        const style = document.createElement('style');
+        style.id = 'arc-social-resume-style';
+        style.textContent = '@keyframes arc-social-spin{to{transform:rotate(360deg)}}';
+        (document.head || document.documentElement).appendChild(style);
+    }
+    const el = document.createElement('div');
+    el.id = SOCIAL_RESUME_SPLASH_ID;
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'z-index:2147483646',
+        'display:flex',
+        'flex-direction:column',
+        'align-items:center',
+        'justify-content:center',
+        'gap:16px',
+        'background:rgba(8,10,16,0.94)',
+        'backdrop-filter:blur(8px)',
+        '-webkit-backdrop-filter:blur(8px)',
+        'font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif',
+        'color:#fff',
+        'pointer-events:all',
+    ].join(';');
+    el.innerHTML = ''
+        + '<div style="width:28px;height:28px;border:3px solid rgba(255,255,255,0.12);'
+        + 'border-top-color:#ffb300;border-radius:50%;'
+        + 'animation:arc-social-spin 0.9s linear infinite;"></div>'
+        + '<p style="margin:0;font-size:15px;font-weight:500;letter-spacing:0.01em;'
+        + 'color:rgba(255,255,255,0.88);">' + label + '</p>';
+    (document.body || document.documentElement).appendChild(el);
+}
+
+function hideSocialResumeSplash() {
+    const el = document.getElementById(SOCIAL_RESUME_SPLASH_ID);
+    if (el) el.remove();
+}
+
+async function handleSocialLogin(provider) {
+    const isGoogle = provider === SOCIAL_GOOGLE;
+    const btn = document.getElementById(isGoogle ? 'arc-google-btn' : 'arc-facebook-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Redirecting…';
+    }
+    setLoginStatus('');
+
+    try {
+        await loadCircleClientConfig();
+        if (isGoogle && !socialAuthConfig.googleClientId) {
+            throw new Error('Google Client ID not configured (CIRCLE_GOOGLE_CLIENT_ID)');
+        }
+        if (!isGoogle && !socialAuthConfig.facebookAppId) {
+            throw new Error('Facebook App ID not configured (CIRCLE_FACEBOOK_APP_ID)');
         }
 
+        ensureArcSdk((error, result) => {
+            void onAuthLoginComplete(error, result, 'social');
+        });
+        const deviceId = await arcSdk.getDeviceId();
+
+        const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/social/device-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId }),
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok) throw new Error(tokenData.error || 'Failed to start social login');
+        if (!tokenData.deviceToken || !tokenData.deviceEncryptionKey) {
+            throw new Error('Incomplete social device token from Circle');
+        }
+        if (tokenData.googleClientId) socialAuthConfig.googleClientId = tokenData.googleClientId;
+        if (tokenData.facebookAppId) socialAuthConfig.facebookAppId = tokenData.facebookAppId;
+
+        const redirectUri = socialRedirectUri();
+        const loginConfigs = {
+            deviceToken: tokenData.deviceToken,
+            deviceEncryptionKey: tokenData.deviceEncryptionKey,
+        };
+        if (isGoogle) {
+            loginConfigs.google = {
+                clientId: socialAuthConfig.googleClientId,
+                redirectUri,
+                selectAccountPrompt: true,
+            };
+        } else {
+            loginConfigs.facebook = {
+                appId: socialAuthConfig.facebookAppId,
+                redirectUri,
+            };
+        }
+
+        saveSocialPending({
+            returnUrl: window.location.href,
+            provider,
+            deviceToken: tokenData.deviceToken,
+            deviceEncryptionKey: tokenData.deviceEncryptionKey,
+            appId: viewerState.appId,
+            googleClientId: socialAuthConfig.googleClientId,
+            facebookAppId: socialAuthConfig.facebookAppId,
+            redirectUri,
+        });
+
+        arcSdk.updateConfigs(
+            {
+                appSettings: { appId: viewerState.appId },
+                loginConfigs,
+            },
+            (error, result) => {
+                void onAuthLoginComplete(error, result, 'social');
+            }
+        );
+
+        setLoginStatus(isGoogle ? 'Opening Google…' : 'Opening Facebook…');
+        await arcSdk.performLogin(provider);
     } catch (error) {
-        console.error('[Tessera] Login error:', error);
-        btn.disabled = false;
-        btn.innerHTML = `${LOCK_SVG} Sign in with PIN`;
-        setLoginStatus('Error: ' + (error.message || 'Unknown error. Please retry.'), true);
+        console.error('[Tessera] Social login error:', error && error.message ? error.message : error);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = isGoogle ? GOOGLE_CONTINUE_HTML : 'Continue with Facebook';
+        }
+        setLoginStatus('Error: ' + (error.message || 'Social login failed'), true);
     }
+}
+
+/** After Google/Facebook redirect, finish login if Circle returns tokens. */
+async function tryResumeSocialLogin() {
+    if (socialResumeInFlight) return socialResumeInFlight;
+    socialResumeInFlight = doTryResumeSocialLogin().finally(() => {
+        socialResumeInFlight = null;
+    });
+    return socialResumeInFlight;
+}
+
+async function doTryResumeSocialLogin() {
+    const pending = readSocialPending();
+    if (!pending?.deviceToken || !pending?.appId) return false;
+
+    // Mirror of the Circle SDK's own isValidHash gate (dist/src/index.js). If the
+    // hash fails this pattern, the SDK silently does nothing on OAuth return.
+    const sdkHashPattern = /^#(?:[a-zA-Z0-9-_.%]+=[^&]*&)*[a-zA-Z0-9-_.%]+=[^&]*$/;
+    const hasOAuthHash = sdkHashPattern.test(window.location.hash || '');
+    // Stale pending without OAuth hash: do not construct W3SSdk (Circle singleton
+    // would then ignore a later constructor with the real callback/configs).
+    if (!hasOAuthHash) {
+        return false;
+    }
+
+    showSocialResumeSplash(pending.provider);
+
+    viewerState.appId = pending.appId;
+    socialAuthConfig.googleClientId = pending.googleClientId || '';
+    socialAuthConfig.facebookAppId = pending.facebookAppId || '';
+
+    const loginConfigs = {
+        deviceToken: pending.deviceToken,
+        deviceEncryptionKey: pending.deviceEncryptionKey,
+    };
+    if (pending.provider === SOCIAL_GOOGLE && pending.googleClientId) {
+        loginConfigs.google = {
+            clientId: pending.googleClientId,
+            redirectUri: pending.redirectUri || socialRedirectUri(),
+            selectAccountPrompt: true,
+        };
+    }
+    if (pending.provider === SOCIAL_FACEBOOK && pending.facebookAppId) {
+        loginConfigs.facebook = {
+            appId: pending.facebookAppId,
+            redirectUri: pending.redirectUri || socialRedirectUri(),
+        };
+    }
+
+    const sdkConfigs = {
+        appSettings: { appId: pending.appId },
+        loginConfigs,
+    };
+
+    return await new Promise((resolve) => {
+        let settled = false;
+        let timeoutId = null;
+        const finish = (ok) => {
+            if (settled) return;
+            settled = true;
+            if (timeoutId != null) clearTimeout(timeoutId);
+            window.removeEventListener('message', circleResumeProbe);
+            if (!ok) hideSocialResumeSplash();
+            resolve(ok);
+        };
+
+        const completeSocialResume = (error, result, source) => {
+            // Claim synchronously so postMessage + sdk-callback cannot both run
+            // onAuthLoginComplete, and so the wait-timeout cannot fire mid-setup.
+            if (settled) return;
+            if (error || !result?.userToken) {
+                const errMsg = (error && error.message) ? error.message : 'no session';
+                console.error('[Tessera] Social resume failed via ' + source + ': ' + errMsg);
+                finish(false);
+                return;
+            }
+            settled = true;
+            if (timeoutId != null) clearTimeout(timeoutId);
+            window.removeEventListener('message', circleResumeProbe);
+            void (async () => {
+                try {
+                    await onAuthLoginComplete(error, result, 'social');
+                    const returnUrl = pending.returnUrl;
+                    clearSocialPending();
+                    if (returnUrl && returnUrl !== window.location.href) {
+                        // Cover survives navigation until paywall mounts on the video page.
+                        setOpaqueCoverFlag(pending.provider);
+                        window.location.replace(returnUrl);
+                    } else {
+                        hideSocialResumeSplash();
+                    }
+                    resolve(true);
+                } catch (err) {
+                    console.error('[Tessera] Social resume post-setup error:', err && err.message ? err.message : err);
+                    hideSocialResumeSplash();
+                    resolve(false);
+                }
+            })();
+        };
+
+        // PeerTube/Zone can leave W3SSdk.onLoginComplete unset while the iframe still
+        // verifies. Evidence: onSocialLoginVerified arrives with error=null but the SDK
+        // never invokes the constructor callback. Complete from the postMessage directly.
+        const circleResumeProbe = (event) => {
+            if (event.origin !== 'https://pw-auth.circle.com') return;
+            const data = event.data || {};
+            const verified = data.onSocialLoginVerified;
+            if (verified) {
+                completeSocialResume(verified.error, verified.result, 'postMessage');
+            }
+        };
+        window.addEventListener('message', circleResumeProbe);
+
+        const onLoginComplete = (error, result) => {
+            completeSocialResume(error, result, 'sdk-callback');
+        };
+
+        // Circle W3SSdk is a singleton: a second `new W3SSdk()` runs setupInstance on a
+        // throwaway object and returns the old instance without applying loginConfigs.
+        if (!arcSdk) {
+            arcSdk = new W3SSdk(sdkConfigs, onLoginComplete);
+        } else {
+            arcSdk.updateConfigs(sdkConfigs, onLoginComplete);
+        }
+
+        // Circle's own verify-token network timeout is 10s and uses onComplete (not
+        // onLoginComplete). Wait past that for the verify postMessage.
+        timeoutId = setTimeout(() => {
+            if (!settled) {
+                console.warn('[Tessera] Social resume timed out after 15s.');
+                finish(false);
+            }
+        }, 15000);
+    });
+}
+
+async function handleRequestEmailOtp() {
+    const btn = document.getElementById('arc-login-btn');
+    const emailInput = document.getElementById('arc-email-input');
+    const email = (emailInput?.value || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+        setLoginStatus('Enter a valid email address.', true);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Sending…';
+    setLoginStatus('');
+
+    try {
+        if (!viewerState.appId) {
+            await loadCircleClientConfig();
+        }
+
+        ensureArcSdk((error, result) => {
+            void onAuthLoginComplete(error, result, 'email');
+        });
+
+        const deviceId = await arcSdk.getDeviceId();
+        setLoginStatus('Sending code to your email…');
+
+        const otpRes = await fetch(ARC_API_BASE + '/api/core/circle/email-otp/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, deviceId }),
+        });
+        const otpData = await otpRes.json();
+        if (!otpRes.ok) {
+            throw new Error(otpData.error || 'Failed to send email OTP');
+        }
+        if (!otpData.deviceToken || !otpData.deviceEncryptionKey || !otpData.otpToken) {
+            throw new Error('Incomplete OTP session from Circle');
+        }
+
+        if (otpData.appId) viewerState.appId = otpData.appId;
+        pendingEmailOtp = {
+            deviceToken: otpData.deviceToken,
+            deviceEncryptionKey: otpData.deviceEncryptionKey,
+            otpToken: otpData.otpToken,
+            email: otpData.email || email,
+            appId: viewerState.appId,
+        };
+
+        arcSdk.updateConfigs(
+            {
+                appSettings: { appId: viewerState.appId },
+                loginConfigs: {
+                    deviceToken: pendingEmailOtp.deviceToken,
+                    deviceEncryptionKey: pendingEmailOtp.deviceEncryptionKey,
+                    otpToken: pendingEmailOtp.otpToken,
+                },
+            },
+            (error, result) => {
+                void onAuthLoginComplete(error, result, 'email');
+            }
+        );
+
+        const verifyBtn = document.getElementById('arc-verify-otp-btn');
+        if (verifyBtn) verifyBtn.style.display = 'block';
+        setLoginStatus('Code sent. Check your inbox, then tap Verify code.');
+        btn.disabled = false;
+        btn.innerHTML = `${LOCK_SVG} Resend code`;
+    } catch (error) {
+        console.error('[Tessera] Email OTP request error:', error && error.message ? error.message : error);
+        btn.disabled = false;
+        btn.innerHTML = `${LOCK_SVG} Send email code`;
+        setLoginStatus('Error: ' + (error.message || 'Could not send code. Is SMTP set in Circle Console?'), true);
+    }
+}
+
+function handleVerifyEmailOtp() {
+    if (!pendingEmailOtp || !arcSdk) {
+        setLoginStatus('Request a code first.', true);
+        return;
+    }
+    const verifyBtn = document.getElementById('arc-verify-otp-btn');
+    if (verifyBtn) {
+        verifyBtn.disabled = true;
+        verifyBtn.innerHTML = '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Opening…';
+    }
+    setLoginStatus('Enter the code in the Circle window…');
+    arcSdk.verifyOtp();
+}
+
+async function onAuthLoginComplete(error, result, authMethod) {
+    const verifyBtn = document.getElementById('arc-verify-otp-btn');
+    if (error || !result?.userToken) {
+        console.error('[Tessera] Auth login failed:', error && error.message ? error.message : 'Login failed');
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = 'Verify code';
+        }
+        const googleBtn = document.getElementById('arc-google-btn');
+        if (googleBtn) {
+            googleBtn.disabled = false;
+            googleBtn.innerHTML = GOOGLE_CONTINUE_HTML;
+        }
+        const facebookBtn = document.getElementById('arc-facebook-btn');
+        if (facebookBtn) {
+            facebookBtn.disabled = false;
+            facebookBtn.innerHTML = 'Continue with Facebook';
+        }
+        setLoginStatus('Error: ' + ((error && error.message) || 'Login failed.'), true);
+        return;
+    }
+
+    try {
+        // Email OTP and Google/Facebook are different Circle users. Never keep a
+        // walletId from a previous method attached to the new userToken.
+        viewerState.walletId = null;
+        viewerState.walletAddress = null;
+        viewerState.ephemeralPk = null;
+        localStorage.removeItem('arc_circle_wallet_id');
+        localStorage.removeItem('arc_circle_wallet_address');
+        localStorage.removeItem('arc_ephemeral_pk');
+
+        viewerState.userToken = result.userToken;
+        viewerState.encryptionKey = result.encryptionKey;
+        viewerState.refreshToken = result.refreshToken || null;
+        viewerState.authMethod = authMethod === 'social' ? 'social' : 'email';
+
+        const oauthEmail = result.oAuthInfo?.socialUserInfo?.email
+            ? String(result.oAuthInfo.socialUserInfo.email).trim().toLowerCase()
+            : null;
+        if (authMethod === 'social') {
+            viewerState.email = oauthEmail || viewerState.email;
+            // Keep social identity separate from email OTP (Circle does not merge them).
+            const socialId = result.oAuthInfo?.socialUserUUID || oauthEmail || 'unknown';
+            viewerState.userId = 'social:' + socialId;
+        } else {
+            viewerState.email = pendingEmailOtp?.email || viewerState.email;
+            viewerState.userId = 'email:' + viewerState.email;
+        }
+
+        persistCircleAuthSession();
+
+        // Fresh SDK with auth tokens; the old singleton may never resolve getDeviceId.
+        arcSdk = ensureArcSdkWithAuth();
+
+        setLoginStatus('Setting up your Arc wallet…');
+        await resolveAndBindArcWallet();
+
+        setLoginStatus('Checking wallet balance…');
+        await ensureEphemeralKey();
+        const hasFunds = await checkArcBalance(viewerState.walletAddress);
+        transitionToFundPhase();
+        if (hasFunds) {
+            enableUnlockButton();
+        } else {
+            startBalancePolling();
+        }
+    } catch (err) {
+        console.error('[Tessera] Post-login wallet setup error:', err && err.message ? err.message : err);
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = 'Verify code';
+        }
+        setLoginStatus('Error: ' + (err.message || 'Wallet setup failed'), true);
+    }
+}
+
+async function resolveAndBindArcWallet() {
+    const walletData = await getOrCreateArcWallet();
+    if (!walletData?.walletId || !walletData?.walletAddress) {
+        throw new Error('Could not resolve Arc wallet for this login.');
+    }
+    viewerState.walletId = walletData.walletId;
+    viewerState.walletAddress = walletData.walletAddress;
+    persistCircleAuthSession();
+    return walletData;
 }
 
 async function getOrCreateArcWallet(retries = 0) {
     if (retries > 10) {
-        throw new Error('No se pudo configurar la wallet. Por favor intenta de nuevo.');
+        throw new Error('Could not set up the wallet. Please try again.');
     }
 
     const walletRes = await fetch(ARC_API_BASE + '/api/core/circle/get-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: viewerState.userId, userToken: viewerState.userToken }),
+        body: JSON.stringify({
+            userId: viewerState.userId,
+            userToken: viewerState.userToken,
+            authMethod: viewerState.authMethod || 'email',
+        }),
     });
     if (!walletRes.ok) throw new Error('Failed to resolve Arc wallet');
     const walletData = await walletRes.json();
 
-    // First-time user: complete wallet creation challenge via Circle SDK popup
+    // First-time user: complete wallet creation challenge via Circle confirmation UI
     if (walletData.status === 'needs_creation') {
-        setLoginStatus('Complete security setup in the popup…');
+        setLoginStatus('Confirm wallet creation in the Circle window…');
         const execOutcome = await new Promise((resolve) => {
             arcSdk.execute(walletData.challengeId, (error, result) => {
-                // Circle SDK can fire 'cancelled' even after the user completes PIN
-                // and the wallet is created on Circle's side. Always resolve (never
-                // reject here) so we can attempt recovery before giving up.
                 resolve({ error: error ?? null, result: result ?? null });
             });
         });
 
         if (execOutcome.error) {
-            // SDK reported an error — could be a Circle SDK false-positive "cancelled",
-            // or the user genuinely closed the popup. Either way, check if the wallet
-            // was actually created before throwing.
             const recoveryRes = await fetch(ARC_API_BASE + '/api/core/circle/get-wallet', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId, userToken: viewerState.userToken }),
+                body: JSON.stringify({
+                    userId: viewerState.userId,
+                    userToken: viewerState.userToken,
+                    authMethod: viewerState.authMethod || 'email',
+                }),
             });
             if (recoveryRes.ok) {
                 const recoveryData = await recoveryRes.json();
-                if (recoveryData.status === 'existing' || recoveryData.status === 'ready') {
-                    console.log('[Tessera] SDK reported cancel but wallet exists — recovered silently.');
-                    return recoveryData;
+                if (recoveryData.status === 'existing') return recoveryData;
+                if (recoveryData.status === 'indexing') {
+                    await new Promise((r) => setTimeout(r, 2000));
+                    return getOrCreateArcWallet(retries + 1);
                 }
             }
-            // Wallet genuinely does not exist — user cancelled before completing PIN.
-            throw new Error('Setup cancelled. Click "Sign in with PIN" to try again.');
+            throw new Error('Setup cancelled. Tap Verify code / Send email code to try again.');
         }
 
-        // SDK succeeded — re-fetch to get the confirmed walletId and address
+        await new Promise((r) => setTimeout(r, 1500));
         return getOrCreateArcWallet(retries + 1);
     }
 
-    // Circle error 155106: wallet just initialized, still indexing on Circle's side.
-    // Wait 1.5s and retry — per Circle docs: "Fetch existing wallets instead of creating".
     if (walletData.status === 'indexing') {
-        setLoginStatus('Setting up your wallet…');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((r) => setTimeout(r, 2000));
         return getOrCreateArcWallet(retries + 1);
     }
 
@@ -893,7 +1660,7 @@ async function getArcBalance(address) {
         const json = await res.json();
         return json.balance;
     } catch (e) {
-        console.warn('[Tessera] Balance fetch via backend failed, using direct query fallback:', e);
+        console.warn('[Tessera] Balance fetch via backend failed, using direct query fallback:', e && e.message ? e.message : e);
         // Direct query fallback (handles case when backend is down/unreachable during early setup)
         try {
             const res = await fetch('https://rpc.testnet.arc.network', {
@@ -908,7 +1675,7 @@ async function getArcBalance(address) {
             const balance = BigInt(json.result || '0x0');
             return Number(balance) / 1e18;
         } catch (innerErr) {
-            console.warn('[Tessera] Direct query fallback also failed:', innerErr);
+            console.warn('[Tessera] Direct query fallback also failed:', innerErr && innerErr.message ? innerErr.message : innerErr);
             return 0;
         }
     }
@@ -923,9 +1690,32 @@ async function checkArcBalance(address) {
 
 // ─── Phase 2: Funding Panel ───────────────────────────────────────────────────
 
-function transitionToFundPhase() {
-    document.getElementById('arc-phase-login').style.display = 'none';
+function transitionToLoginPhase(message, isError = true) {
     const fundPhase = document.getElementById('arc-phase-fund');
+    const loginPhase = document.getElementById('arc-phase-login');
+    if (fundPhase) fundPhase.style.display = 'none';
+    if (loginPhase) loginPhase.style.display = 'block';
+
+    const headerTitle = document.querySelector('#arc-paywall-header h2');
+    if (headerTitle) {
+        headerTitle.innerHTML = isTipMode ? 'Support the creator' : 'Pay to watch';
+        headerTitle.className = '';
+    }
+    const headerSub = document.querySelector('#arc-paywall-header p');
+    if (headerSub) headerSub.style.display = '';
+
+    void refreshSocialLoginButtons();
+    if (message) setLoginStatus(message, isError);
+}
+
+function transitionToFundPhase() {
+    // Overlay may not be mounted yet (e.g. social resume finished on a
+    // non-video page after the OAuth redirect). Bail out; initPaywall will
+    // render the correct phase when the overlay mounts.
+    const loginPhase = document.getElementById('arc-phase-login');
+    const fundPhase = document.getElementById('arc-phase-fund');
+    if (!loginPhase || !fundPhase) return;
+    loginPhase.style.display = 'none';
     fundPhase.style.display = 'block';
 
     // Change header content to the simplified Phase 2 label
@@ -942,6 +1732,30 @@ function transitionToFundPhase() {
     const display = addr ? addr.slice(0, 6) + '…' + addr.slice(-4) : '';
     const displayEl = document.getElementById('arc-wallet-display');
     if (displayEl) displayEl.textContent = display;
+
+    void refreshUcwBalanceDisplay();
+}
+
+/** Show UCW (Arc wallet) USDC balance on the deposit panel. */
+async function refreshUcwBalanceDisplay() {
+    const el = document.getElementById('arc-ucw-balance');
+    if (!el) return;
+    if (!viewerState.walletAddress) {
+        el.textContent = '—';
+        return;
+    }
+    el.textContent = '…';
+    try {
+        const bal = await getArcBalance(viewerState.walletAddress);
+        const n = Number(bal);
+        if (!Number.isFinite(n)) {
+            el.textContent = '—';
+            return;
+        }
+        el.textContent = n.toFixed(4) + ' USDC';
+    } catch (_) {
+        el.textContent = '—';
+    }
 }
 
 function copyWalletAddress() {
@@ -954,8 +1768,32 @@ function copyWalletAddress() {
     });
 }
 
+// Local sign-out only. The server keeps the canonical session for this userId,
+// so Gateway funds and the ephemeral key are recovered on the next login via
+// sync-session. Nothing on the server side is deleted here.
+function handleLogout() {
+    if (balancePollingInterval) {
+        clearInterval(balancePollingInterval);
+        balancePollingInterval = null;
+    }
+    viewerState.userId = null;
+    viewerState.email = null;
+    viewerState.authMethod = 'email';
+    viewerState.walletId = null;
+    viewerState.walletAddress = null;
+    viewerState.ephemeralPk = null;
+    clearCircleAuthTokens();
+    CIRCLE_AUTH_LS_KEYS.forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem('arc_ephemeral_pk');
+    clearSocialPending();
+    setFundStatus('');
+    transitionToLoginPhase('Signed out. Your balance stays linked to your account.', false);
+    console.log('[Tessera] Signed out (local session cleared).');
+}
+
 function startBalancePolling() {
-    document.getElementById('arc-waiting-balance').style.display = 'flex';
+    const waitingEl = document.getElementById('arc-waiting-balance');
+    if (waitingEl) waitingEl.style.display = 'flex';
     if (balancePollingInterval) clearInterval(balancePollingInterval);
     balancePollingInterval = setInterval(async () => {
         const minReq = getRequiredMinBalance();
@@ -978,10 +1816,12 @@ function startBalancePolling() {
 
         // Gateway still empty: wallet funds only mean the user can deposit.
         const walletCanDeposit = await checkArcBalance(viewerState.walletAddress);
+        void refreshUcwBalanceDisplay();
         if (walletCanDeposit) {
             clearInterval(balancePollingInterval);
             balancePollingInterval = null;
-            document.getElementById('arc-waiting-balance').style.display = 'none';
+            const waitingDone = document.getElementById('arc-waiting-balance');
+            if (waitingDone) waitingDone.style.display = 'none';
             enableUnlockButton();
         }
     }, 4000);
@@ -998,6 +1838,7 @@ function enableUnlockButton() {
     // Small celebration pulse
     btn.classList.add('arc-pulse-once');
     setTimeout(() => btn.classList.remove('arc-pulse-once'), 600);
+    void refreshUcwBalanceDisplay();
 }
 
 function getSelectedDepositAmount() {
@@ -1018,18 +1859,6 @@ function getSelectedDepositAmount() {
 
 async function handleUnlock() {
     const btn = document.getElementById('arc-unlock-btn');
-    // #region agent log
-    agentDebugLog('H2,H5', 'handleUnlock entry', {
-        isTipMode,
-        btnDisabledBefore: btn ? btn.disabled : null,
-        selectedDepositAmount: getSelectedDepositAmount(),
-        hasEphemeralKey: Boolean(viewerState.ephemeralPk || localStorage.getItem('arc_ephemeral_pk')),
-        bodyLocked: document.body.classList.contains('arc-locked'),
-        overlayParentClass: (document.getElementById('arc-paywall-overlay') || {}).parentElement
-            ? document.getElementById('arc-paywall-overlay').parentElement.className
-            : null,
-    });
-    // #endregion
     btn.disabled = true;
     btn.innerHTML = isTipMode
         ? '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Enabling…'
@@ -1042,42 +1871,21 @@ async function handleUnlock() {
             throw new Error('Minimum deposit amount is 0.1 USDC');
         }
 
+        setFundStatus('Preparing deposit to Gateway…');
+
+        await ensureCircleAuthSession();
+        // Re-bind wallet to the current Circle userToken (email OTP != Google user).
+        setFundStatus('Resolving wallet…');
+        await resolveAndBindArcWallet();
+
         setFundStatus('Checking wallet balance…');
         const currentBalance = await getArcBalance(viewerState.walletAddress);
         if (currentBalance < selectedAmount) {
             throw new Error(`Insufficient funds: Your wallet has $${currentBalance.toFixed(4)} USDC, but you chose to deposit $${selectedAmount.toFixed(2)} USDC.`);
         }
 
-        setFundStatus('Preparing deposit to Gateway…');
-
-        // Refresh Circle token if expired
-        const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/get-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
-        });
-        if (!tokenRes.ok) throw new Error('Failed to refresh session');
-        const tokenData = await tokenRes.json();
-        viewerState.userToken = tokenData.userToken;
-        viewerState.encryptionKey = tokenData.encryptionKey;
-        if (!arcSdk) {
-            arcSdk = new W3SSdk({
-                appSettings: { appId: tokenData.appId }
-            });
-            arcSdk.getDeviceId();
-        }
-        arcSdk.setAuthentication({
-            userToken: viewerState.userToken,
-            encryptionKey: viewerState.encryptionKey,
-        });
-
         // Ensure ephemeral key exists (needed for both deposit and register-session)
-        viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
-        if (!viewerState.ephemeralPk) {
-            viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                .map(b => b.toString(16).padStart(2, '0')).join('');
-            localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
-        }
+        await ensureEphemeralKey();
 
         // Check if Gateway already funded (returning user)
         let skipDeposit = false;
@@ -1106,11 +1914,14 @@ async function handleUnlock() {
                     ephemeralPk: viewerState.ephemeralPk,
                 }),
             });
-            if (!depositRes.ok) throw new Error('Failed to prepare deposit');
+            if (!depositRes.ok) {
+                const errJson = await depositRes.json().catch(() => ({}));
+                throw new Error(errJson.error || 'Failed to prepare deposit');
+            }
             const depositData = await depositRes.json();
             if (!depositData.challengeId) throw new Error('No deposit challenge received');
 
-            // User approves via Circle PIN/Email popup
+            // User approves in the Circle confirmation UI
             await new Promise((resolve, reject) => {
                 arcSdk.execute(depositData.challengeId, (error, result) => {
                     if (error) reject(new Error('Deposit cancelled or failed'));
@@ -1142,19 +1953,9 @@ async function handleUnlock() {
         // Register session with ephemeral key
         setFundStatus('Opening stream…');
 
-        const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: viewerState.userId,
-                privateKey: viewerState.ephemeralPk,
-                returnAddress: viewerState.walletAddress,
-                ratePerSecond: getRequiredMinBalance(),
-            }),
-        });
+        const { regRes, regData } = await registerViewerSession(getRequiredMinBalance());
         if (!regRes.ok) {
-            const errJson = await regRes.json().catch(() => ({}));
-            throw new Error(errJson.error || 'Backend failed to register session.');
+            throw new Error(regData.error || 'Backend failed to register session.');
         }
 
         // ✅ Unlock stream or Enable Tipping
@@ -1173,7 +1974,6 @@ async function handleUnlock() {
                 viewerState.userId = localStorage.getItem('arc_cashier_user_id');
                 viewerState.walletId = localStorage.getItem('arc_circle_wallet_id');
                 viewerState.walletAddress = localStorage.getItem('arc_circle_wallet_address');
-                viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
                 window.arcShowTipButton(tipCreatorWallet, tipAmountVal);
             }
             // Tip is sent only when the user clicks the tip button: not on enable.
@@ -1187,19 +1987,16 @@ async function handleUnlock() {
         }
 
     } catch (error) {
-        console.error('[Tessera] Unlock error:', error);
-        // #region agent log
-        agentDebugLog('H2,H5', 'handleUnlock catch', {
-            isTipMode,
-            errorName: error && error.name ? error.name : null,
-            errorMessage: error && error.message ? error.message : String(error),
-            btnDisabledAfterError: btn ? btn.disabled : null,
-            fundStatus: (document.getElementById('arc-fund-status') || {}).textContent || '',
-        });
-        // #endregion
+        console.error('[Tessera] Unlock error:', error && error.message ? error.message : error);
         btn.disabled = false;
         btn.innerHTML = isTipMode ? `${UNLOCK_SVG} Enable Tipping` : `${UNLOCK_SVG} Unlock Video`;
+        if (error && error.code === 'AUTH_REQUIRED') {
+            transitionToLoginPhase(error.message || 'Sign in with Google or email to continue.');
+            setFundStatus('');
+            return;
+        }
         setFundStatus('Error: ' + (error.message || 'Please retry.'), true);
+        void refreshUcwBalanceDisplay();
     }
 }
 
@@ -1368,13 +2165,13 @@ async function executeCctpBridge(chain) {
             console.log(`[CCTP] Forwarded mint transaction detected on Arc: ${forwardTxHash}`);
             startBalancePolling();
         } catch (err) {
-            console.error('[Tessera] CCTP forwarding error:', err);
+            console.error('[Tessera] CCTP forwarding error:', err && err.message ? err.message : err);
             setFundStatus('Bridge submitted but confirmation timed out. Polling wallet balance...', true);
             startBalancePolling(); // Still poll as the mint might succeed eventually
         }
 
     } catch (error) {
-        console.error('[Tessera] CCTP bridge error:', error);
+        console.error('[Tessera] CCTP bridge error:', error && error.message ? error.message : error);
         setCctpProgress('Error: ' + (error.message || 'Bridge failed. Please retry.'));
         // Reset to select step
         document.getElementById('arc-cctp-step-select').style.display = 'block';
@@ -1417,7 +2214,7 @@ async function pollCctpForwarding(sourceDomain, txHash) {
                 return msg.forwardTxHash;
             }
         } catch (e) {
-            console.warn(`[CCTP] Error polling Iris:`, e);
+            console.warn('[CCTP] Error polling Iris:', e && e.message ? e.message : e);
         }
     }
     throw new Error('CCTP forwarding timed out');
@@ -1439,6 +2236,11 @@ function setCctpProgress(msg) {
 }
 
 // ─── Session Manager (post-unlock) ───────────────────────────────────────────
+
+function removeSessionManagerWidget() {
+    const sm = document.getElementById('arc-session-manager');
+    if (sm) sm.remove();
+}
 
 function renderSessionManager() {
     const existing = document.getElementById('arc-session-manager');
@@ -1549,7 +2351,7 @@ window.arcSetRate = function (ratePerSec) {
         currentRatePerSecond = Number(ratePerSec);
         // Paywall overlay rate display
         const el = document.getElementById('arc-display-rate');
-        if (el) el.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' USDC / sec (varies by video)';
+        if (el) el.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' / sec';
         // Session manager rate display
         const rateEl = document.getElementById('arc-sm-rate');
         if (rateEl) rateEl.textContent = '$' + currentRatePerSecond.toFixed(4) + ' USDC / sec';
@@ -1578,10 +2380,10 @@ window.arcResetVideoSession = function (newRate) {
 
     // Also keep paywall overlay in sync
     const displayRate = document.getElementById('arc-display-rate');
-    if (displayRate) displayRate.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' USDC / sec (varies by video)';
+    if (displayRate) displayRate.textContent = 'From $' + currentRatePerSecond.toFixed(4) + ' / sec';
 
     // Auto-unlock if credentials exist and paywall is still locked
-    if (document.body.classList.contains('arc-locked') && viewerState.userId && viewerState.walletAddress) {
+    if (document.body.classList.contains('arc-locked') && hasResumableCircleSession()) {
         void checkAutoUnlock();
     }
 };
@@ -1723,7 +2525,7 @@ function startSessionTimer() {
                         }
                     }
                 }
-            } catch (e) { console.error('Heartbeat failed', e); }
+            } catch (e) { console.error('[Tessera] Heartbeat failed:', e && e.message ? e.message : e); }
         }
     }, 1000);
 }
@@ -1763,32 +2565,16 @@ async function handleTopUp(depositAmount) {
             }
         }
 
-        // Step 1: Refresh Circle user token
-        const tokenRes = await fetch(ARC_API_BASE + '/api/core/circle/get-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
-        });
-        if (!tokenRes.ok) throw new Error('Failed to refresh Circle session');
-        const tokenData = await tokenRes.json();
-
-        if (!arcSdk) {
-            arcSdk = new W3SSdk({
-                appSettings: { appId: tokenData.appId }
-            });
-            arcSdk.getDeviceId();
-        }
-        arcSdk.setAuthentication({
-            userToken: tokenData.userToken,
-            encryptionKey: tokenData.encryptionKey,
-        });
+        // Step 1: Refresh Circle session via refreshToken (email OTP / social login)
+        await ensureCircleAuthSession();
+        await resolveAndBindArcWallet();
 
         // Step 2: Create the transfer from the SCA wallet to the ephemeral wallet
         const prepRes = await fetch(ARC_API_BASE + '/api/core/circle/prepare-deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                userToken: tokenData.userToken,
+                userToken: viewerState.userToken,
                 walletId: viewerState.walletId,
                 depositAmount: depositAmount.toFixed(6),
                 ephemeralPk: viewerState.ephemeralPk,
@@ -1825,7 +2611,7 @@ async function handleTopUp(depositAmount) {
         resetForm('Top Up');
         document.getElementById('arc-sm-warning').classList.add('arc-hidden');
     } catch (error) {
-        console.error('[Tessera] Top-up failed', error);
+        console.error('[Tessera] Top-up failed:', error && error.message ? error.message : error);
         resetForm('Error (Retry)');
     }
 }
@@ -1925,23 +2711,7 @@ window.arcResumeSession = async function () {
     }
 
     try {
-        viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
-        if (!viewerState.ephemeralPk) {
-            viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                .map(b => b.toString(16).padStart(2, '0')).join('');
-            localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
-        }
-
-        const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: viewerState.userId,
-                privateKey: viewerState.ephemeralPk,
-                returnAddress: viewerState.walletAddress,
-                ratePerSecond: getRequiredMinBalance(),
-            }),
-        });
+        const { regRes } = await registerViewerSession(getRequiredMinBalance());
 
         if (regRes.ok) {
             console.log('[Tessera] Session resumed successfully.');
@@ -1957,7 +2727,7 @@ window.arcResumeSession = async function () {
             return;
         }
     } catch (err) {
-        console.error('[Tessera] Resume session error:', err);
+        console.error('[Tessera] Resume session error:', err && err.message ? err.message : err);
     }
 
     // Fallback if silent resume fails: check auto unlock or open onboarding
@@ -1984,8 +2754,12 @@ window.arcEndSession = async function () {
         if (xhr.status >= 200 && xhr.status < 300) {
             localStorage.removeItem('arc_ephemeral_pk');
             viewerState.ephemeralPk = null;
-            // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+            // We keep user identity (userId, walletId, walletAddress) so returning users do not have to reconnect their wallet.
             // These stay persistent for subsequent sessions or top-ups.
+
+            removeSessionManagerWidget();
+            initialGatewayBalance = null;
+            secondsThisVideo = 0;
 
             // Lock screen
             document.body.classList.add('arc-locked');
@@ -2023,6 +2797,7 @@ window.arcEndSession = async function () {
                 const doneBtn = document.getElementById('arc-success-done-btn');
                 if (doneBtn) {
                     doneBtn.onclick = () => {
+                        removeSessionManagerWidget();
                         successPhase.style.display = 'none';
                         document.getElementById('arc-phase-login').style.display = 'block';
                     };
@@ -2084,7 +2859,7 @@ function openTipOnboarding() {
         document.body.classList.remove('arc-locked');
         renderPaywallOverlay();
         document.body.classList.remove('arc-locked');
-        if (viewerState.userId && viewerState.walletAddress) {
+        if (hasResumableCircleSession()) {
             transitionToFundPhase();
             void checkAutoUnlock();
         }
@@ -2205,6 +2980,9 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
     btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
 
     const refreshStatus = async () => {
+        if (!viewerState.ephemeralPk && hasResumableCircleSession()) {
+            try { await ensureEphemeralKey(); } catch (_) { /* ignore */ }
+        }
         if (!viewerState.userId || !viewerState.ephemeralPk) {
             updateContainerStyle();
             header.style.display = 'none';
@@ -2273,7 +3051,7 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
 
                 localStorage.removeItem('arc_ephemeral_pk');
                 viewerState.ephemeralPk = null;
-                // We keep user identity (userId, walletId, walletAddress) so returning users do not have to recreate their PIN or wallet address.
+                // We keep user identity (userId, walletId, walletAddress) so returning users do not have to reconnect their wallet.
                 // These stay persistent for subsequent sessions or top-ups.
 
                 const scanUrl = txHash
@@ -2297,14 +3075,14 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                     </div>
                 `;
                 document.getElementById('arc-tip-success-close').addEventListener('click', () => {
-                    // Reset the tipping button state back to initial unconnected floating card
-                    window.arcShowTipButton(creatorWallet, tipAmount);
+                    clearInterval(tipInterval);
+                    container.remove();
                 });
             } else {
                 throw new Error('Cash-out failed on server');
             }
         } catch (err) {
-            console.error('[Tessera] Cash-out failed', err);
+            console.error('[Tessera] Cash-out failed:', err && err.message ? err.message : err);
             alert('Cash-out failed: ' + (err.message || 'Please try again.'));
             endBtn.disabled = false;
             endBtn.innerHTML = 'Cash Out & Exit';
@@ -2313,6 +3091,9 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
 
     // ── Click handler ─────────────────────────────────────────────────────
     btn.addEventListener('click', async () => {
+        if (!viewerState.ephemeralPk && hasResumableCircleSession()) {
+            try { await ensureEphemeralKey(); } catch (_) { /* ignore */ }
+        }
         // No userId or no ephemeralPk (active session) -> trigger full wallet onboarding
         if (!viewerState.userId || !viewerState.ephemeralPk) {
             openTipOnboarding();
@@ -2343,30 +3124,20 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                     btn.textContent = `\u2764\uFE0F +$${amount.toFixed(2)} more`;
                     void refreshStatus();
                 } else {
-                    const err = await res.json().catch(() => ({}));
-                    console.error('[Tessera] Tip failed:', err);
+                    console.error('[Tessera] Tip failed: HTTP ' + res.status);
 
                     if (res.status === 404) {
-                        if (attempt === 1 && viewerState.walletAddress && viewerState.ephemeralPk) {
+                        if (attempt === 1 && viewerState.walletAddress) {
                             console.log('[Tessera] Attempting silent session registration...');
                             try {
-                                const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        userId: viewerState.userId,
-                                        privateKey: viewerState.ephemeralPk,
-                                        returnAddress: viewerState.walletAddress,
-                                        ratePerSecond: getRequiredMinBalance(),
-                                    }),
-                                });
+                                const { regRes } = await registerViewerSession(getRequiredMinBalance());
                                 if (regRes.ok) {
                                     console.log('[Tessera] Silent session registration succeeded. Retrying tip.');
                                     await sendTip(2);
                                     return;
                                 }
                             } catch (regErr) {
-                                console.error('[Tessera] Silent registration error:', regErr);
+                                console.error('[Tessera] Silent registration error:', regErr && regErr.message ? regErr.message : regErr);
                             }
                         }
 
@@ -2379,7 +3150,7 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                         openTipOnboarding();
                     } else {
                         if (attempt < 3) {
-                            console.log(`[Tessera] Tip failed with status ${res.status}. Retrying in 500ms... (attempt ${attempt})`);
+                            console.log('[Tessera] Tip failed with status ' + res.status + '. Retrying...');
                             await new Promise(resolve => setTimeout(resolve, 500));
                             await sendTip(attempt + 1);
                             return;
@@ -2388,9 +3159,9 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                     }
                 }
             } catch (e) {
-                console.error('[Tessera] Tip request error:', e);
+                console.error('[Tessera] Tip request error:', e && e.message ? e.message : e);
                 if (attempt < 3) {
-                    console.log(`[Tessera] Tip network error. Retrying in 500ms... (attempt ${attempt})`);
+                    console.log('[Tessera] Tip network error. Retrying...');
                     await new Promise(resolve => setTimeout(resolve, 500));
                     await sendTip(attempt + 1);
                     return;
@@ -2463,3 +3234,19 @@ window.ArcCashier = {
     // Legacy alias kept for backwards compatibility with any external callers
     init: initPaywall,
 };
+
+// Complete Google/Facebook OAuth return even if paywall is not open yet (redirect lands on origin).
+if (typeof window !== 'undefined') {
+    const pendingBoot = readSocialPending();
+    const coverBoot = peekOpaqueCoverFlag();
+    if (pendingBoot?.deviceToken) {
+        const bootHashOk = /^#(?:[a-zA-Z0-9-_.%]+=[^&]*&)*[a-zA-Z0-9-_.%]+=[^&]*$/.test(
+            window.location.hash || ''
+        );
+        if (bootHashOk) showSocialResumeSplash(pendingBoot.provider);
+        void tryResumeSocialLogin();
+    } else if (coverBoot) {
+        // Returning to the video after OAuth: cover until initPaywall mounts.
+        showSocialResumeSplash(coverBoot);
+    }
+}
