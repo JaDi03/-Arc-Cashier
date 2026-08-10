@@ -7,10 +7,15 @@
  * Cross-chain payments are handled client-side via the Circle Forwarding Service.
  *
  * External paths:
- *   POST /api/core/circle/get-token
+ *   POST /api/core/circle/email-otp/request
+ *   POST /api/core/circle/email-otp/refresh
+ *   POST /api/core/circle/social/device-token
  *   POST /api/core/circle/get-wallet
  *   POST /api/core/circle/prepare-deposit
  *   POST /api/core/circle/poll-challenge
+ *
+ * Email OTP requires SMTP configured in the Circle Developer Console.
+ * Circle sends the OTP via that SMTP; Tessera does not send mail itself.
  */
 
 import { Router, Request, Response } from 'express';
@@ -54,43 +59,132 @@ const circleRateLimiter = rateLimit({
 // ---------------------------------------------------------------------------
 const circleRouter = Router();
 
-// --- BUYER SIDE (Web2): Initialize Circle User + Session Token ---
-// Creates the user in Circle if not exists, then returns a 60-min session token.
-circleRouter.post('/circle/get-token', circleRateLimiter, async (req: Request, res: Response) => {
-    const { userId } = req.body;
+circleRouter.get('/circle/app-id', circleRateLimiter, (_req: Request, res: Response) => {
+    const appId = process.env.CIRCLE_APP_ID || '';
+    if (!appId) return res.status(500).json({ error: 'CIRCLE_APP_ID not configured' });
+    return res.json({
+        appId,
+        googleClientId: process.env.CIRCLE_GOOGLE_CLIENT_ID || '',
+        facebookAppId: process.env.CIRCLE_FACEBOOK_APP_ID || '',
+    });
+});
 
-    if (!userId) {
-        return res.status(400).json({ error: 'Missing userId' });
+// --- BUYER SIDE (Web2): Start Email OTP login ---
+// Returns deviceToken / deviceEncryptionKey / otpToken for W3SSdk.verifyOtp().
+circleRouter.post('/circle/email-otp/request', circleRateLimiter, async (req: Request, res: Response) => {
+    const { email, deviceId } = req.body as { email?: string; deviceId?: string };
+
+    if (!email || !deviceId) {
+        return res.status(400).json({ error: 'Missing email or deviceId' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!normalizedEmail.includes('@')) {
+        return res.status(400).json({ error: 'Invalid email' });
     }
 
     try {
-        // createUser is idempotent — safe to call even if the user already exists.
-        await circleClient.createUser({ userId }).catch(() => {
-            // Silently ignore if user already exists (Circle returns 409 Conflict)
+        const response = await circleClient.createDeviceTokenForEmailLogin({
+            deviceId: String(deviceId),
+            email: normalizedEmail,
+            idempotencyKey: crypto.randomUUID(),
         });
 
-        const response = await circleClient.createUserToken({ userId });
+        return res.json({
+            deviceToken: response.data?.deviceToken,
+            deviceEncryptionKey: response.data?.deviceEncryptionKey,
+            otpToken: response.data?.otpToken,
+            appId: process.env.CIRCLE_APP_ID,
+            email: normalizedEmail,
+        });
+    } catch (error: any) {
+        console.error(`[Circle] ❌ Email OTP request failed:`, error?.response?.data || error.message);
+        return res.status(500).json({
+            error: 'Failed to request email OTP. Confirm SMTP is configured in Circle Console.',
+            debugError: error.message,
+            debugData: error?.response?.data,
+        });
+    }
+});
 
+circleRouter.post('/circle/social/device-token', circleRateLimiter, async (req: Request, res: Response) => {
+    const { deviceId } = req.body as { deviceId?: string };
+
+    if (!deviceId) {
+        return res.status(400).json({ error: 'Missing deviceId' });
+    }
+
+    try {
+        const response = await circleClient.createDeviceTokenForSocialLogin({
+            deviceId: String(deviceId),
+            idempotencyKey: crypto.randomUUID(),
+        });
+
+        return res.json({
+            deviceToken: response.data?.deviceToken,
+            deviceEncryptionKey: response.data?.deviceEncryptionKey,
+            appId: process.env.CIRCLE_APP_ID,
+            googleClientId: process.env.CIRCLE_GOOGLE_CLIENT_ID || '',
+            facebookAppId: process.env.CIRCLE_FACEBOOK_APP_ID || '',
+        });
+    } catch (error: any) {
+        console.error(`[Circle] ❌ Social device token failed:`, error?.response?.data || error.message);
+        return res.status(500).json({
+            error: 'Failed to create social login device token',
+            debugError: error.message,
+            debugData: error?.response?.data,
+        });
+    }
+});
+
+circleRouter.post('/circle/email-otp/refresh', circleRateLimiter, async (req: Request, res: Response) => {
+    const { userToken, refreshToken, deviceId } = req.body as {
+        userToken?: string
+        refreshToken?: string
+        deviceId?: string
+    };
+
+    if (!userToken || !refreshToken || !deviceId) {
+        return res.status(400).json({ error: 'Missing userToken, refreshToken, or deviceId' });
+    }
+
+    try {
+        const response = await circleClient.refreshUserToken({
+            userToken: String(userToken),
+            refreshToken: String(refreshToken),
+            deviceId: String(deviceId),
+            idempotencyKey: crypto.randomUUID(),
+        });
         return res.json({
             userToken: response.data?.userToken,
             encryptionKey: response.data?.encryptionKey,
-            appId: process.env.CIRCLE_APP_ID
+            refreshToken: response.data?.refreshToken,
+            appId: process.env.CIRCLE_APP_ID,
         });
     } catch (error: any) {
-        console.error(`[Circle] ❌ Failed to generate token:`, error?.response?.data || error.message);
-        return res.status(500).json({ error: 'Failed to generate Circle session token' });
+        console.error(`[Circle] ❌ Email OTP refresh failed:`, error?.response?.data || error.message);
+        return res.status(401).json({
+            error: 'Session expired. Sign in with email again.',
+            debugError: error.message,
+            debugData: error?.response?.data,
+        });
     }
 });
 
 // --- BUYER SIDE (Web2): Get or Create Circle SCA Wallet ---
 // Returns the walletId and address of the user's SCA on Arc Testnet.
 // Also bootstraps wallet creation (returns challengeId if first-time user).
+// Viewer auth is email OTP or social login only. Wallet creation is approved
+// via the Circle confirmation UI (no PIN flow).
 circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, res: Response) => {
     const { userId, userToken } = req.body;
 
     if (!userId || !userToken) {
         return res.status(400).json({ error: 'Missing userId or userToken' });
     }
+
+    // Viewer auth is email OTP or social login only. Wallet creation uses the
+    // Circle initialization challenge (INITIALIZE), approved in the hosted UI.
 
     try {
         // List existing wallets for this user on Arc Testnet
@@ -146,7 +240,10 @@ circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, 
                 ((parseInt(userIdHash[16], 16) & 0x3) | 0x8).toString(16) + userIdHash.slice(17, 20),
                 userIdHash.slice(20, 32),
             ].join('-');
-            const createRes = await circleClient.createWallet({
+            // First-time email/social users must run Circle's INITIALIZE challenge
+            // (SDK name createUserPinWithWallets). It creates the wallet after the
+            // hosted confirmation UI; there is no PIN step in this product.
+            const createRes = await circleClient.createUserPinWithWallets({
                 userToken,
                 idempotencyKey: deterministicKey,
                 blockchains: ['ARC-TESTNET' as any],
@@ -156,7 +253,7 @@ circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, 
         } catch (err: any) {
             // Circle error 155106: "User already initialized"
             // Per Circle UCW docs: "Fetch existing wallets instead of creating"
-            // This happens when the user completed PIN setup but the wallet hasn't indexed yet.
+            // This happens when the user completed initialization but the wallet hasn't indexed yet.
             const errCode = err?.code ?? err?.response?.data?.code ?? err?.message;
             if (String(errCode).includes('155106') || err?.message?.includes('155106')) {
                 console.log(`[Circle] ♻️ Error 155106: User already initialized. Re-fetching existing wallets for ${userId}.`);
@@ -174,14 +271,6 @@ circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, 
                     });
                 }
                 return res.json({ status: 'indexing' });
-            } else if (err?.message?.includes('PIN')) {
-                console.log(`[Circle] 🔑 User needs PIN setup. Issuing createUserPinWithWallets challenge.`);
-                const pinRes = await circleClient.createUserPinWithWallets({
-                    userToken,
-                    blockchains: ['ARC-TESTNET' as any],
-                    accountType: 'SCA',
-                });
-                challengeId = pinRes.data?.challengeId;
             } else {
                 throw err;
             }
@@ -248,7 +337,8 @@ circleRouter.post('/circle/prepare-deposit', circleRateLimiter, async (req: Requ
         });
     } catch (error: any) {
         console.error(`[Circle] ❌ Failed to prepare deposit:`, error?.response?.data || error.message);
-        return res.status(500).json({ error: 'Failed to prepare deposit challenge' });
+        const circleMessage = error?.response?.data?.message || error?.message || 'Failed to prepare deposit challenge';
+        return res.status(500).json({ error: circleMessage });
     }
 });
 
@@ -281,5 +371,36 @@ circleRouter.post('/circle/poll-challenge', circleRateLimiter, async (req: Reque
 });
 
 
+
+/**
+ * Prove that userToken controls a LIVE Arc SCA at returnAddress.
+ * Used before returning or accepting session ephemeral keys.
+ */
+export async function verifyCircleWalletOwnership(
+    userToken: string,
+    returnAddress: string
+): Promise<'ok' | 'unauthorized' | 'error'> {
+    if (!userToken || !returnAddress) return 'unauthorized';
+    try {
+        const walletsRes = await circleClient.listWallets({
+            userToken,
+            blockchain: 'ARC-TESTNET' as any,
+        });
+        const wallets = walletsRes.data?.wallets || [];
+        const target = returnAddress.toLowerCase();
+        const owns = wallets.some(
+            (w: { state?: string; address?: string }) =>
+                w.state === 'LIVE'
+                && typeof w.address === 'string'
+                && w.address.toLowerCase() === target
+        );
+        return owns ? 'ok' : 'unauthorized';
+    } catch (error: any) {
+        const status = error?.response?.status ?? error?.status;
+        if (status === 401 || status === 403) return 'unauthorized';
+        console.error('[Circle] verifyCircleWalletOwnership failed:', error?.response?.data || error?.message || error);
+        return 'error';
+    }
+}
 
 export default circleRouter;

@@ -165,8 +165,16 @@
     border-radius: inherit;
 }
 
-#arc-paywall-overlay.arc-hidden-initially {
-    opacity: 0 !important;
+/* Keep the dark cover opaque so the video never flashes; only hide the modal
+   card while session/auto-unlock is resolving. */
+#arc-paywall-overlay.arc-session-check #arc-paywall-modal {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Legacy class: treat like session-check (opaque cover). Do not use opacity:0. */
+#arc-paywall-overlay.arc-hidden-initially #arc-paywall-modal {
+    visibility: hidden;
     pointer-events: none;
 }
 
@@ -203,7 +211,7 @@ body.arc-locked {
 }
 
 #arc-paywall-header {
-    padding: 24px 24px 12px;
+    padding: 16px 20px 10px;
     text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
@@ -212,19 +220,19 @@ body.arc-locked {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 
 #arc-paywall-logo img {
-    height: 34px;
+    height: 28px;
     width: auto;
     filter: drop-shadow(0 4px 10px rgba(255, 179, 0, 0.15));
 }
 
 #arc-paywall-modal h2 {
     font-family: 'Outfit', 'Inter', system-ui, sans-serif;
-    margin: 0 0 8px;
-    font-size: 24px;
+    margin: 0 0 4px;
+    font-size: 20px;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text-primary);
@@ -232,14 +240,14 @@ body.arc-locked {
 
 #arc-paywall-modal p {
     color: #ffffff;
-    font-size: 13.5px;
+    font-size: 12.5px;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.4;
     font-weight: 500;
 }
 
 #arc-paywall-body {
-    padding: 16px 24px 24px;
+    padding: 12px 20px 16px;
 }
 
 /* -- Pricing box ----------------------------------- */
@@ -247,9 +255,9 @@ body.arc-locked {
 .arc-pricing-box {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.03);
-    border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 24px;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
 }
 
 .arc-pricing-row {
@@ -324,6 +332,16 @@ body.arc-locked {
     color: #000000 !important;
 }
 
+.arc-btn-google {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.arc-btn-google .arc-google-g {
+    flex-shrink: 0;
+}
+
 .arc-btn-svg {
     transition: transform 0.2s ease;
 }
@@ -371,6 +389,24 @@ body.arc-locked {
     align-items: center;
     gap: 8px;
     width: 100%;
+}
+
+.arc-ucw-balance-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.arc-ucw-balance-row .arc-accent {
+    font-size: 13px;
+    color: var(--accent-color);
+    font-variant-numeric: tabular-nums;
 }
 
 .arc-address-text {
@@ -515,7 +551,7 @@ body.arc-locked {
 .arc-spinner {
     border: 3px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
-    border-top: 3px solid #00f2fe;
+    border-top: 3px solid var(--accent-color);
     width: 20px;
     height: 20px;
     animation: arc-spin 0.9s linear infinite;
