@@ -14,6 +14,7 @@ import type { Connector, ConnectorConfig } from './core/types';
 const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> = {
     owncast: () => import('./connectors/owncast'),
     peertube: () => import('./connectors/peertube'),
+    jellyfin: () => import('./connectors/jellyfin'),
 };
 
 export async function createServer(connectors: ConnectorConfig[]) {
@@ -47,6 +48,7 @@ export async function createServer(connectors: ConnectorConfig[]) {
     app.use('/api/core', express.json());
     // Attach rawBody for connectors (required for PeerTube HMAC signature verification)
     app.use('/api/connectors', express.json({
+        type: '*/*',
         verify: (req: any, res, buf) => {
             req.rawBody = buf;
         }

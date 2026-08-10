@@ -28,10 +28,14 @@ mkdir -p "$DATA_DIR"
 [ -f "$(pwd)/sessions.json" ] && [ ! -f "$DATA_DIR/sessions.json" ] && cp "$(pwd)/sessions.json" "$DATA_DIR/sessions.json" && echo "  Migrated sessions.json" || true
 [ -f "$(pwd)/creators.json" ] && [ ! -f "$DATA_DIR/creators.json" ] && cp "$(pwd)/creators.json" "$DATA_DIR/creators.json" && echo "  Migrated creators.json" || true
 
+echo "🌐 Ensuring tessera_net network exists..."
+docker network create tessera_net 2>/dev/null || true
+
 echo "🚀 Starting new container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
+  --network tessera_net \
   -p 7878:7878 \
   --env-file .env \
   -v "$DATA_DIR:/app/data" \

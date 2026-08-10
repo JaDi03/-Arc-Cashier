@@ -3,18 +3,20 @@ import type { CashierConfig } from './core/types';
 /**
  * Tessera Configuration
  * 
- * Enable or disable connectors by adding/removing them from the list.
- * Only connectors listed here will be loaded at startup.
+ * Dynamically loads the active connector specified in the environment (.env).
  */
-const config: CashierConfig = {
-    port: 7878,
+const activeConnector = process.env.ACTIVE_CONNECTOR;
+const upstreamUrl = process.env.UPSTREAM_URL;
 
-    connectors: [
+const config: CashierConfig = {
+    port: Number(process.env.PORT || 7878),
+
+    connectors: activeConnector && upstreamUrl ? [
         {
-            name: 'peertube',
-            upstreamUrl: 'http://localhost:9000',
+            name: activeConnector,
+            upstreamUrl: upstreamUrl,
         },
-    ],
+    ] : [],
 };
 
 export default config;

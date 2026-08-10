@@ -14,7 +14,11 @@ owncastRouter.post('/webhook', async (req: Request, res: Response) => {
     if (payload.type === 'USER_JOINED') {
         const eventData = payload.eventData as WebhookUserJoinedEventData;
         console.log(`[Owncast] 📥 Received USER_JOINED webhook for ${eventData.user.id}`);
-        sessionService.recordJoin(eventData.user.id);
+        sessionService.recordJoin(eventData.user.id, {
+            resourceId: 'owncast-stream',
+            ratePerSecond: process.env.OWNCAST_RATE_PER_SECOND ?? '0.0001',
+            payoutAddress: process.env.OWNCAST_PAYOUT_ADDRESS ?? '0x0000000000000000000000000000000000000001',
+        });
         return res.json({ status: "recorded" });
     } 
     else if (payload.type === 'USER_PARTED') {
