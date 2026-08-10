@@ -1,0 +1,76 @@
+/* Creator earnings panel (MetaMask withdraw) — kept out of paywall.css */
+
+.tessera-creator-earnings {
+    position: relative;
+    z-index: 1;
+    margin: 16px 0 24px;
+    padding: 16px 18px;
+    max-width: 320px;
+    background: rgba(17, 24, 39, 0.96);
+    color: #f7fafc;
+    border: 1px solid rgba(99, 179, 237, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+.tessera-creator-earnings .tce-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #90cdf4;
+}
+
+.tessera-creator-earnings .tce-wallet {
+    font-size: 11px;
+    color: #a0aec0;
+    word-break: break-all;
+    margin-bottom: 10px;
+}
+
+.tessera-creator-earnings .tce-balance {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+}
+
+.tessera-creator-earnings .tce-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tessera-creator-earnings .tce-btn-balance {
+    background: #2d3748;
+    color: #e2e8f0;
+}
+
+.tessera-creator-earnings .tce-btn-withdraw {
+    background: #38a169;
+    color: #fff;
+}
+
+.tessera-creator-earnings .tce-btn:hover {
+    filter: brightness(1.08);
+}
+
+.tessera-creator-earnings .tce-status {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #a0aec0;
+    line-height: 1.4;
+    min-height: 1.2em;
+}
+
+.tessera-creator-earnings .tce-tx-link {
+    color: #68d391;
+    font-weight: 600;
+    text-decoration: underline;
+}
