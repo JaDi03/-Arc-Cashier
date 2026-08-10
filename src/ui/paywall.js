@@ -2,6 +2,7 @@
 // Injected or embedded by any Tessera connector.
 
 import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
+import { initCreatorEarnings } from './creator-earnings.js';
 
 // ─── Constants (all values verified from official docs) ──────────────────────
 
@@ -109,6 +110,23 @@ let isCheckingAutoUnlock = false;
 // Idempotency guard for lockMedia(). Null means no lock is active.
 let mediaLockController = null;
 
+// #region agent log
+function agentDebugLog(hypothesisId, message, data = {}) {
+    try {
+        const parts = ['[TesseraDebug]', 'h=' + hypothesisId, 'msg=' + message];
+        Object.keys(data).forEach((key) => {
+            let value = data[key];
+            if (value === null || value === undefined) value = 'null';
+            else if (typeof value === 'object') value = String(value);
+            else value = String(value);
+            value = value.replace(/\s+/g, '_').slice(0, 120);
+            parts.push(key + '=' + value);
+        });
+        console.log(parts.join(' | '));
+    } catch (_) { }
+}
+// #endregion
+
 // Floating elements are reparented into document.fullscreenElement on
 // every fullscreenchange so they stay visible above the top-layer.
 const floatingElements = new Set();
@@ -173,78 +191,138 @@ async function checkAutoUnlock() {
     if (!viewerState.userId || !viewerState.walletAddress) return;
 
     isCheckingAutoUnlock = true;
+    // Paid init uses hideInitially (pointer-events:none). Free tip modal does not.
+    // Always reveal + clear sticky status unless we fully auto-unlocked.
+    let autoUnlocked = false;
+    let hasFundsResult = null;
+    let sessionBalanceStatus = null;
+    let autoUnlockBranch = 'start';
     try {
-        setFundStatus('Checking wallet balance…');
+        // Unlock/billing is funded from Gateway (same source the tip widget shows).
+        // Wallet SCA balance only matters later, when the user needs to deposit into Gateway.
+        setFundStatus('Checking Gateway balance…');
         const minReq = getRequiredMinBalance();
-        const hasFunds = await checkArcBalance(viewerState.walletAddress);
 
-        if (hasFunds) {
-            // Check if Gateway already has funds
-            const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
-            if (balRes.ok) {
-                const balData = await balRes.json();
-                const available = Number(balData.gatewayAvailable || '0');
+        const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+        sessionBalanceStatus = balRes.status;
+        let gatewayAvailable = 0;
+        if (balRes.ok) {
+            const balData = await balRes.json();
+            gatewayAvailable = Number(balData.gatewayAvailable || '0');
+        }
+        hasFundsResult = gatewayAvailable >= minReq;
 
-                if (available >= minReq) {
-                    setFundStatus('Auto-unlocking session…');
-                    // Ensure we have an ephemeral key
-                    viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
-                    if (!viewerState.ephemeralPk) {
-                        viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                            .map(b => b.toString(16).padStart(2, '0')).join('');
-                        localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
-                    }
-
-                    // Register session with backend
-                    const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: viewerState.userId,
-                            privateKey: viewerState.ephemeralPk,
-                            returnAddress: viewerState.walletAddress,
-                            ratePerSecond: getRequiredMinBalance(),
-                        }),
-                    });
-
-                    if (regRes.ok) {
-                        console.log('[Tessera] Auto-unlocked video using existing funded gateway session.');
-                        setFundStatus('');
-                        unlockMedia();
-                        document.body.classList.remove('arc-locked');
-
-                        const overlay = document.getElementById('arc-paywall-overlay');
-                        if (overlay) {
-                            overlay.style.pointerEvents = 'none';
-                            overlay.style.opacity = '0';
-                            setTimeout(() => overlay.remove(), 500);
-                        }
-
-                        const sm = document.getElementById('arc-session-manager');
-                        if (sm) sm.classList.remove('arc-hidden');
-                        startSessionTimer();
-                        return;
-                    }
-                }
+        if (gatewayAvailable >= minReq) {
+            // Tip mode: never auto-start a paid session timer / initPaywall path.
+            if (isTipMode) {
+                autoUnlockBranch = 'tip-enable';
+                setFundStatus('');
+                enableUnlockButton();
+                return;
             }
 
-            // Wallet has funds but gateway is not funded yet -> enable unlock button
+            setFundStatus('Auto-unlocking session…');
+            // Ensure we have an ephemeral key
+            viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
+            if (!viewerState.ephemeralPk) {
+                viewerState.ephemeralPk = '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                localStorage.setItem('arc_ephemeral_pk', viewerState.ephemeralPk);
+            }
+
+            // Register session with backend
+            const regRes = await fetch(ARC_API_BASE + '/api/core/register-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: viewerState.userId,
+                    privateKey: viewerState.ephemeralPk,
+                    returnAddress: viewerState.walletAddress,
+                    ratePerSecond: getRequiredMinBalance(),
+                }),
+            });
+
+            if (regRes.ok) {
+                console.log('[Tessera] Auto-unlocked video using existing funded gateway session.');
+                autoUnlocked = true;
+                autoUnlockBranch = 'paid-auto-unlocked';
+                setFundStatus('');
+                unlockMedia();
+                document.body.classList.remove('arc-locked');
+
+                const overlay = document.getElementById('arc-paywall-overlay');
+                if (overlay) {
+                    overlay.style.pointerEvents = 'none';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 500);
+                }
+
+                const sm = document.getElementById('arc-session-manager');
+                if (sm) sm.classList.remove('arc-hidden');
+                startSessionTimer();
+                if (typeof window.tesseraOnPaywallUnlocked === 'function') {
+                    void window.tesseraOnPaywallUnlocked();
+                }
+                return;
+            }
+
+            // Gateway funded but register failed -> let user retry via Unlock
+            autoUnlockBranch = 'manual-unlock';
+            setFundStatus('');
             enableUnlockButton();
-            const overlay = document.getElementById('arc-paywall-overlay');
-            if (overlay) overlay.classList.remove('arc-hidden-initially');
+            return;
+        }
+
+        // Gateway empty: wallet only gates whether the user can deposit now.
+        const walletCanDeposit = await checkArcBalance(viewerState.walletAddress);
+        if (walletCanDeposit) {
+            autoUnlockBranch = 'manual-unlock';
+            setFundStatus('');
+            enableUnlockButton();
         } else {
-            // No funds in wallet yet -> start polling
+            autoUnlockBranch = 'polling';
+            setFundStatus('');
             startBalancePolling();
-            const overlay = document.getElementById('arc-paywall-overlay');
-            if (overlay) overlay.classList.remove('arc-hidden-initially');
         }
     } catch (error) {
         console.error('[Tessera] Auto-unlock check failed:', error);
+        autoUnlockBranch = 'catch';
+        setFundStatus('');
         startBalancePolling();
-        const overlay = document.getElementById('arc-paywall-overlay');
-        if (overlay) overlay.classList.remove('arc-hidden-initially');
     } finally {
         isCheckingAutoUnlock = false;
+        if (!autoUnlocked) {
+            const overlay = document.getElementById('arc-paywall-overlay');
+            if (overlay) overlay.classList.remove('arc-hidden-initially');
+        }
+        // #region agent log
+        const overlay = document.getElementById('arc-paywall-overlay');
+        const btn = document.getElementById('arc-unlock-btn');
+        let topAtCenter = null;
+        if (overlay) {
+            const r = overlay.getBoundingClientRect();
+            topAtCenter = document.elementFromPoint(
+                r.left + (r.width / 2),
+                r.top + (r.height / 2)
+            );
+        }
+        agentDebugLog('H3', 'checkAutoUnlock exit', {
+            isTipMode,
+            autoUnlocked,
+            autoUnlockBranch,
+            hasFunds: hasFundsResult,
+            sessionBalanceStatus,
+            btnDisabled: btn ? btn.disabled : null,
+            btnClass: btn ? btn.className : null,
+            overlayClass: overlay ? overlay.className : null,
+            overlayPointerEvents: overlay ? getComputedStyle(overlay).pointerEvents : null,
+            overlayOpacity: overlay ? getComputedStyle(overlay).opacity : null,
+            fundStatus: (document.getElementById('arc-fund-status') || {}).textContent || '',
+            parentTag: overlay && overlay.parentElement ? overlay.parentElement.tagName : null,
+            topAtCenterTag: topAtCenter ? topAtCenter.tagName : null,
+            topAtCenterId: topAtCenter ? topAtCenter.id : null,
+        });
+        // #endregion
     }
 }
 
@@ -376,6 +454,7 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
 
     const overlay = document.createElement('div');
     overlay.id = 'arc-paywall-overlay';
+    overlay.classList.add('arc-tessera-root');
 
     // Check if user is logged in to hide initially and prevent flicker
     const isLoggedIn = viewerState.userId && viewerState.walletAddress;
@@ -549,22 +628,34 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
         </div>
     `;
 
-    // Resolve an explicit container the connector may have passed. No
-    // platform class names are guessed here — if a connector wants the
-    // overlay embedded inside its own player wrapper it must pass that
-    // element explicitly (see CONNECTOR_SPEC.md).
-    const explicitContainer = resolveContainer(targetContainer);
+    // Always mount on body / fullscreen mount point (same as tip mode). Contained
+    // mounts inside the player lose hit-testing to host OSD pages (e.g. Jellyfin
+    // videoOsdPage) that sit outside the player stacking context. Connectors may
+    // still pass targetContainer for API compatibility; it is ignored for mount.
+    mountFloatingElement(overlay);
 
-    if (explicitContainer && explicitContainer !== document.body) {
-        overlay.classList.add('arc-contained-overlay');
-        try {
-            if (window.getComputedStyle(explicitContainer).position === 'static') {
-                explicitContainer.style.position = 'relative';
-            }
-        } catch (_) { }
-    }
-
-    mountFloatingElement(overlay, explicitContainer);
+    // #region agent log
+    const unlockBtnForMountLog = document.getElementById('arc-unlock-btn');
+    const overlayRect = overlay.getBoundingClientRect();
+    const centerX = overlayRect.left + (overlayRect.width / 2);
+    const centerY = overlayRect.top + (overlayRect.height / 2);
+    const topAtCenter = document.elementFromPoint(centerX, centerY);
+    agentDebugLog('H1,H4', 'paywall overlay mounted', {
+        isTipMode,
+        contained: false,
+        connectorPassedContainer: Boolean(resolveContainer(targetContainer)),
+        parentTag: overlay.parentElement ? overlay.parentElement.tagName : null,
+        parentClass: overlay.parentElement ? overlay.parentElement.className : null,
+        parentLastChildId: overlay.parentElement && overlay.parentElement.lastElementChild ? overlay.parentElement.lastElementChild.id : null,
+        overlayClass: overlay.className,
+        overlayPointerEvents: getComputedStyle(overlay).pointerEvents,
+        overlayOpacity: getComputedStyle(overlay).opacity,
+        btnDisabled: unlockBtnForMountLog ? unlockBtnForMountLog.disabled : null,
+        topAtCenterTag: topAtCenter ? topAtCenter.tagName : null,
+        topAtCenterId: topAtCenter ? topAtCenter.id : null,
+        topAtCenterClass: topAtCenter ? topAtCenter.className : null,
+    });
+    // #endregion
 
     // Wire up events
     if (isTipMode) {
@@ -591,9 +682,46 @@ function renderPaywallOverlay(hideInitially = false, targetContainer = null) {
     document.getElementById('arc-login-btn').addEventListener('click', handleEmailLogin);
     document.getElementById('arc-bridge-btn').addEventListener('click', openCctpModal);
     document.getElementById('arc-cctp-close').addEventListener('click', closeCctpModal);
-    document.getElementById('arc-unlock-btn').addEventListener('click', handleUnlock);
+    document.getElementById('arc-unlock-btn').addEventListener('click', (event) => {
+        // #region agent log
+        const btn = document.getElementById('arc-unlock-btn');
+        const btnRect = btn ? btn.getBoundingClientRect() : null;
+        const topAtButton = btnRect
+            ? document.elementFromPoint(btnRect.left + (btnRect.width / 2), btnRect.top + (btnRect.height / 2))
+            : null;
+        agentDebugLog('H1,H2', 'unlock button click listener fired', {
+            isTipMode,
+            btnDisabled: btn ? btn.disabled : null,
+            btnClass: btn ? btn.className : null,
+            topAtButtonTag: topAtButton ? topAtButton.tagName : null,
+            topAtButtonId: topAtButton ? topAtButton.id : null,
+            topAtButtonClass: topAtButton ? topAtButton.className : null,
+        });
+        // #endregion
+        return handleUnlock(event);
+    });
     document.getElementById('arc-cctp-info-btn').addEventListener('click', toggleCctpInfo);
     document.getElementById('arc-copy-btn').addEventListener('click', copyWalletAddress);
+
+    // #region agent log
+    overlay.addEventListener('click', (event) => {
+        const btn = document.getElementById('arc-unlock-btn');
+        const btnRect = btn ? btn.getBoundingClientRect() : null;
+        const topAtButton = btnRect
+            ? document.elementFromPoint(btnRect.left + (btnRect.width / 2), btnRect.top + (btnRect.height / 2))
+            : null;
+        agentDebugLog('H1,H2', 'overlay capture click', {
+            isTipMode,
+            targetTag: event.target ? event.target.tagName : null,
+            targetId: event.target ? event.target.id : null,
+            targetClass: event.target ? event.target.className : null,
+            btnDisabled: btn ? btn.disabled : null,
+            topAtButtonTag: topAtButton ? topAtButton.tagName : null,
+            topAtButtonId: topAtButton ? topAtButton.id : null,
+            topAtButtonClass: topAtButton ? topAtButton.className : null,
+        });
+    }, true);
+    // #endregion
 
     // Wire up deposit selector buttons and custom input events
     const optButtons = overlay.querySelectorAll('.arc-deposit-opt');
@@ -830,8 +958,27 @@ function startBalancePolling() {
     document.getElementById('arc-waiting-balance').style.display = 'flex';
     if (balancePollingInterval) clearInterval(balancePollingInterval);
     balancePollingInterval = setInterval(async () => {
-        const hasFunds = await checkArcBalance(viewerState.walletAddress);
-        if (hasFunds) {
+        const minReq = getRequiredMinBalance();
+        // Prefer Gateway: that is what billing spends. Same source as tip widget.
+        try {
+            const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+            if (balRes.ok) {
+                const balData = await balRes.json();
+                const gatewayAvailable = Number(balData.gatewayAvailable || '0');
+                if (gatewayAvailable >= minReq) {
+                    clearInterval(balancePollingInterval);
+                    balancePollingInterval = null;
+                    const waiting = document.getElementById('arc-waiting-balance');
+                    if (waiting) waiting.style.display = 'none';
+                    void checkAutoUnlock();
+                    return;
+                }
+            }
+        } catch (_) { /* fall through to wallet check */ }
+
+        // Gateway still empty: wallet funds only mean the user can deposit.
+        const walletCanDeposit = await checkArcBalance(viewerState.walletAddress);
+        if (walletCanDeposit) {
             clearInterval(balancePollingInterval);
             balancePollingInterval = null;
             document.getElementById('arc-waiting-balance').style.display = 'none';
@@ -842,10 +989,12 @@ function startBalancePolling() {
 
 function enableUnlockButton() {
     const btn = document.getElementById('arc-unlock-btn');
+    if (!btn) return;
     btn.disabled = false;
     btn.classList.remove('arc-btn-disabled');
     btn.innerHTML = isTipMode ? `${UNLOCK_SVG} Enable Tipping` : `${UNLOCK_SVG} Unlock Video`;
-    document.getElementById('arc-waiting-balance').style.display = 'none';
+    const waiting = document.getElementById('arc-waiting-balance');
+    if (waiting) waiting.style.display = 'none';
     // Small celebration pulse
     btn.classList.add('arc-pulse-once');
     setTimeout(() => btn.classList.remove('arc-pulse-once'), 600);
@@ -869,6 +1018,18 @@ function getSelectedDepositAmount() {
 
 async function handleUnlock() {
     const btn = document.getElementById('arc-unlock-btn');
+    // #region agent log
+    agentDebugLog('H2,H5', 'handleUnlock entry', {
+        isTipMode,
+        btnDisabledBefore: btn ? btn.disabled : null,
+        selectedDepositAmount: getSelectedDepositAmount(),
+        hasEphemeralKey: Boolean(viewerState.ephemeralPk || localStorage.getItem('arc_ephemeral_pk')),
+        bodyLocked: document.body.classList.contains('arc-locked'),
+        overlayParentClass: (document.getElementById('arc-paywall-overlay') || {}).parentElement
+            ? document.getElementById('arc-paywall-overlay').parentElement.className
+            : null,
+    });
+    // #endregion
     btn.disabled = true;
     btn.innerHTML = isTipMode
         ? '<div class="arc-spinner-sm" style="margin-right:8px;"></div> Enabling…'
@@ -1003,6 +1164,9 @@ async function handleUnlock() {
             const sm = document.getElementById('arc-session-manager');
             if (sm) sm.classList.remove('arc-hidden');
             startSessionTimer();
+            if (typeof window.tesseraOnPaywallUnlocked === 'function') {
+                void window.tesseraOnPaywallUnlocked();
+            }
         } else {
             // Refresh tipping widget to reflect new wallet balance/card state
             if (typeof window.arcShowTipButton === 'function') {
@@ -1012,24 +1176,27 @@ async function handleUnlock() {
                 viewerState.ephemeralPk = localStorage.getItem('arc_ephemeral_pk');
                 window.arcShowTipButton(tipCreatorWallet, tipAmountVal);
             }
-
-            // Automatically trigger the tip button click
-            const tipBtn = document.getElementById('arc-tip-btn');
-            if (tipBtn) {
-                setTimeout(() => {
-                    tipBtn.click();
-                }, 100);
-            }
+            // Tip is sent only when the user clicks the tip button: not on enable.
         }
 
         const overlay = document.getElementById('arc-paywall-overlay');
         if (overlay) {
+            overlay.style.pointerEvents = 'none';
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
         }
 
     } catch (error) {
         console.error('[Tessera] Unlock error:', error);
+        // #region agent log
+        agentDebugLog('H2,H5', 'handleUnlock catch', {
+            isTipMode,
+            errorName: error && error.name ? error.name : null,
+            errorMessage: error && error.message ? error.message : String(error),
+            btnDisabledAfterError: btn ? btn.disabled : null,
+            fundStatus: (document.getElementById('arc-fund-status') || {}).textContent || '',
+        });
+        // #endregion
         btn.disabled = false;
         btn.innerHTML = isTipMode ? `${UNLOCK_SVG} Enable Tipping` : `${UNLOCK_SVG} Unlock Video`;
         setFundStatus('Error: ' + (error.message || 'Please retry.'), true);
@@ -1279,7 +1446,7 @@ function renderSessionManager() {
 
     const sm = document.createElement('div');
     sm.id = 'arc-session-manager';
-    sm.className = 'arc-hidden';
+    sm.className = 'arc-tessera-root arc-hidden';
     sm.innerHTML = `
         <div id="arc-sm-header">
             <h3><span class="arc-pulse-dot"></span> Active Session</h3>
@@ -1483,8 +1650,10 @@ function startSessionTimer() {
     window.sessionTimer = setInterval(async () => {
         tickCount++;
         let isMediaPlaying = playingMediaCount > 0;
-        if (!isMediaPlaying) {
-            // Fallback: check if there's any active HTML5 video or audio element playing in the DOM
+        // Only fall back to scanning the DOM when the connector is NOT driving
+        // play-state. Jellyfin/PeerTube set arcManualMediaControl so detail-page
+        // trailers cannot keep the meter running after leaving the player.
+        if (!isMediaPlaying && !window.arcManualMediaControl) {
             const mediaElements = document.querySelectorAll('video, audio');
             mediaElements.forEach(m => {
                 if (!m.paused && !m.ended && m.readyState >= 2) {
@@ -1527,6 +1696,8 @@ function startSessionTimer() {
                     clearInterval(window.sessionTimer);
                     const sm = document.getElementById('arc-session-manager');
                     if (sm) sm.classList.add('arc-hidden');
+                    // Tip/free mode must never fall through into a locked paywall.
+                    if (isTipMode) return;
                     initPaywall();
                 } else if (statusRes.ok) {
                     const balanceRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
@@ -1540,6 +1711,14 @@ function startSessionTimer() {
                             initialGatewayBalance += (withdrawable - lastWithdrawableBalance);
                             lastWithdrawableBalance = withdrawable;
                         } else {
+                            // Rebase the client ticker to the real Gateway balance so a
+                            // refresh cannot "restore" funds that were already spent.
+                            if (Number.isFinite(withdrawable) && initialGatewayBalance !== null) {
+                                const actualSpent = Math.max(0, initialGatewayBalance - withdrawable);
+                                if (currentRatePerSecond > 0) {
+                                    secondsThisVideo = Math.max(secondsThisVideo, Math.round(actualSpent / currentRatePerSecond));
+                                }
+                            }
                             lastWithdrawableBalance = withdrawable;
                         }
                     }
@@ -1708,7 +1887,8 @@ window.arcTeardownOnNavigate = async function () {
         balancePollingInterval = null;
     }
 
-    if (hadActiveUnlockedSession) {
+    // Stop server-side billing for this paywall session (idempotent).
+    if (hadActiveUnlockedSession && viewerState.userId) {
         try {
             await fetch(ARC_API_BASE + '/api/core/end-session', {
                 method: 'POST',
@@ -1716,11 +1896,6 @@ window.arcTeardownOnNavigate = async function () {
                 body: JSON.stringify({ userId: viewerState.userId }),
             });
         } catch (_) { }
-    }
-
-    if (hadActiveUnlockedSession) {
-        document.body.classList.add('arc-locked');
-        lockMedia();
     }
 
     const sm = document.getElementById('arc-session-manager');
@@ -1732,7 +1907,14 @@ window.arcTeardownOnNavigate = async function () {
     const overlay = document.getElementById('arc-paywall-overlay');
     if (overlay) overlay.remove();
 
+    // Leaving the player: drop lock + pause loop so preview pages are never charged/locked.
+    if (mediaLockController) {
+        unlockMedia();
+    }
     document.body.classList.remove('arc-locked');
+    playingMediaCount = 0;
+    secondsThisVideo = 0;
+    initialGatewayBalance = null;
 };
 
 window.arcResumeSession = async function () {
@@ -1769,6 +1951,9 @@ window.arcResumeSession = async function () {
             const sm = document.getElementById('arc-session-manager');
             if (sm) sm.classList.remove('arc-hidden');
             startSessionTimer();
+            if (typeof window.tesseraOnPaywallUnlocked === 'function') {
+                void window.tesseraOnPaywallUnlocked();
+            }
             return;
         }
     } catch (err) {
@@ -1804,6 +1989,7 @@ window.arcEndSession = async function () {
 
             // Lock screen
             document.body.classList.add('arc-locked');
+            lockMedia();
 
             // Force render overlay
             renderPaywallOverlay();
@@ -1922,6 +2108,7 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
 
     const container = document.createElement('div');
     container.id = 'arc-tip-btn-container';
+    container.classList.add('arc-tessera-root');
 
     // Renders the container styled dynamically based on whether the wallet is active
     const updateContainerStyle = () => {
@@ -2267,10 +2454,12 @@ function initTipMode(creatorWallet, tipAmount) {
 //
 //   window.ArcCashier.initPaywall()               → pay-per-second (locks media)
 //   window.ArcCashier.initTipMode(wallet, amount)  → free resource (tip button only)
+//   window.ArcCashier.initCreatorEarnings(opts)    → creator Gateway balance + MetaMask withdraw
 
 window.ArcCashier = {
     initPaywall,
     initTipMode,
+    initCreatorEarnings,
     // Legacy alias kept for backwards compatibility with any external callers
     init: initPaywall,
 };

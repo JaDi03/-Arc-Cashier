@@ -26,17 +26,22 @@ export async function createServer(connectors: ConnectorConfig[]) {
     // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
     app.set('trust proxy', 1);
 
-    // Logging middleware MUST be first to catch everything
+    // Logging middleware MUST be first to catch everything.
+    // Skip high-frequency payment/poll paths: Session already logs Payment ok/fail.
+    const QUIET_PATHS = [
+        '/stream-access',
+        '/session-status',
+        '/session-balance',
+    ];
     app.use((req, res, next) => {
-        if (req.url.includes('/stream-access')) {
-            console.log(`[API] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers)}`);
-            const originalJson = res.json;
-            res.json = function (body) {
-                console.log(`[API-DEBUG] Response (Status ${res.statusCode}):`, JSON.stringify(body));
-                return originalJson.call(this, body);
-            };
-        } else {
-            console.log(`[API] ${req.method} ${req.url}`);
+        const quiet = QUIET_PATHS.some((p) => req.url.includes(p));
+        if (!quiet) {
+            // Redact wallet addresses from query strings (admin balance/stats).
+            const safeUrl = req.url.replace(
+                /([?&]address=)0x[a-fA-F0-9]{40}/g,
+                '$1[redacted]'
+            );
+            console.log(`[API] ${req.method} ${safeUrl}`);
         }
         next();
     });
