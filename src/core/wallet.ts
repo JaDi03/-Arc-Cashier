@@ -112,7 +112,14 @@ export class WalletService {
             const obj = Object.fromEntries(this.sessionRecords);
             const plainText = JSON.stringify(obj, null, 2);
             const encrypted = encrypt(plainText);
-            fs.writeFileSync(DB_PATH, encrypted, 'utf-8');
+            // Atomic write: write to a temp file in the same directory, then
+            // rename() over the real path. rename() is atomic on POSIX
+            // filesystems, so a process crash mid-write can never leave
+            // sessions.json truncated/corrupted — readers always see either
+            // the complete old file or the complete new file.
+            const tmpPath = `${DB_PATH}.tmp-${process.pid}-${Date.now()}`;
+            fs.writeFileSync(tmpPath, encrypted, 'utf-8');
+            fs.renameSync(tmpPath, DB_PATH);
         } catch (e: any) {
             console.error('[Wallet] Error saving DB:', e.message || e);
         }

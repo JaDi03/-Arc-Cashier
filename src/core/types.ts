@@ -1,62 +1,60 @@
 import type { Express } from 'express';
 
+export interface Split {
+    address: string;
+    fraction: number;
+    /** For logs only. */
+    label?: string;
+}
+
+/** Body of POST /api/core/v1/sessions/start. */
+export interface StartSessionRequest {
+    userId: string;
+    /** videoId, trackId, streamId, etc. */
+    resourceId: string;
+    /** Decimal string in USDC, e.g. "0.000100". "0" is valid (tip-only mode). */
+    ratePerSecond: string;
+    payoutAddress: string;
+    /** Sum of fractions must be <= 1. */
+    splits?: Split[];
+    metadata?: Record<string, string>;
+}
+
+/** Body of POST /api/core/v1/sessions/stop. */
+export interface StopSessionRequest {
+    userId: string;
+}
+
+/** Body of POST /api/core/v1/tips. */
+export interface TipRequest {
+    userId: string;
+    payoutAddress: string;
+    /** Decimal string in USDC, e.g. "0.100000". */
+    amount: string;
+}
+
 /**
- * Connector Interface
- * 
- * Every platform connector (Owncast, PeerTube, Jellyfin, etc.) must implement
- * this interface. The engine loads connectors from `tessera.config.ts` and calls
- * `register()` to mount them onto the Express app.
- * 
- * A connector is responsible for:
- * 1. Translating the platform's native events (webhooks, WebSockets, etc.)
- *    into `sessionService.recordJoin()` / `recordPartAndSettle()` calls.
- * 2. Optionally injecting a paywall UI into the platform's web interface.
- * 3. Optionally proxying the platform's traffic through the sidecar.
+ * Interface every connector must implement.
+ * Translates platform events into calls to the core's HTTP contract:
+ *   POST /api/core/v1/sessions/start
+ *   POST /api/core/v1/sessions/stop
+ *   POST /api/core/v1/tips
  */
 export interface Connector {
-    /** Human-readable name for logs (e.g., "Owncast", "PeerTube") */
     readonly name: string;
-
-    /**
-     * Register this connector's routes, webhooks, proxy, and static assets
-     * onto the Express application.
-     * 
-     * @param app - The Express application instance
-     * @param config - The connector-specific configuration from tessera.config.ts
-     */
     register(app: Express, config: ConnectorConfig): void;
 }
 
-/**
- * Configuration for a single connector instance.
- */
 export interface ConnectorConfig {
-    /** Connector identifier matching the directory name in src/connectors/ */
     name: string;
-
-    /** The upstream platform URL (e.g., "http://localhost:8080" for Owncast) */
     upstreamUrl: string;
-
-    /** Per-second rate in USDC (default: 0.0001) */
     ratePerSecond?: number;
-
-    /** Platform display fee fraction (e.g. 0.10 for 10%) */
-    displayFee?: number;
-
-    /** Platform origin fee fraction (e.g. 0.10 for 10%) */
-    originFee?: number;
+    /** Default payee for single-operator connectors (e.g. Owncast). */
+    payoutAddress?: string;
 }
 
-/**
- * Top-level configuration for the Tessera engine.
- */
 export interface CashierConfig {
-    /** Port the sidecar listens on (default: 3000) */
     port?: number;
-
-    /** Seller wallet address for receiving payments (overridden by SELLER_ADDRESS env var) */
     sellerAddress?: string;
-
-    /** List of connectors to activate */
     connectors: ConnectorConfig[];
 }

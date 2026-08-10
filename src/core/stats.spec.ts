@@ -2,42 +2,43 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { statsService } from './stats';
 import { sessionService } from './session';
 
-vi.mock('./session', () => {
-    return {
-        sessionService: {
-            getSession: vi.fn(),
-        },
-    };
-});
+vi.mock('./session', () => ({
+    sessionService: {
+        getSession: vi.fn(),
+    },
+}));
 
 describe('StatsService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        // Clear internal stats map
         (statsService as any).stats = {};
     });
 
-    it('records payment ticks correctly by role', () => {
+    it('accumulates earnings per address per resource', () => {
         const mockSession = {
-            videoId: 'video_123',
-            creatorAddress: '0xCreator',
-            displayAdminAddress: '0xDisplay',
-            originAdminAddress: '0xOrigin',
+            resourceId: 'video_123',
+            payoutAddress: '0xCreator',
+            splits: [],
         };
 
         vi.mocked(sessionService.getSession).mockReturnValue(mockSession as any);
 
-        // Record creator payment
         statsService.recordPayment('user_1', '0xCreator', 0.0001);
-        // Record display admin payment
         statsService.recordPayment('user_1', '0xDisplay', 0.0001);
-        // Record origin admin payment
-        statsService.recordPayment('user_1', '0xOrigin', 0.0001);
+        statsService.recordPayment('user_1', '0xCreator', 0.0001);
 
-        const creatorStats = statsService.getCreatorStats('0xCreator');
-        expect(creatorStats).toEqual([{ videoId: 'video_123', amount: 0.0001 }]);
+        const result = statsService.getStatsByResource('video_123');
+        expect(result?.earnings['0xcreator']).toBeCloseTo(0.0002);
+        expect(result?.earnings['0xdisplay']).toBeCloseTo(0.0001);
+    });
 
-        const adminStats = statsService.getAdminStats();
-        expect(adminStats).toEqual([{ videoId: 'video_123', displayAmount: 0.0001, originAmount: 0.0001 }]);
+    it('getEarningsByAddress returns only matching resources', () => {
+        const mockSession = { resourceId: 'vid_abc', payoutAddress: '0xAddr', splits: [] };
+        vi.mocked(sessionService.getSession).mockReturnValue(mockSession as any);
+
+        statsService.recordPayment('user_1', '0xAddr', 0.005);
+
+        const rows = statsService.getEarningsByAddress('0xAddr');
+        expect(rows).toEqual([{ resourceId: 'vid_abc', amount: 0.005 }]);
     });
 });
