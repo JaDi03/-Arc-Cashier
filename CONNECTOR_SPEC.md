@@ -1,22 +1,21 @@
-# Tessera Connector Specification
+# Tessera Integration Contract
 
-A connector is a single TypeScript file in `src/connectors/<name>.ts` that implements the `Connector` interface from `src/core/types.ts`.
+Plugins and platform services call the core HTTP API. Tessera does not embed platform adapters.
 
-Its only job: translate platform events into calls to the core's HTTP contract below.
+Base URL: `{PUBLIC_URL}/api/core`
 
----
+## Auth (sessions only)
 
-## Core HTTP Contract
+`POST /v1/sessions/start` and `POST /v1/sessions/stop` require:
 
-Base URL: `http://localhost:{PORT}/api/core`
+- Env on Tessera: `TESSERA_INGEST_SECRET`
+- Headers: `X-Tessera-Timestamp`, `X-Tessera-Nonce`, `X-Tessera-Signature`
+- Signature: `HMAC-SHA256(secret, \`${timestamp}.${nonce}.${rawBody}\`)` hex digest
+- Replay window: 60s; nonces are single-use
 
-All requests are localhost-only. The connector and the core run in the same process.
+Tips (`POST /v1/tips`) use the viewer Gateway session, not ingest HMAC.
 
----
-
-### POST /v1/sessions/start
-
-Start billing a user.
+## POST /v1/sessions/start
 
 ```json
 {
@@ -25,35 +24,27 @@ Start billing a user.
   "ratePerSecond": "0.000100",
   "payoutAddress": "0x...",
   "splits": [
-    { "address": "0x...", "fraction": 0.1, "label": "platform-fee" }
+    { "address": "0x...", "fraction": 0.1, "label": "display-admin" }
   ],
   "metadata": {}
 }
 ```
 
-- `ratePerSecond` — decimal string in USDC. `"0"` is valid (tip-only mode).
-- `splits` — optional. Sum of fractions must be `<= 1`. The remainder goes to `payoutAddress`.
-- `metadata` — optional. Opaque key/value, never interpreted by the core.
+- `ratePerSecond`: USDC decimal string. `"0"` is tip-only.
+- `splits`: optional; sum of fractions `<= 1`; remainder goes to `payoutAddress`.
+- Resolve payee, rate, and splits in the plugin before calling.
 
-**Response:** `{ "status": "session_started", "sessionId": "userId" }`
+Response: `{ "status": "session_started", "sessionId": "userId" }`
 
----
-
-### POST /v1/sessions/stop
-
-Stop billing a user.
+## POST /v1/sessions/stop
 
 ```json
 { "userId": "string" }
 ```
 
-**Response:** `{ "status": "session_stopped" }`
+Response: `{ "status": "session_stopped" }`
 
----
-
-### POST /v1/tips
-
-One-off tip, independent of any active session.
+## POST /v1/tips
 
 ```json
 {
@@ -63,38 +54,15 @@ One-off tip, independent of any active session.
 }
 ```
 
-- Requires the user to have a registered gateway session (`/register-session`).
-- `amount` — decimal string in USDC.
+Requires a registered Gateway session for `userId`.
 
-**Response:** `{ "status": "success", "amount": "0.100000", "payoutAddress": "0x..." }`
+## Assets
 
----
+UI bundles: `GET {PUBLIC_URL}/assets/paywall.bundle.js` (and related files under `/assets`).
 
-## Connector Interface
+## Creator
 
-```typescript
-export interface Connector {
-    readonly name: string;
-    register(app: Express, config: ConnectorConfig): void;
-}
-```
-
-`register()` is called once at startup. Mount all routes, webhooks, and static assets here.
-
----
-
-## Rules
-
-- Each connector is self-contained. It communicates with the core exclusively over the HTTP contract above.
-- All identity resolution (payee address, splits, rate) is the connector's responsibility. The core receives already-resolved values.
-- Connectors are isolated from each other. The dependency graph is: `connector → core HTTP`, never `connector → connector`.
-- Webhook authentication uses `verifyConnectorSignature` from `src/core/security/verify-connector-signature.ts`.
-
----
-
-## Adding a New Connector
-
-1. Create `src/connectors/<name>.ts`.
-2. Export a default object implementing `Connector`.
-3. Register it in `tessera.config.ts` under `connectors`.
-4. Add the secret `TESSERA_CONNECTOR_SECRET_<NAME_UPPERCASE>` to `.env`.
+- `GET /api/core/creator/balance?address=`
+- `POST /api/core/creator/prepare-withdraw`
+- `POST /api/core/creator/complete-withdraw`
+- `GET /api/core/creator/stats?address=`

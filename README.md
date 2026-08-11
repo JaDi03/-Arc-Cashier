@@ -90,10 +90,9 @@ When the creator and the instance admin are **not the same person**, the default
 | Platform | Integration | Status |
 |---|---|---|
 | [PeerTube](https://joinpeertube.org/) | Plugin | Live |
-| [Owncast](https://owncast.online/) | Connector | In development |
-| [Jellyfin](https://jellyfin.org/) | Connector | In development |
+| [Jellyfin](https://jellyfin.org/) | Plugin | In development |
 
-Tessera runs **alongside** your platform (sidecar + thin connector). It does not modify the platform's source code.
+Tessera is a payment engine sidecar. Platforms integrate via plugin or native webhook calling the [HTTP contract](CONNECTOR_SPEC.md).
 
 ---
 
@@ -101,7 +100,7 @@ Tessera runs **alongside** your platform (sidecar + thin connector). It does not
 
 With tips, any FOSS content can ask for support without locking the page: blogs (Ghost, WriteFreely), wikis (BookStack), photos (Immich), audio (Funkwhale, Castopod, Navidrome), and more.
 
-Platform not listed yet? A connector is usually on the order of ~100 lines. Guide: [Building a Connector](docs/connectors/building-a-connector.md).
+New platform: implement the [integration contract](CONNECTOR_SPEC.md) (`sessions/start|stop` + HMAC). No Tessera code changes required.
 
 ---
 
@@ -119,7 +118,10 @@ More detail: [Documentation](https://jadi03.github.io/tessera/) · [ARCHITECTURE
 git clone https://github.com/JaDi03/tessera.git
 cd tessera
 npm install
-npm run setup
+cp .env.example .env
+# Fill CIRCLE_*, MASTER_KEY, TESSERA_INGEST_SECRET
+npm run build
+npm start
 ```
 
 Install, env, and deploy: [Getting started](https://jadi03.github.io/tessera/getting-started/).

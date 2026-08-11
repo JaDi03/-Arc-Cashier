@@ -3,8 +3,7 @@
 Tessera integrates natively with PeerTube via an official plugin, which handles loading and configuring the paywall directly into the video interface automatically.
 
 > [!IMPORTANT]
-> This guide assumes you have already successfully installed the Tessera backend following the [Quick Start](../../getting-started/index.md) guide and selected **Option 2 (PeerTube)** during the setup wizard.
-> It also assumes you have a PeerTube instance running and Administrator access.
+> This guide assumes Tessera is running ([Quick Start](../../getting-started/index.md)) and you have PeerTube admin access.
 
 ## The Sustainability Model (Plugin V1)
 

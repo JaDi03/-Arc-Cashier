@@ -1,38 +1,22 @@
 # Contributing to Tessera
 
-Thank you for your interest in contributing to Tessera! This document outlines the process for contributing to the project.
+## Development
 
-## Code of Conduct
+```bash
+npm install
+cp .env.example .env
+npm run typecheck
+npm run lint
+npm run test
+npm run build:ui
+```
 
-By participating in this project, you agree to abide by our Code of Conduct. Please be respectful and professional in all interactions.
+## Adding a platform
 
-## Reporting Bugs
+Do **not** add code under this repo for a new platform. Implement a plugin or webhook client against [CONNECTOR_SPEC.md](CONNECTOR_SPEC.md).
 
-If you find a bug, please open an issue in the GitHub repository. Include:
-1. A clear and descriptive title.
-2. Steps to reproduce the bug.
-3. Expected behavior vs actual behavior.
-4. Information about your environment (Node version, OS, etc.).
+## Pull requests
 
-## Pull Request Workflow
-
-1. **Fork the repository** and create your branch from `main`.
-2. **Setup your environment** using the recommended flow (`nvm use`, `npm install`).
-3. **Make your changes** ensuring that the code is clean and modular.
-4. **Run checks** locally before pushing:
-   - `npm run typecheck`
-   - `npm run lint`
-   - `npm test`
-5. **Commit your changes** using conventional commit messages (e.g., `feat:`, `fix:`, `docs:`).
-6. **Submit a Pull Request**. Nuestro CI pipeline will automatically run checks against your branch. Wait for the pipeline to pass (turn green) and respond to any code review feedback.
-
-## Proposing New Connectors
-
-Tessera is designed to be easily extensible. If you want to add support for a new self-hosted platform (e.g., PeerTube, Jellyfin):
-
-1. Create a new folder under `src/connectors/<your-platform>`.
-2. Implement the `Connector` interface defined in `src/core/types.ts`.
-3. Provide a simple `README.md` inside your connector folder explaining how to configure the webhooks or integration APIs for your platform.
-4. Add your connector to the `CONNECTOR_REGISTRY` en `src/server.ts` (optional for local forks, but required if you want it merged upstream).
-
-We welcome all new platform integrations!
+- Conventional commits when possible (`feat`, `fix`, `docs`, …).
+- Keep Circle / Arc payment changes aligned with Canteen docs when touching the rail.
+- Do not commit `.env`, secrets, or local agent folders (`.agents/`, `.cursor/`, `.context/`).
