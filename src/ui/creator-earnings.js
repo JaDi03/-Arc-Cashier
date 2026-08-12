@@ -1,6 +1,6 @@
 /**
  * Creator earnings panel: Gateway balance + MetaMask (EIP-712 BurnIntent) withdraw.
- * Mounted by connectors via window.ArcCashier.initCreatorEarnings({ wallet, apiBase?, mount? }).
+ * Mounted via window.ArcCashier.initCreatorEarnings({ wallet, apiBase?, mount? }).
  * Kept separate from paywall.js to avoid growing the viewer paywall further.
  */
 

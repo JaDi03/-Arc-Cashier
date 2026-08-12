@@ -110,11 +110,11 @@ sequenceDiagram
     Tessera-->>Browser: 200 OK - session active
 
     %% 4. Streaming & billing (off-chain)
-    Platform->>Tessera: POST /api/connectors/events (joins / starts consumption)
+    Platform->>Tessera: POST /api/core/v1/sessions/start
     loop Every second while connected
         Note over Tessera,Gateway: EIP-3009 off-chain signatures (no gas per tick)
     end
-    Platform->>Tessera: POST /api/connectors/events (parts / stops consumption)
+    Platform->>Tessera: POST /api/core/v1/sessions/stop
 
     %% 5. End session & refund
     Viewer->>Browser: Clicks "End Session"
@@ -148,7 +148,7 @@ Tessera is designed to plug into the open-source creator stack where communities
 - **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
 - **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article subscriptions.
 
-Want to add your platform? Tessera connectors are ~100 lines of code. See [Building a Connector](connectors/building-a-connector.md) to get started.
+Want to add your platform? Call the [integration contract](../CONNECTOR_SPEC.md) from a plugin or native webhook. No Tessera code changes required.
 
 ---
 
@@ -168,13 +168,13 @@ Want to add your platform? Tessera connectors are ~100 lines of code. See [Build
 
 ## Architecture Summary
 
-Tessera uses a **sidecar pattern** to add payments without platform modifications. The architecture separates concerns into three layers:
+Tessera uses a **sidecar pattern**. Two layers in this repo:
 
-**Core Engine** (`src/core/`) - Platform-agnostic payment logic: session management, per-second billing, wallet operations, and Circle Gateway integration via the x402 protocol.
+**Core Engine** (`src/core/`) - Session management, per-second billing, wallet ops, Circle Gateway / x402.
 
-**Platform Connectors** (`src/connectors/`) - Lightweight adapters that translate platform-specific events (webhooks, SSE, API calls) into the core engine's billing interface. Each connector is ~100 lines of TypeScript.
+**Client Overlay** (`src/ui/`) - Paywall UI. Platforms load it from `/assets/`.
 
-**Client Overlay** (`src/ui/`) - The paywall interface injected into the platform's HTML. Handles wallet connection, session funding, real-time billing display, and session termination.
+Platform plugins live outside this repo and call the HTTP contract.
 
 For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
