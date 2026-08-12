@@ -124,6 +124,8 @@ npm run build
 npm start
 ```
 
+**Important:** every platform plugin needs a **Tessera Base URL** (how the platform server reaches Tessera) and the same **ingest secret** as `.env`. Steps: [Getting started §3](docs/getting-started/index.md#3-tessera-base-url).
+
 Install, env, and deploy: [Getting started](https://jadi03.github.io/tessera/getting-started/).
 
 ---

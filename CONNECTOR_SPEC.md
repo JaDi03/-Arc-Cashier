@@ -2,7 +2,9 @@
 
 Plugins and platform services call the core HTTP API. Tessera does not embed platform adapters.
 
-Base URL: `{PUBLIC_URL}/api/core`
+**Base URL (plugin setting):** HTTP origin where the platform server reaches Tessera. How to set it: [Quick Start §3](docs/getting-started/index.md#3-tessera-base-url).
+
+API paths below are relative to `{Base URL}/api/core`.
 
 ## Auth (sessions only)
 
