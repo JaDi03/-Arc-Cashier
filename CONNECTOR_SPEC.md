@@ -294,7 +294,6 @@ Always `tips` only — reading an article is not a timed session.
 Always `tips` only — a post or newsletter is not metered by the second.
 
 - `initTipMode` in the post template or alongside a subscribe button.
-- If your platform has a native membership system (Ghost Members, Stripe): Tessera is a tip alongside it, not a replacement. Do not disable native memberships.
 
 **Fediverse (Mastodon, Lemmy, Pixelfed)**
 
