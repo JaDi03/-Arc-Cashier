@@ -146,20 +146,32 @@ Server-side `start` / `stop` do **not** fund the viewer wallet. Funding is alway
 
 ## 3. Plugin settings dashboard
 
-Ship an admin page **on the platform** (PeerTube: Administration → Plugins → Tessera). That config belongs to the plugin, not Tessera `.env`.
+Ship an admin page on the platform (your plugin settings UI, webhook config page, or admin panel route). That config belongs to the plugin — not to Tessera `.env`.
 
-Example fields (PeerTube today):
+**Required for any connector:**
 
-| Plugin setting | Goes into |
-|---|---|
-| Tessera Base URL | Server POST origin for HMAC |
-| Tessera Ingest Secret | HMAC (`TESSERA_INGEST_SECRET`; cite `.env.example`) |
-| Admin wallet | `splits[].address` on time-based `start` |
-| Display fee (e.g. 0.10) | `splits[].fraction`; remainder to the creator |
-| Creator wallet (per channel / resource) | `payoutAddress` |
-| Rate per resource (exclusive only) | `ratePerSecond` on `start` |
+| Setting | Maps to | Notes |
+|---|---|---|
+| Tessera Base URL | Server-to-server POST origin | Used for HMAC `start` / `stop`. Confirm: `GET {Base URL}/health`. |
+| Tessera Ingest Secret | `TESSERA_INGEST_SECRET` | Copy from Tessera `.env.example`. Never expose to the browser. |
 
-Free / tip-only resources: do not call `start`. Call `initTipMode` and let the browser handle `tips`.
+**For time-based billing — add only if your platform meters consumption over time (video, audio, live):**
+
+| Setting | Maps to | Notes |
+|---|---|---|
+| Creator wallet | `payoutAddress` | Per-channel, per-artist, or per-resource. |
+| Rate per second (USDC) | `ratePerSecond` on `start` | e.g. `0.000100`. |
+| Platform fee wallet | `splits[].address` | Optional. Your platform's cut. |
+| Platform fee fraction | `splits[].fraction` | e.g. `0.1` = 10%. Remainder → creator. |
+
+**For tip-only billing — all platforms need this if they support tips:**
+
+| Setting | Maps to | Notes |
+|---|---|---|
+| Creator wallet | `payoutAddress` in `tips` | Resolve from EXIF, feed author, post metadata — whatever your platform exposes. |
+| Default tip amount (USDC) | `initTipMode(wallet, amount)` | Optional. Default `0.10` if omitted. |
+
+If your platform is exclusively tip-based (photos, posts, RSS, newsletter, fediverse): you only need the Required fields and the tip-only section above.
 
 ## 4. Native events → Tessera
 
@@ -174,13 +186,13 @@ Typical native events: `userJoined`, PlaybackStart, Play, NowPlaying, exclusive 
 ```json
 {
   "userId": "email:viewer@example.com",
-  "resourceId": "video-1",
+  "resourceId": "content-abc",
   "ratePerSecond": "0.000100",
   "payoutAddress": "0x...",
   "splits": [
-    { "address": "0x...", "fraction": 0.1, "label": "display-admin" }
+    { "address": "0x...", "fraction": 0.1, "label": "platform-fee" }
   ],
-  "metadata": { "platform": "peertube", "channelId": "3" }
+  "metadata": { "platform": "your-platform", "channelId": "3" }
 }
 ```
 
@@ -196,7 +208,7 @@ Response: `{ "status": "session_started", "sessionId": "userId" }`
 
 | Situation | What to do |
 |---|---|
-| Switch video/track while charging | `stop` previous `userId`, then `start` with new `resourceId` / rate. |
+| Switch resource while charging | `stop` previous `userId`, then `start` with new `resourceId` / rate. |
 | Second `start` same `userId` without `stop` | Overwrites the active session (new rate/resource). Prefer `stop` first. |
 | Pause should stop billing | Send `stop`. Send `start` again on resume if you still charge. |
 | Tab close / disconnect | Send `stop` on best-effort (`beforeunload`, websocket leave, idle timeout). |
@@ -240,27 +252,55 @@ PlaybackProgress, ping, and heartbeat: ignore for billing. The meter already run
 - Free: UI: `initTipMode()`. Tips from browser. Do not `start`.
 - Progress webhooks: ignore.
 
-**Music (Subsonic / Navidrome and family)**
+**Music server (Navidrome, Subsonic, Airsonic, Ampache, ...)**
 
-- While playing: NowPlaying/play → `start`; stop → `stop`.
-- Scrobble only at the end, no start: `tips` with the amount you computed.
+- Platform emits play/stop in real-time: `NowPlaying` / `play` → `start`; stop/pause → `stop`.
+- Platform only emits a scrobble at track end (no live play event): use `tips` with the computed amount. Do not invent a `start` you cannot pair with a `stop`.
+- `payoutAddress`: resolve from track metadata (MusicBrainz artist, Beets custom field). Do not use the platform's native account id.
 
-**Podcast**
+**Music metadata tools (Beets, Maloja, Picard)**
 
-- Support while it plays: same as music (`start`/`stop`).
-- Support this episode: `tips`.
+These are not billing surfaces — they resolve identity and wallet addresses.
 
-**Photos**
+- Beets / Picard: query before POSTing `start` or `tips` to get `payoutAddress` and `splits` from artist/composer credits.
+- Maloja: accepts scrobbles inbound → map to `tips` (same as scrobble-only music server above).
+- Do not call `start` / `stop` from a tagging tool.
 
-- Resolve, download, tip: `tips`.
+**Podcasting + audio (Audiobookshelf, Castopod, AntennaPod)**
 
-**Posts / publishing / feeds**
+- Support while it plays: play event → `start`; stop/pause → `stop`.
+- Support this episode (one-time gesture): `tips` only.
+- If the platform uses Podcasting 2.0 `<podcast:value>` tags or Castopod Premium: those are separate payment rails. Tessera is additive — do not replace them.
 
-- Tip, citation, support this post: `tips` only.
+**Photos / galleries (Immich, PhotoPrism, Lychee, ...)**
 
-**Fediverse**
+Photos have no duration — there is nothing to meter. Never call `start` or `stop`.
 
-- Map a native tip or boost to `tips`, or inject `initTipMode`.
+- UI: `initTipMode(creatorWallet)`. The paywall renders a tip button next to the image.
+- On tip gesture (download, like, support button): `POST /v1/tips` from the browser or your server.
+- `payoutAddress`: resolve from EXIF metadata (photographer's wallet), not from the platform account system.
+- `resourceId` is optional since there is no timed session; pass it via `metadata` if you need per-photo earnings in stats.
+
+**Feeds + RSS (FreshRSS, Miniflux, Wallabag)**
+
+Always `tips` only — reading an article is not a timed session.
+
+- `resourceId`: use the canonical URL of the article (stable, unique per post).
+- `payoutAddress`: resolve from the feed's `<author>` or a wallet tag in the feed.
+- UI: inject `initTipMode` next to each item in the reader UI.
+
+**Publishing + newsletter (Ghost, WriteFreely, Halo)**
+
+Always `tips` only — a post or newsletter is not metered by the second.
+
+- `initTipMode` in the post template or alongside a subscribe button.
+- If your platform has a native membership system (Ghost Members, Stripe): Tessera is a tip alongside it, not a replacement. Do not disable native memberships.
+
+**Fediverse (Mastodon, Lemmy, Pixelfed)**
+
+- `tips` only. Do not meter reading a post by the second.
+- Map a native tip, boost, or donation gesture to `POST /v1/tips`.
+- Or inject `initTipMode` in the post or profile view.
 
 ## 5. HMAC (`start` and `stop` only)
 
@@ -278,7 +318,7 @@ const crypto = require('crypto');
 const secret = process.env.TESSERA_INGEST_SECRET;
 const rawBody = JSON.stringify({
   userId: 'email:viewer@example.com',
-  resourceId: 'video-1',
+  resourceId: 'content-abc',
   ratePerSecond: '0.000100',
   payoutAddress: '0x...',
 });
@@ -349,13 +389,13 @@ Response:
 {
   "status": "success",
   "stats": [
-    { "resourceId": "video-1", "amount": 0.05 },
-    { "resourceId": "video-2", "amount": 1.20 }
+    { "resourceId": "resource-abc", "amount": 0.05 },
+    { "resourceId": "resource-xyz", "amount": 1.20 }
   ]
 }
 ```
 
-Each entry is a resource that generated earnings for `address`. `amount` is in USDC.
+Each entry is a `resourceId` your connector sent on `start` (or via `tips`) that generated earnings for `address`. `amount` is in USDC. Tessera does not interpret the value — it is whatever your connector passed.
 
 ## 7. Errors
 
