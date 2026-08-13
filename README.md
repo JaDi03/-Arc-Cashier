@@ -2,7 +2,7 @@
   <img src="docs/assets/logo_yellow.svg" alt="Tessera Logo" width="400">
   <br><br>
 
-  <strong>Support sidecar for self-hosted open-source platforms</strong>
+  <strong>USDC support engine for self-hosted platforms</strong>
   <br><br>
 
   <!-- Row 1: Status Badges -->
@@ -24,14 +24,25 @@
 
 ---
 
-## In one sentence
+## What is Tessera?
 
-Tessera is a support sidecar for open content (video, podcasts, posts, and more). Your audience can support creators and instance admins in USDC without forking the platform.
+Tessera is a support engine, not a platform. If your app emits events a connector can read, admins and creators receive USDC from their audience. People stay where they already are.
 
 - **Free content stays free**: optional tip.
-- **Exclusive content** (tutorial, course, masterclass): support **by the second watched**. If someone watches 10 minutes and leaves, they only support those 10 minutes. No full-course purchase. No fixed subscription.
+- **Exclusive content** (tutorial, course, masterclass): support **by the second watched**. Ten minutes watched means ten minutes of support.
 
-Free stays free. Support is optional and fair to the time watched.
+## Connect any platform
+
+Tessera runs as a sidecar. Your stack keeps its UI; a plugin or webhook maps native events to Tessera over HTTP.
+
+| Surface | Examples |
+|---|---|
+| Video / live | PeerTube (connector live), Jellyfin, Owncast |
+| Audio / podcast | Navidrome, Funkwhale, Castopod |
+| Photos | Immich, PhotoPrism |
+| Posts / publishing | Ghost, WriteFreely |
+
+New platform: implement the [integration contract](CONNECTOR_SPEC.md). No fork of Tessera.
 
 ---
 
@@ -39,68 +50,23 @@ https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
 
 ---
 
-## Contents
+## How support works
 
-- [Why it exists](#why-it-exists)
-- [How audiences can support](#how-audiences-can-support)
-- [Platforms today](#platforms-today)
-- [Beyond video](#beyond-video)
-- [Why Arc](#why-arc)
-- [Quick start](#quick-start)
-- [License](#license)
+### Tips on free content
 
----
-
-## Why it exists
-
-Self-hosted platforms give you freedom, but keeping servers online is expensive. Supporting a creator with the usual options often means high fees or getting locked into a payment SaaS.
-
-Tessera is not a tollbooth. It is a **support layer** for the free software ecosystem: optional tips, time-based support on exclusives, and a way for instances and creators to sustain what they publish.
-
-| Who | What they get |
-|---|---|
-| **Admins** | Help keep the lights on (configurable split on exclusive / time-based mode) |
-| **Creators** | Direct audience support (tips or by time) |
-| **Audience** | Support only what they consume; leave anytime |
-
----
-
-## How audiences can support
-
-### 1. Tips on free content
-
-The resource **stays open**. Tessera only offers an optional USDC tip. Works for free videos, posts, photos, wikis, podcasts…
+The resource stays open. Tessera offers an optional USDC tip.
 
 ![Optional tip on free content](docs/assets/support-tip.png)
 
 *Tips go to the creator.*
 
-### 2. Time-based support on exclusive content
+### Time-based support on exclusive content
 
-For tutorials, courses, or premieres: the audience supports **while watching** and can leave anytime. Ten minutes watched means ten minutes of support.
+The audience supports while watching and can leave anytime.
 
-When the creator and the instance admin are **not the same person**, the default split is about **~90% creator / ~10% instance** (configurable; helps cover hosting).
+When the creator and the instance admin are not the same person, the default split is about **~90% creator / ~10% instance** (configurable; helps cover hosting).
 
 ![Time-based support on exclusive content](docs/assets/support-time.png)
-
----
-
-## Platforms today
-
-| Platform | Integration | Status |
-|---|---|---|
-| [PeerTube](https://joinpeertube.org/) | Plugin | Live |
-| [Jellyfin](https://jellyfin.org/) | Plugin | In development |
-
-Tessera is a payment engine sidecar. Platforms integrate via plugin or native webhook calling the [HTTP contract](CONNECTOR_SPEC.md).
-
----
-
-## Beyond video
-
-With tips, any FOSS content can ask for support without locking the page: blogs (Ghost, WriteFreely), wikis (BookStack), photos (Immich), audio (Funkwhale, Castopod, Navidrome), and more.
-
-New platform: implement the [integration contract](CONNECTOR_SPEC.md) (`sessions/start|stop` + HMAC). No Tessera code changes required.
 
 ---
 
@@ -114,6 +80,8 @@ More detail: [Documentation](https://jadi03.github.io/tessera/) · [ARCHITECTURE
 
 ## Quick start
 
+**Run Tessera** (instance operator):
+
 ```bash
 git clone https://github.com/JaDi03/tessera.git
 cd tessera
@@ -124,7 +92,7 @@ npm run build
 npm start
 ```
 
-**Important:** every platform plugin needs a **Tessera Base URL** (how the platform server reaches Tessera) and the same **ingest secret** as `.env`. Steps: [Getting started §3](docs/getting-started/index.md#3-tessera-base-url).
+**Build a connector** (platform developer): your plugin needs Tessera’s **Base URL** and the same **ingest secret** as `.env`. See [Getting started §3](docs/getting-started/index.md#3-tessera-base-url) and the [integration contract](CONNECTOR_SPEC.md).
 
 Install, env, and deploy: [Getting started](https://jadi03.github.io/tessera/getting-started/).
 
