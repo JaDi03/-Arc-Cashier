@@ -1,12 +1,7 @@
 # Integrating a platform
 
-Tessera has no in-repo platform adapters. Your plugin or native service calls the HTTP contract:
+Tessera has no in-repo platform adapters. Write a plugin or webhook that translates native events and calls the HTTP contract.
 
-See [CONNECTOR_SPEC.md](../../CONNECTOR_SPEC.md).
+The full spec (events → `start` / `stop` / `tips`, HMAC, plugin settings): [CONNECTOR_SPEC.md](../../CONNECTOR_SPEC.md).
 
-Summary:
-
-1. On join / playback start: `POST /api/core/v1/sessions/start` (HMAC with `TESSERA_INGEST_SECRET`).
-2. On leave / stop: `POST /api/core/v1/sessions/stop`.
-3. Resolve `payoutAddress`, `ratePerSecond`, and `splits` in the plugin before calling.
-4. Load UI from `{PUBLIC_URL}/assets/`.
+Tessera install and Base URL: [Getting started](../getting-started/index.md).
