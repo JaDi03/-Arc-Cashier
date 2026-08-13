@@ -15,66 +15,62 @@
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://developers.circle.com/gateway/nanopayments"><img src="https://img.shields.io/badge/Circle_x402-2B3139?style=for-the-badge&logo=web3dotjs&logoColor=white" alt="Circle x402"></a>
   <a href="https://docs.arc.network"><img src="https://img.shields.io/badge/Arc_Testnet-6C63FF?style=for-the-badge" alt="Arc Testnet"></a>
-  <br><br>
-
-  <a href="https://jadi03.github.io/tessera/">Documentation</a>
-  ·
-  <a href="https://try-tessera.xyz">Live Playground</a>
 </div>
+
+---
+
+**[Documentation](https://jadi03.github.io/tessera/)** · See how it feels → **[Live Playground](https://try-tessera.xyz)**
 
 ---
 
 ## What is Tessera?
 
-Tessera is a support engine, not a platform. If your app emits events a connector can read, admins and creators receive USDC from their audience. People stay where they already are.
+Self-hosted platforms publish great content, but turning audience support into sustainable revenue is hard: high fees, SaaS lock-in, or paywalls that punish casual viewers.
 
-- **Free content stays free**: optional tip.
-- **Exclusive content** (tutorial, course, masterclass): support **by the second watched**. Ten minutes watched means ten minutes of support.
+Tessera is a **USDC support engine** that runs as a sidecar on **Arc Testnet** (MVP). Your platform keeps its UI; a connector translates native events (play, stop, tip) into HTTP calls. Viewers stay on your app; creators and instance admins get paid in testnet USDC.
+
+| Who | What they get |
+|---|---|
+| **Admins** | Configurable share on time-based content (helps cover hosting) |
+| **Creators** | Direct support via tips or per-second billing on exclusives |
+| **Viewers** | Optional tips on free content; pay only for the seconds they watch |
+
+https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
+
+## Billing modes
+
+**Tips (free content)** — The resource stays open. Tessera adds an optional USDC tip button. One gesture, one payment to the creator.
+
+**Per-second (exclusive content)** — Tutorials, courses, premieres: billing runs while the viewer consumes and stops when they leave. Ten minutes watched means ten minutes of support, not a full-course purchase. When creator and instance admin differ, the default split is about **90% creator / 10% instance** (configurable in the connector).
 
 ## Connect any platform
 
-Tessera runs as a sidecar. Your stack keeps its UI; a plugin or webhook maps native events to Tessera over HTTP.
+Tessera does not ship inside your codebase. Any stack that can observe consumption events can integrate via a plugin or webhook.
 
 | Surface | Examples |
 |---|---|
-| Video / live | PeerTube (connector live), Jellyfin, Owncast |
+| Video / live | [PeerTube](https://joinpeertube.org/) ([plugin](https://github.com/JaDi03/peertube-plugin-tessera)), Jellyfin, Owncast |
 | Audio / podcast | Navidrome, Funkwhale, Castopod |
 | Photos | Immich, PhotoPrism |
 | Posts / publishing | Ghost, WriteFreely |
 
-New platform: implement the [integration contract](CONNECTOR_SPEC.md). No fork of Tessera.
+**Integration:** three HTTP endpoints — `sessions/start`, `sessions/stop`, `tips` — plus HMAC on time-based calls. Full contract: [CONNECTOR_SPEC.md](CONNECTOR_SPEC.md). No fork of Tessera required.
 
----
+### Architecture
 
-https://github.com/user-attachments/assets/a85f14af-b1aa-4657-8f52-83f9ebd1c297
+<p align="center">
+  <img src="docs/assets/architecture-overview.png" alt="Tessera architecture overview" width="480">
+</p>
 
----
-
-## How support works
-
-### Tips on free content
-
-The resource stays open. Tessera offers an optional USDC tip.
-
-![Optional tip on free content](docs/assets/support-tip.png)
-
-*Tips go to the creator.*
-
-### Time-based support on exclusive content
-
-The audience supports while watching and can leave anytime.
-
-When the creator and the instance admin are not the same person, the default split is about **~90% creator / ~10% instance** (configurable; helps cover hosting).
-
-![Time-based support on exclusive content](docs/assets/support-time.png)
+<p align="center"><em>Platform events flow through a connector to the Tessera sidecar. The paywall UI runs in the viewer's browser. USDC settles to the creator.</em></p>
 
 ---
 
 ## Why Arc
 
-On traditional rails, a small tip dies in fees. On **Arc**, gas is USDC and network costs are on the order of cents. With Circle Gateway, support runs **off-chain** while people consume, so you are not paying a network fee for every tip or every second.
+On traditional rails, a small tip dies in fees. On **Arc Testnet**, gas is USDC and network costs are on the order of cents. With Circle Gateway, support runs **off-chain** while people consume, so you are not paying a network fee for every tip or every second.
 
-More detail: [Documentation](https://jadi03.github.io/tessera/) · [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+More detail: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
