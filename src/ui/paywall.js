@@ -626,14 +626,23 @@ function initPaywall(targetContainer) {
     })();
 }
 
+function injectCss(id, filename) {
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = SCRIPT_BASE_DIR + filename;
+    document.head.appendChild(link);
+}
+
 function injectDependencies() {
-    if (!document.getElementById('arc-paywall-css')) {
-        const link = document.createElement('link');
-        link.id = 'arc-paywall-css';
-        link.rel = 'stylesheet';
-        link.href = SCRIPT_BASE_DIR + 'paywall.css';
-        document.head.appendChild(link);
-    }
+    injectCss('arc-paywall-css', 'paywall.css');
+}
+
+function initCreatorEarningsUi(options) {
+    injectDependencies();
+    injectCss('arc-creator-earnings-css', 'creator-earnings.css');
+    return initCreatorEarnings(options);
 }
 
 /**
@@ -3392,7 +3401,7 @@ function initTipMode(creatorWallet, tipAmount) {
 window.ArcCashier = {
     initPaywall,
     initTipMode,
-    initCreatorEarnings,
+    initCreatorEarnings: initCreatorEarningsUi,
     // Legacy alias kept for backwards compatibility with any external callers
     init: initPaywall,
 };
