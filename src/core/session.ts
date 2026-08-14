@@ -104,7 +104,6 @@ export class SessionService {
             }
 
             this.isProcessingLoop = true;
-            console.log(`[Session] Running payment loop for ${this.activeSessions.size} active sessions...`);
 
             try {
                 const userIds = Array.from(this.activeSessions.keys());
@@ -125,6 +124,8 @@ export class SessionService {
                             }
                             const sessionData = this.activeSessions.get(userId);
                             const headers: Record<string, string> = { 'x-user-id': userId };
+                            let payeeSuffix = '????';
+                            let payeeLabel = 'unknown';
                             if (sessionData) {
                                 const elapsedSeconds = Math.floor((Date.now() - sessionData.joinedAt) / 1000);
                                 if (sessionData.tickCount >= elapsedSeconds) return;
@@ -133,13 +134,22 @@ export class SessionService {
                                 const payoutAddress = resolvePayoutForTick(sessionData, sessionData.tickCount);
                                 headers['x-seller-address'] = payoutAddress;
                                 if (sessionData.resourceId) headers['x-resource-id'] = sessionData.resourceId;
+
+                                payeeSuffix = payoutAddress.slice(-6);
+                                const payeeLower = payoutAddress.toLowerCase();
+                                payeeLabel =
+                                    payeeLower === sessionData.payoutAddress.toLowerCase()
+                                        ? 'creator'
+                                        : (sessionData.splits.find((s) => s.address.toLowerCase() === payeeLower)?.label ?? 'split');
                             }
 
                             const payResult = await gatewayClient.pay<{ access: boolean }>(
                                 `${SIDECAR_URL}/api/core/stream-access`,
                                 { headers }
                             );
-                            console.log(`[Session] Payment ok for ${userId}: ${payResult.formattedAmount} USDC`);
+                            console.log(
+                                `[Session] Payment ok for ${userId}: ${payResult.formattedAmount} USDC -> ...${payeeSuffix} (${payeeLabel})`
+                            );
                         } catch (error: any) {
                             const errMsg = error.response?.data?.error || error.response?.data || error.message || String(error);
                             console.error(`[Session] Payment failed for ${userId} (${error.response?.status ?? 'N/A'}):`, errMsg);
@@ -183,8 +193,8 @@ export class SessionService {
         });
 
         const splitDesc = resolvedSplits.length > 0
-            ? resolvedSplits.map((s) => `${s.slots * 10}% → ${s.label ?? s.address}`).join(' | ') + ' | remainder → primary payee'
-            : '100% → primary payee';
+            ? resolvedSplits.map((s) => `${s.slots * 10}% → ${s.label ?? s.address}`).join(' | ') + ' | remainder → creator'
+            : '100% → creator';
 
         console.log(`[Session] 🟢 Session started: ${userId} | resource: ${request.resourceId || 'unknown'} | $${rate}/s | ${splitDesc}`);
     }
