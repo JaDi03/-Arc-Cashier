@@ -1,6 +1,6 @@
 # How to get your Circle App ID
 
-This tutorial explains how to locate your App ID in the Circle Developer Console. Tessera uses the App ID on the frontend so the Web3 Services SDK can initialize the Circle-hosted UI for wallet creation (the PIN and Email screens).
+This tutorial explains how to locate your App ID in the Circle Developer Console. Tessera uses the App ID on the frontend so the Web3 Services SDK can initialize the Circle-hosted UI for wallet creation (email OTP and social login screens).
 
 ## Step-by-Step Guide
 
