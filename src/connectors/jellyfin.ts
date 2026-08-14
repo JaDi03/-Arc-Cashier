@@ -1,5 +1,6 @@
 import { Router, type Express } from 'express';
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { isAddress } from 'viem';
 import { verifyConnectorSignature } from '../core/security/verify-connector-signature';
@@ -8,6 +9,14 @@ import type { Connector, ConnectorConfig, Split } from '../core/types';
 const CONNECTOR_NAME = 'jellyfin';
 const CORE_PORT = process.env.PORT || '7878';
 const CORE_BASE_URL = `http://localhost:${CORE_PORT}`;
+
+function resolveUiAssetsDir(): string {
+    const distUi = path.join(process.cwd(), 'dist', 'ui');
+    const srcUi = path.join(process.cwd(), 'src', 'ui');
+    if (fs.existsSync(distUi)) return distUi;
+    if (fs.existsSync(srcUi)) return srcUi;
+    return path.join(__dirname, '..', 'ui');
+}
 
 interface JellyfinWebhookNotification {
     NotificationType?: string;
@@ -31,7 +40,7 @@ const jellyfinConnector: Connector = {
     name: 'Jellyfin',
 
     register(app: Express, config: ConnectorConfig): void {
-        app.use('/jellyfin-assets', express.static(path.join(__dirname, '..', 'ui')));
+        app.use('/jellyfin-assets', express.static(resolveUiAssetsDir()));
 
         const router = Router();
         router.use(verifyConnectorSignature(CONNECTOR_NAME));
@@ -85,7 +94,7 @@ const jellyfinConnector: Connector = {
                         splits.push({
                             address: displayAdminAddress,
                             fraction: Number(process.env.TESSERA_DISPLAY_FEE || 0.10),
-                            label: 'display-admin',
+                            label: 'display',
                         });
                     }
 

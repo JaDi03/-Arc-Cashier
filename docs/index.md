@@ -157,7 +157,7 @@ Want to add your platform? Tessera connectors are ~100 lines of code. See [Build
 | Technology | Purpose | Why It Matters |
 |---|---|---|
 | [**Circle x402 Gateway**](https://developers.circle.com/gateway/nanopayments) | Batched nanopayment settlement & protocol | Enables gas-free USDC payments as small as $0.000001 using the open HTTP 402 standard |
-| [**Circle UCW SDK**](https://developers.circle.com/wallets/user-controlled) | Smart Contract Accounts on Arc Testnet | Non-custodial wallets with social login, PIN, or biometrics |
+| [**Circle UCW SDK**](https://developers.circle.com/wallets/user-controlled) | Smart Contract Accounts on Arc Testnet | Non-custodial wallets with email OTP or social login |
 | [**Circle CCTP Forwarding**](https://www.circle.com/cross-chain-transfer-protocol) | Cross-chain USDC bridging (Domain 26) | Allows viewers to deposit USDC from any supported source chain |
 | [**Arc Testnet**](https://docs.arc.network) | Settlement layer (Chain ID 5042002) | Native USDC gas, sub-second finality, purpose-built for payments |
 | [**EIP-3009**](https://eips.ethereum.org/EIPS/eip-3009) | Off-chain transfer authorization | Gasless cryptographic signatures for nanopayments |

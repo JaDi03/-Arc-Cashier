@@ -1,13 +1,24 @@
 import { Router, type Express } from 'express';
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { isAddress } from 'viem';
 import { verifyConnectorSignature } from '../core/security/verify-connector-signature';
 import type { Connector, ConnectorConfig, Split } from '../core/types';
+import peertubeAdminRouter from './peertube-admin-routes';
 
 const CONNECTOR_NAME = 'peertube';
 const CORE_PORT = process.env.PORT || '7878';
 const CORE_BASE_URL = `http://localhost:${CORE_PORT}`;
+
+/** Docker image has dist/ui (Dockerfile copies it); local npm start may only have src/ui. */
+function resolveUiAssetsDir(): string {
+    const distUi = path.join(process.cwd(), 'dist', 'ui');
+    const srcUi = path.join(process.cwd(), 'src', 'ui');
+    if (fs.existsSync(distUi)) return distUi;
+    if (fs.existsSync(srcUi)) return srcUi;
+    return path.join(__dirname, '..', 'ui');
+}
 
 interface PeerTubeWebhookPayload {
     event?: 'viewer_joined' | 'viewer_left';
@@ -61,7 +72,7 @@ async function resolveFederationOriginSplit(originInstanceUrl: string): Promise<
         return {
             address: remoteData.adminWallet.trim(),
             fraction: originFee,
-            label: 'federation-origin',
+            label: 'host',
         };
     } catch (err) {
         console.warn(`[PeerTube] Federation lookup failed for ${originInstanceUrl}:`, err instanceof Error ? err.message : String(err));
@@ -73,12 +84,22 @@ const peertubeConnector: Connector = {
     name: 'PeerTube',
 
     register(app: Express, config: ConnectorConfig): void {
-        app.use('/peertube-assets', express.static(path.join(__dirname, '..', 'ui')));
+        // Bridge legacy env so existing installs keep working after flatten.
+        if (!process.env.TESSERA_CONNECTOR_SECRET_PEERTUBE && process.env.PEERTUBE_WEBHOOK_SECRET) {
+            process.env.TESSERA_CONNECTOR_SECRET_PEERTUBE = process.env.PEERTUBE_WEBHOOK_SECRET;
+            console.log('[PeerTube] Bridged PEERTUBE_WEBHOOK_SECRET → TESSERA_CONNECTOR_SECRET_PEERTUBE');
+        }
 
-        const router = Router();
-        router.use(verifyConnectorSignature(CONNECTOR_NAME));
+        const uiDir = resolveUiAssetsDir();
+        console.log(`[PeerTube] Serving UI assets from ${uiDir}`);
+        app.use('/peertube-assets', express.static(uiDir));
 
-        router.post('/webhook', async (req, res) => {
+        // Webhook only: Tessera HMAC on POST /webhook.
+        // Do not router.use(HMAC) here: Express still enters this router for
+        // /admin/* and /creator/stats and would reject Bearer-only plugin calls.
+        const webhookRouter = Router();
+
+        webhookRouter.post('/webhook', verifyConnectorSignature(CONNECTOR_NAME), async (req, res) => {
             const payload = req.body as PeerTubeWebhookPayload;
 
             if (!payload.event || !payload.userId) {
@@ -104,7 +125,7 @@ const peertubeConnector: Connector = {
                     splits.push({
                         address: displayAdminAddress,
                         fraction: payload.displayFee !== undefined ? Number(payload.displayFee) : Number(process.env.TESSERA_DISPLAY_FEE || 0.10),
-                        label: 'display-admin',
+                        label: 'display',
                     });
                 }
 
@@ -149,7 +170,9 @@ const peertubeConnector: Connector = {
             return res.json({ status: 'ok' });
         });
 
-        app.use(`/api/connectors/${CONNECTOR_NAME}`, router);
+        app.use(`/api/connectors/${CONNECTOR_NAME}`, webhookRouter);
+        // Admin + creator/stats: Bearer auth (no Tessera HMAC middleware)
+        app.use(`/api/connectors/${CONNECTOR_NAME}`, peertubeAdminRouter);
     },
 };
 
