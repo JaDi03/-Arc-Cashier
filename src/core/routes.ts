@@ -10,7 +10,7 @@ import { verifyCircleWalletOwnership } from './circle-routes';
 import { addressesEqual, isValidPrivateKeyHex, isValidViewerUserId } from './session-key-auth';
 import { verifyIngestSignature } from './security/verify-ingest-signature';
 import rateLimit from 'express-rate-limit';
-import { isAddress, isHex, verifyMessage, createPublicClient, http, formatUnits, parseUnits } from 'viem';
+import { isAddress, isHex, createPublicClient, http, formatUnits, parseUnits } from 'viem';
 import { arcTestnet } from 'viem/chains';
 
 const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
@@ -230,26 +230,6 @@ coreRouter.post('/v1/tips', sessionLimiter, async (req: Request, res: Response) 
 });
 
 // ─── Buyer-side routes ────────────────────────────────────────────────────────
-
-coreRouter.post('/recover-session', sessionLimiter, async (req: Request, res: Response) => {
-    const { returnAddress, signature } = req.body;
-    if (!returnAddress || !signature) return res.status(400).json({ error: 'Missing returnAddress or signature' });
-    if (!isAddress(returnAddress)) return res.status(400).json({ error: 'Invalid returnAddress' });
-
-    try {
-        const isValid = await verifyMessage({ address: returnAddress, message: 'Login to Tessera', signature });
-        if (!isValid) return res.status(401).json({ error: 'Invalid signature. Ownership of address not proven.' });
-
-        const session = walletService.getSessionByReturnAddress(returnAddress);
-        if (session) {
-            return res.json({ status: 'recovered', userId: session.userId, privateKey: session.record.privateKey });
-        }
-        return res.status(404).json({ error: 'No active session found for this address.' });
-    } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        return res.status(500).json({ error: 'Signature verification failed' });
-    }
-});
 
 /**
  * Return the canonical ephemeral privateKey for a viewer after proving Circle

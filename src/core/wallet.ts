@@ -151,18 +151,6 @@ export class WalletService {
     }
 
     /**
-     * Finds a session by the user's return address (MetaMask address).
-     */
-    public getSessionByReturnAddress(returnAddress: string): { userId: string, record: SessionRecord } | null {
-        for (const [userId, record] of this.sessionRecords.entries()) {
-            if (record.returnAddress.toLowerCase() === returnAddress.toLowerCase()) {
-                return { userId, record };
-            }
-        }
-        return null;
-    }
-
-    /**
      * Removes a session record after settlement is complete.
      */
     public clearSession(userId: string): void {
