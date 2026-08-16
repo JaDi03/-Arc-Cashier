@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { formatUnits, parseUnits, pad } from 'viem';
+import { statsService } from './stats';
 import {
     BURN_INTENT_EIP712_DOMAIN,
     BURN_INTENT_EIP712_TYPES,
@@ -13,13 +14,11 @@ import {
 } from './creator-gateway';
 
 /**
- * Platform-agnostic creator earnings routes (MetaMask / EIP-712 BurnIntent).
- * Mounted under /api/core so any connector plugin can relay:
+ * Creator earnings (MetaMask / EIP-712 BurnIntent) + earnings stats.
  *   GET  /api/core/creator/balance?address=
  *   POST /api/core/creator/prepare-withdraw  { address }
  *   POST /api/core/creator/complete-withdraw { address, burnIntent, signature }
- *
- * Contract restored from historical PeerTube creator-routes (commit 6948bc6 / 9957984).
+ *   GET  /api/core/creator/stats?address=
  */
 const creatorRouter = Router();
 
@@ -143,6 +142,21 @@ creatorRouter.post('/creator/complete-withdraw', async (req: Request, res: Respo
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[Creator] complete-withdraw failed for ${address}:`, err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+creatorRouter.get('/creator/stats', async (req: Request, res: Response) => {
+    const address = (req.query.address as string || '').trim();
+    if (!address || !isValidEvmAddress(address)) {
+        return res.status(400).json({ error: 'Missing or invalid address' });
+    }
+
+    try {
+        const stats = statsService.getEarningsByAddress(address);
+        return res.json({ status: 'success', stats });
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
         return res.status(500).json({ error: err.message });
     }
 });

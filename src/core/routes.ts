@@ -8,6 +8,7 @@ import { GATEWAY_FEE_BUFFER } from './gateway-utils';
 import creatorRouter from './creator-routes';
 import { verifyCircleWalletOwnership } from './circle-routes';
 import { addressesEqual, isValidPrivateKeyHex, isValidViewerUserId } from './session-key-auth';
+import { verifyIngestSignature } from './security/verify-ingest-signature';
 import rateLimit from 'express-rate-limit';
 import { isAddress, isHex, verifyMessage, createPublicClient, http, formatUnits, parseUnits } from 'viem';
 import { arcTestnet } from 'viem/chains';
@@ -85,10 +86,10 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
     res.json({ access: true, payment: req.payment });
 });
 
-// ─── Universal v1 Connector Contract ─────────────────────────────────────────
-// Only interface connectors may depend on. See CONNECTOR_SPEC.md.
+// ─── v1 ingest: sessions/start|stop (HMAC TESSERA_INGEST_SECRET) ─────────────
+// Tips stay unsigned (viewer Gateway session).
 
-coreRouter.post('/v1/sessions/start', sessionLimiter, (req: Request, res: Response) => {
+coreRouter.post('/v1/sessions/start', sessionLimiter, verifyIngestSignature, (req: Request, res: Response) => {
     const { userId, resourceId, ratePerSecond, payoutAddress, splits, metadata } = req.body;
 
     if (!userId || !resourceId || ratePerSecond === undefined || ratePerSecond === null || !payoutAddress) {
@@ -117,7 +118,7 @@ coreRouter.post('/v1/sessions/start', sessionLimiter, (req: Request, res: Respon
     }
 });
 
-coreRouter.post('/v1/sessions/stop', async (req: Request, res: Response) => {
+coreRouter.post('/v1/sessions/stop', sessionLimiter, verifyIngestSignature, async (req: Request, res: Response) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
