@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { TESSERA_VERSION } from '../version';
 
 const instanceInfoRouter = Router();
 
@@ -30,7 +31,7 @@ instanceInfoRouter.get('/instance-info', (req, res) => {
     if (!adminWallet) {
         return res.status(503).json({
             error: 'Tessera not fully configured: Admin wallet address is missing. Configure it in the PeerTube plugin settings UI.',
-            tesseraVersion: '1.2.0',
+            tesseraVersion: TESSERA_VERSION,
         });
     }
 
@@ -38,7 +39,7 @@ instanceInfoRouter.get('/instance-info', (req, res) => {
         adminWallet,
         displayFee,
         originFee,
-        tesseraVersion: '1.2.0',
+        tesseraVersion: TESSERA_VERSION,
     });
 });
 
