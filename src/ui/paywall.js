@@ -3294,6 +3294,8 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                         userId: viewerState.userId,
                         payoutAddress: creatorWallet,
                         amount: amount.toFixed(6),
+                        userToken: viewerState.userToken,
+                        returnAddress: viewerState.walletAddress,
                     }),
                 });
 
@@ -3308,9 +3310,10 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
                 } else {
                     console.error('[Tessera] Tip failed: HTTP ' + res.status);
 
+                    // 401: Circle session does not own this wallet. Re-onboard.
                     // 404/402: need deposit or session. Do not silent-register here
                     // (that delayed the deposit modal by seconds when unfunded).
-                    if (res.status === 404 || res.status === 402) {
+                    if (res.status === 401 || res.status === 404 || res.status === 402) {
                         btn.textContent = `\u2764\uFE0F Support $${amount.toFixed(2)}`;
                         void refreshStatus();
                         openTipOnboarding();

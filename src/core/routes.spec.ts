@@ -3,6 +3,7 @@ import instanceInfoRouter from './instance-info';
 import coreRouter from './routes';
 import { statsService } from './stats';
 import { walletService } from './wallet';
+import { sessionService } from './session';
 import * as circleRoutes from './circle-routes';
 import { Request, Response } from 'express';
 import * as fs from 'fs';
@@ -262,5 +263,76 @@ describe('sync-session Endpoint', () => {
         } as Request, res);
         expect(getStatus()).toBe(200);
         expect(getJson()).toEqual({ status: 'synced', privateKey });
+    });
+});
+
+describe('POST /v1/tips', () => {
+    const returnAddress = '0x1111222233334444555566667777888899990000';
+    const payoutAddress = '0x2222333344445555666677778888999900001111';
+    const privateKey = ('0x' + 'ab'.repeat(32)) as `0x${string}`;
+    const tipBody = {
+        userId: 'social:abc',
+        payoutAddress,
+        amount: '0.100000',
+        userToken: 'x'.repeat(40),
+        returnAddress,
+    };
+    let handler: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        handler = getRouteHandler('/v1/tips');
+    });
+
+    it('rejects missing Circle proof fields', async () => {
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: { userId: 'social:abc', payoutAddress, amount: '0.100000' },
+        } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toMatch(/Missing/);
+    });
+
+    it('rejects when Circle ownership fails', async () => {
+        vi.spyOn(circleRoutes, 'verifyCircleWalletOwnership').mockResolvedValue('unauthorized');
+        const { res, getStatus } = mockRes();
+        await handler({ body: tipBody } as Request, res);
+        expect(getStatus()).toBe(401);
+    });
+
+    it('rejects when no Gateway session exists', async () => {
+        vi.spyOn(circleRoutes, 'verifyCircleWalletOwnership').mockResolvedValue('ok');
+        vi.spyOn(walletService, 'hasSessionRecord').mockReturnValue(false);
+        const { res, getStatus } = mockRes();
+        await handler({ body: tipBody } as Request, res);
+        expect(getStatus()).toBe(404);
+    });
+
+    it('rejects returnAddress mismatch against stored session', async () => {
+        vi.spyOn(circleRoutes, 'verifyCircleWalletOwnership').mockResolvedValue('ok');
+        vi.spyOn(walletService, 'hasSessionRecord').mockReturnValue(true);
+        vi.spyOn(walletService, 'getSessionRecord').mockReturnValue({
+            privateKey,
+            returnAddress: '0x9999999999999999999999999999999999999999',
+        } as any);
+        const { res, getStatus } = mockRes();
+        await handler({ body: tipBody } as Request, res);
+        expect(getStatus()).toBe(401);
+    });
+
+    it('pays after Circle ownership proof and matching session', async () => {
+        const pay = vi.fn().mockResolvedValue({ success: true });
+        vi.spyOn(circleRoutes, 'verifyCircleWalletOwnership').mockResolvedValue('ok');
+        vi.spyOn(walletService, 'hasSessionRecord').mockReturnValue(true);
+        vi.spyOn(walletService, 'getSessionRecord').mockReturnValue({
+            privateKey,
+            returnAddress,
+        } as any);
+        vi.spyOn(sessionService, 'getGatewayClientForUser').mockReturnValue({ pay } as any);
+        const { res, getStatus, getJson } = mockRes();
+        await handler({ body: tipBody } as Request, res);
+        expect(getStatus()).toBe(200);
+        expect(getJson()).toEqual({ status: 'success', amount: '0.100000', payoutAddress });
+        expect(pay).toHaveBeenCalledTimes(1);
     });
 });

@@ -29,6 +29,10 @@ export interface TipRequest {
     payoutAddress: string;
     /** Decimal string in USDC, e.g. "0.100000". */
     amount: string;
+    /** Circle userToken: must own returnAddress. */
+    userToken: string;
+    /** UCW SCA address; must match the stored Gateway session. */
+    returnAddress: string;
 }
 
 export interface CashierConfig {
