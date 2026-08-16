@@ -336,3 +336,49 @@ describe('POST /v1/tips', () => {
         expect(pay).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('POST /cash-out', () => {
+    let handler: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        handler = getRouteHandler('/cash-out');
+    });
+
+    it('rejects missing Circle proof fields', async () => {
+        const { res, getStatus, getJson } = mockRes();
+        await handler({ body: { userId: 'social:abc' }, headers: {} } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toMatch(/Missing/);
+    });
+
+    it('rejects when Circle ownership fails', async () => {
+        vi.spyOn(circleRoutes, 'verifyCircleWalletOwnership').mockResolvedValue('unauthorized');
+        const { res, getStatus } = mockRes();
+        await handler({
+            body: {
+                userId: 'social:abc',
+                userToken: 'x'.repeat(40),
+                returnAddress: '0x1111222233334444555566667777888899990000',
+            },
+            headers: {},
+        } as Request, res);
+        expect(getStatus()).toBe(401);
+    });
+});
+
+describe('POST /session-balance', () => {
+    let handler: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        handler = getRouteHandler('/session-balance');
+    });
+
+    it('rejects missing Circle proof fields', async () => {
+        const { res, getStatus, getJson } = mockRes();
+        await handler({ body: { userId: 'social:abc' }, headers: {} } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toMatch(/Missing/);
+    });
+});
