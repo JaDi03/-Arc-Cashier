@@ -359,8 +359,6 @@ circleRouter.post('/circle/email-otp/request', circleRateLimiter, async (req: Re
         console.error(`[Circle] ❌ Email OTP request failed:`, error?.response?.data || error.message);
         return res.status(500).json({
             error: 'Failed to request email OTP. Confirm SMTP is configured in Circle Console.',
-            debugError: error.message,
-            debugData: error?.response?.data,
         });
     }
 });
@@ -389,8 +387,6 @@ circleRouter.post('/circle/social/device-token', circleRateLimiter, async (req: 
         console.error(`[Circle] ❌ Social device token failed:`, error?.response?.data || error.message);
         return res.status(500).json({
             error: 'Failed to create social login device token',
-            debugError: error.message,
-            debugData: error?.response?.data,
         });
     }
 });
@@ -431,8 +427,6 @@ circleRouter.post('/circle/email-otp/refresh', circleRateLimiter, async (req: Re
         console.error(`[Circle] ❌ Email OTP refresh failed:`, error?.response?.data || error.message);
         return res.status(401).json({
             error: 'Session expired. Sign in with email again.',
-            debugError: error.message,
-            debugData: error?.response?.data,
         });
     }
 });
@@ -554,7 +548,7 @@ circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, 
             walletCreationLocks.delete(userId);
         }
         console.error(`[Circle] ❌ Failed to get/create wallet:`, error?.response?.data || error.message);
-        return res.status(500).json({ error: 'Failed to get or create Circle wallet', debugError: error.message, debugData: error?.response?.data });
+        return res.status(500).json({ error: 'Failed to get or create Circle wallet' });
     }
 });
 
@@ -573,27 +567,31 @@ circleRouter.post('/circle/prepare-deposit', circleRateLimiter, async (req: Requ
         const account = privateKeyToAccount(ephemeralPk as `0x${string}`);
         const ephemeralWalletAddress = account.address;
 
-        // Fetch token balance to get the correct tokenId (Circle API requires tokenId even for native tokens)
+        // Fetch token balances and transfer USDC only (never native / tokens[0]).
         const balancesRes = await circleClient.getWalletTokenBalance({
             walletId,
             userToken
         });
-
-        // Find the token holding the funds (should be Native token or USDC)
-        const tokens = balancesRes.data?.tokenBalances || [];
-        const fundedToken = tokens.find((t: any) => parseFloat(t.amount) >= parseFloat(depositAmount)) || tokens[0];
-
-        if (!fundedToken) {
-            return res.status(400).json({ error: 'Wallet has no tokens' });
+        const usdc = findUsdcTokenBalance(balancesRes.data?.tokenBalances as CircleTokenBalanceRow[] | undefined);
+        if (!usdc?.token?.id) {
+            return res.status(400).json({ error: 'USDC token not found in wallet' });
+        }
+        const usdcBalance = String(usdc.amount ?? '0');
+        const requested = Number(depositAmount);
+        if (!Number.isFinite(requested) || requested <= 0) {
+            return res.status(400).json({ error: 'Invalid deposit amount' });
+        }
+        if (Number(usdcBalance) < requested) {
+            return res.status(400).json({ error: `Insufficient USDC balance: wallet has ${usdcBalance}, requested ${depositAmount}` });
         }
 
         const transferRes = await circleClient.createTransaction({
             userToken,
             walletId,
-            tokenId: fundedToken.token.id,
+            tokenId: usdc.token.id,
             idempotencyKey: crypto.randomUUID(),
             destinationAddress: ephemeralWalletAddress,
-            amounts: [depositAmount],
+            amounts: [String(depositAmount)],
             fee: { type: 'level', config: { feeLevel: 'HIGH' } }
         });
 
