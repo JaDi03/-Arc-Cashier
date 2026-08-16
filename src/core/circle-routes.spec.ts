@@ -214,3 +214,83 @@ describe('POST /circle/prepare-external-withdraw', () => {
         }));
     });
 });
+
+const DEPOSIT_EPHEMERAL_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+
+describe('POST /circle/prepare-deposit', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('creates a USDC transfer even when another token has a larger balance', async () => {
+        const handler = getRouteHandler('/circle/prepare-deposit');
+        mockCircleClient.getWalletTokenBalance.mockResolvedValue({
+            data: {
+                tokenBalances: [
+                    { amount: '99', token: { id: OTHER_TOKEN_ID, symbol: 'ETH' } },
+                    usdcBalanceRow('5'),
+                ],
+            },
+        });
+        mockCircleClient.createTransaction.mockResolvedValue({
+            data: { challengeId: 'deposit-challenge' },
+        });
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userToken: 't',
+                walletId: 'w',
+                depositAmount: '1.5',
+                ephemeralPk: DEPOSIT_EPHEMERAL_PK,
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(200);
+        expect(getJson().challengeId).toBe('deposit-challenge');
+        expect(mockCircleClient.createTransaction).toHaveBeenCalledWith(expect.objectContaining({
+            userToken: 't',
+            walletId: 'w',
+            tokenId: USDC_TOKEN_ID,
+            amounts: ['1.5'],
+            fee: { type: 'level', config: { feeLevel: 'HIGH' } },
+        }));
+        expect(mockCircleClient.createTransaction.mock.calls[0][0].tokenId).not.toBe(OTHER_TOKEN_ID);
+    });
+
+    it('rejects when the wallet has no USDC', async () => {
+        const handler = getRouteHandler('/circle/prepare-deposit');
+        mockCircleClient.getWalletTokenBalance.mockResolvedValue({
+            data: { tokenBalances: [{ amount: '9', token: { id: OTHER_TOKEN_ID, symbol: 'ETH' } }] },
+        });
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userToken: 't',
+                walletId: 'w',
+                depositAmount: '1',
+                ephemeralPk: DEPOSIT_EPHEMERAL_PK,
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toBe('USDC token not found in wallet');
+        expect(mockCircleClient.createTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects amount above USDC balance', async () => {
+        const handler = getRouteHandler('/circle/prepare-deposit');
+        mockCircleClient.getWalletTokenBalance.mockResolvedValue({
+            data: { tokenBalances: [usdcBalanceRow('0.5')] },
+        });
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userToken: 't',
+                walletId: 'w',
+                depositAmount: '1',
+                ephemeralPk: DEPOSIT_EPHEMERAL_PK,
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toContain('Insufficient USDC');
+        expect(mockCircleClient.createTransaction).not.toHaveBeenCalled();
+    });
+});
