@@ -142,14 +142,14 @@ Tessera does **not** have to be on the public internet if the platform server an
 
 ### Tips flow (browser)
 
-`POST /v1/tips` is called from the **browser** (paywall tip button), not from your ingest HMAC server. Your server may also POST `tips` if you already have a funded Gateway session for that `userId`, but the usual path is:
+`POST /v1/tips` is called from the **browser** (paywall tip button), not from your ingest HMAC server. A server POST is only valid if it also sends a live Circle `userToken` and the session `returnAddress`. The usual path is:
 
 1. Load `paywall.bundle.js`.
 2. `initTipMode(creatorWallet, tipAmount)`.
 3. Viewer signs in (email or Google) and funds wallet in the paywall UI.
 4. Paywall calls `POST /api/core/register-session` (Gateway deposit). This requires a valid `userId` and Circle `userToken`.
-5. Viewer clicks tip → paywall calls `POST /api/core/v1/tips` with `{ userId, payoutAddress, amount }`.
-6. `402` = insufficient Gateway balance. `404` = no session for `userId` (viewer has not completed step 4).
+5. Viewer clicks tip → paywall calls `POST /api/core/v1/tips` with `{ userId, payoutAddress, amount, userToken, returnAddress }`.
+6. `401` = Circle session does not own `returnAddress`, or it does not match the stored Gateway session. `402` = insufficient Gateway balance. `404` = no session for `userId` (viewer has not completed step 4).
 
 Server-side `start` / `stop` do **not** fund the viewer wallet. Funding is always through the paywall.
 
@@ -237,15 +237,17 @@ Response: `{ "status": "session_stopped" }`
 
 ### `POST /v1/tips`
 
-One amount, now. **No ingest HMAC.** Requires a Gateway session for `userId` (see §2 tips flow).
+One amount, now. **No ingest HMAC.** Requires a Gateway session for `userId` plus Circle proof that `userToken` owns `returnAddress`, and that address matches the stored session (same pattern as `sync-session`).
 
-Typical native events: tip button click (browser); or server gesture if session already funded.
+Typical native events: tip button click (browser). Do not POST `tips` from the plugin server unless you also hold a live Circle `userToken` for that viewer.
 
 ```json
 {
   "userId": "email:viewer@example.com",
   "payoutAddress": "0x...",
-  "amount": "0.100000"
+  "amount": "0.100000",
+  "userToken": "<circle-user-token>",
+  "returnAddress": "0x..."
 }
 ```
 
@@ -413,6 +415,8 @@ Each entry is a `resourceId` your connector sent on `start` (or via `tips`) that
 | 400 | `start` | `splits` fractions sum > 1 |
 | 400 | `stop` | Missing `userId` |
 | 401 | `start`, `stop` | Missing/invalid HMAC, expired timestamp (> 60 s), or duplicate nonce |
+| 400 | `tips` | Missing `userToken` or `returnAddress` |
+| 401 | `tips` | Circle session does not own `returnAddress`, or it does not match the stored Gateway session |
 | 402 | `tips` | Insufficient Gateway balance |
 | 404 | `tips` | No Gateway session for `userId` (viewer has not funded wallet) |
 | 500 | `stop`, creator | Settlement failed or Tessera server error |

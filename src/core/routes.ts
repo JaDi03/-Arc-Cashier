@@ -133,12 +133,37 @@ coreRouter.post('/v1/sessions/stop', sessionLimiter, verifyIngestSignature, asyn
 });
 
 coreRouter.post('/v1/tips', sessionLimiter, async (req: Request, res: Response) => {
-    const { userId, payoutAddress, amount } = req.body;
+    const { userId, payoutAddress, amount, userToken, returnAddress } = req.body;
 
-    if (!userId || !payoutAddress || !amount) return res.status(400).json({ error: 'Missing userId, payoutAddress, or amount' });
+    if (!userId || !payoutAddress || !amount || !userToken || !returnAddress) {
+        return res.status(400).json({ error: 'Missing userId, payoutAddress, amount, userToken, or returnAddress' });
+    }
+    if (!isValidViewerUserId(userId)) {
+        return res.status(400).json({ error: 'Invalid userId' });
+    }
     if (!isAddress(payoutAddress)) return res.status(400).json({ error: 'Invalid payoutAddress' });
+    if (!isAddress(returnAddress)) return res.status(400).json({ error: 'Invalid returnAddress' });
+    if (typeof userToken !== 'string' || userToken.length < 20 || userToken.length > 8192) {
+        return res.status(400).json({ error: 'Invalid userToken' });
+    }
 
     try {
+        const ownership = await verifyCircleWalletOwnership(String(userToken), returnAddress);
+        if (ownership === 'unauthorized') {
+            return res.status(401).json({ error: 'Circle session does not own this wallet.' });
+        }
+        if (ownership === 'error') {
+            return res.status(503).json({ error: 'Unable to verify Circle wallet ownership. Try again.' });
+        }
+
+        if (!walletService.hasSessionRecord(userId)) {
+            return res.status(404).json({ error: 'No active session found for this user.' });
+        }
+        const sessionRecord = walletService.getSessionRecord(userId);
+        if (!addressesEqual(sessionRecord.returnAddress, returnAddress)) {
+            return res.status(401).json({ error: 'Return address does not match existing session.' });
+        }
+
         const gatewayClient = sessionService.getGatewayClientForUser(userId);
         if (!gatewayClient) return res.status(404).json({ error: 'No active session found for this user.' });
 
