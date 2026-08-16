@@ -7,7 +7,7 @@
 
   <!-- Row 1: Status Badges -->
   <a href="https://github.com/JaDi03/tessera/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Status"></a>
-  <a href="https://github.com/JaDi03/tessera/releases"><img src="https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge" alt="Version"></a>
+  <a href="https://github.com/JaDi03/tessera/releases"><img src="https://img.shields.io/badge/version-1.3.1-blue?style=for-the-badge" alt="Version"></a>
   <a href="https://github.com/JaDi03/tessera/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge" alt="License"></a>
   <br>
   <!-- Row 2: Tech Stack Badges -->

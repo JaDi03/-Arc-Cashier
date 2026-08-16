@@ -5,6 +5,7 @@ import circleRouter from './core/circle-routes';
 import instanceInfoRouter from './core/instance-info';
 import { sessionService } from './core/session';
 import type { Connector, ConnectorConfig } from './core/types';
+import { TESSERA_VERSION } from './version';
 
 /**
  * Connector Registry
@@ -106,7 +107,7 @@ export async function createServer(connectors: ConnectorConfig[]) {
 
             res.json({ 
                 status: 'healthy', 
-                version: '1.0.0',
+                version: TESSERA_VERSION,
                 gateway: gatewayHealth.ok ? 'connected' : 'degraded',
                 activeSessions: sessionService.getActiveSessionCount(),
             });

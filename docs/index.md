@@ -7,7 +7,7 @@
 *Per-second nanopayments powered by [Circle x402](https://www.circle.com/nanopayments) & [Arc](https://www.arc.network)*
 
 [![Build Passing](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/JaDi03/tessera/actions)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](https://github.com/JaDi03/tessera/releases)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue?style=for-the-badge)](https://github.com/JaDi03/tessera/releases)
 [![License](https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge)](https://github.com/JaDi03/tessera/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
