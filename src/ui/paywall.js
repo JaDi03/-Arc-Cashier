@@ -243,6 +243,29 @@ function hasResumableCircleSession() {
     );
 }
 
+function circleProofFields() {
+    return {
+        userToken: viewerState.userToken,
+        returnAddress: viewerState.walletAddress,
+    };
+}
+
+function fetchSessionBalance(userId) {
+    return fetch(ARC_API_BASE + '/api/core/session-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId || viewerState.userId, ...circleProofFields() }),
+    });
+}
+
+function fetchSessionStatus(userId) {
+    return fetch(ARC_API_BASE + '/api/core/session-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId || viewerState.userId, ...circleProofFields() }),
+    });
+}
+
 // Auth is email OTP or social login only. Legacy PIN-era identities (arc_*)
 // cannot resume a session, so drop them: the viewer signs in with email/social.
 if (viewerState.userId
@@ -452,7 +475,7 @@ async function checkAutoUnlock() {
         const minReq = getRequiredMinBalance();
 
         // First try: existing session record (returning user / already registered).
-        let balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+        let balRes = await fetchSessionBalance(viewerState.userId);
         sessionBalanceStatus = balRes.status;
         // #region agent log
         agentDebugLog('H3', 'session-balance first', { status: balRes.status });
@@ -2193,7 +2216,7 @@ function startBalancePolling() {
         const minReq = getRequiredMinBalance();
         // Prefer Gateway: that is what billing spends. Same source as tip widget.
         try {
-            const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+            const balRes = await fetchSessionBalance(viewerState.userId);
             if (balRes.ok) {
                 const balData = await balRes.json();
                 const gatewayAvailable = Number(balData.gatewayAvailable || '0');
@@ -2284,7 +2307,7 @@ async function handleUnlock() {
         // Check if Gateway already funded (returning user)
         let skipDeposit = false;
         try {
-            const balRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+            const balRes = await fetchSessionBalance(viewerState.userId);
             if (balRes.ok) {
                 const balData = await balRes.json();
                 if (Number(balData.gatewayAvailable) >= getRequiredMinBalance()) {
@@ -2595,7 +2618,7 @@ function startSessionTimer() {
     let lastWithdrawableBalance = null;
 
     // Fetch the initial gateway balance immediately so video cost is accurate and displayed from the start
-    fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId)
+    fetchSessionBalance(viewerState.userId)
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (data) {
             if (data) {
@@ -2654,7 +2677,7 @@ function startSessionTimer() {
 
         if (tickCount % 5 === 0) {
             try {
-                const statusRes = await fetch(ARC_API_BASE + '/api/core/session-status?userId=' + viewerState.userId);
+                const statusRes = await fetchSessionStatus(viewerState.userId);
                 if (statusRes.status === 404) {
                     clearInterval(window.sessionTimer);
                     const sm = document.getElementById('arc-session-manager');
@@ -2663,7 +2686,7 @@ function startSessionTimer() {
                     if (isTipMode) return;
                     initPaywall();
                 } else if (statusRes.ok) {
-                    const balanceRes = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + viewerState.userId);
+                    const balanceRes = await fetchSessionBalance(viewerState.userId);
                     if (balanceRes.ok) {
                         const data = await balanceRes.json();
                         const withdrawable = Number(data.gatewayAvailable);
@@ -2714,7 +2737,7 @@ async function handleTopUp(depositAmount) {
         const flushRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
+            body: JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }),
         });
         if (flushRes.ok) {
             const flushData = await flushRes.json();
@@ -2760,7 +2783,7 @@ async function handleTopUp(depositAmount) {
         const topupRes = await fetch(ARC_API_BASE + '/api/core/topup-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId, expectFunds: true }),
+            body: JSON.stringify({ userId: viewerState.userId, expectFunds: true, ...circleProofFields() }),
         });
 
         if (!topupRes.ok) {
@@ -2789,7 +2812,7 @@ window.arcLeaveSession = async function () {
         await fetch(ARC_API_BASE + '/api/core/end-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: viewerState.userId }),
+            body: JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }),
         });
     } catch (_) { /* best effort */ }
 
@@ -2840,7 +2863,7 @@ window.arcTeardownOnNavigate = async function () {
             await fetch(ARC_API_BASE + '/api/core/end-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId }),
+                body: JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }),
             });
         } catch (_) { }
     }
@@ -2974,7 +2997,7 @@ window.arcEndSession = async function () {
         if (endBtn) { endBtn.disabled = false; endBtn.innerText = 'Network Error - Retry'; }
     };
 
-    xhr.send(JSON.stringify({ userId: viewerState.userId }));
+    xhr.send(JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }));
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -3005,7 +3028,7 @@ async function fetchTipBalance() {
     const userId = viewerState.userId;
     if (!userId) return null;
     try {
-        const res = await fetch(ARC_API_BASE + '/api/core/session-balance?userId=' + userId);
+        const res = await fetchSessionBalance(userId);
         if (!res.ok) return null;
         const data = await res.json();
         return Number(data.gatewayAvailable) || 0;
@@ -3199,13 +3222,13 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
             await fetch(ARC_API_BASE + '/api/core/end-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId }),
+                body: JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }),
             });
 
             const res = await fetch(ARC_API_BASE + '/api/core/cash-out', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: viewerState.userId }),
+                body: JSON.stringify({ userId: viewerState.userId, ...circleProofFields() }),
             });
 
             if (res.ok) {

@@ -42,6 +42,51 @@ const coreRouter = Router();
 const PORT = process.env.PORT || 7878;
 const SIDECAR_URL = `http://localhost:${PORT}`;
 
+function circleProofFromRequest(req: Request): { userToken: unknown; returnAddress: unknown } {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const headerToken = req.headers['x-tessera-user-token'];
+    const headerAddr = req.headers['x-tessera-return-address'];
+    return {
+        userToken: body.userToken || (typeof headerToken === 'string' ? headerToken : undefined),
+        returnAddress: body.returnAddress || (typeof headerAddr === 'string' ? headerAddr : undefined),
+    };
+}
+
+async function requireViewerSessionOwnership(
+    userId: unknown,
+    userToken: unknown,
+    returnAddress: unknown,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+    if (!userId || !userToken || !returnAddress) {
+        return { ok: false, status: 400, error: 'Missing userId, userToken, or returnAddress' };
+    }
+    if (!isValidViewerUserId(userId)) {
+        return { ok: false, status: 400, error: 'Invalid userId' };
+    }
+    if (!isAddress(String(returnAddress))) {
+        return { ok: false, status: 400, error: 'Invalid returnAddress' };
+    }
+    if (typeof userToken !== 'string' || userToken.length < 20 || userToken.length > 8192) {
+        return { ok: false, status: 400, error: 'Invalid userToken' };
+    }
+
+    const ownership = await verifyCircleWalletOwnership(String(userToken), String(returnAddress));
+    if (ownership === 'unauthorized') {
+        return { ok: false, status: 401, error: 'Circle session does not own this wallet.' };
+    }
+    if (ownership === 'error') {
+        return { ok: false, status: 503, error: 'Unable to verify Circle wallet ownership. Try again.' };
+    }
+    if (!walletService.hasSessionRecord(String(userId))) {
+        return { ok: false, status: 404, error: 'No active session found for this user.' };
+    }
+    const sessionRecord = walletService.getSessionRecord(String(userId));
+    if (!addressesEqual(sessionRecord.returnAddress, String(returnAddress))) {
+        return { ok: false, status: 401, error: 'Return address does not match existing session.' };
+    }
+    return { ok: true };
+}
+
 // ─── x402 Payment Gate ───────────────────────────────────────────────────────
 
 coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunction) => {
@@ -353,9 +398,11 @@ coreRouter.post('/register-session', sessionLimiter, async (req: Request, res: R
     }
 });
 
-coreRouter.post('/end-session', async (req: Request, res: Response) => {
+coreRouter.post('/end-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    const proof = circleProofFromRequest(req);
+    const owned = await requireViewerSessionOwnership(userId, proof.userToken, proof.returnAddress);
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
     try {
         await sessionService.recordPartAndSettle(userId);
         return res.json({ status: 'session_ended' });
@@ -365,9 +412,11 @@ coreRouter.post('/end-session', async (req: Request, res: Response) => {
     }
 });
 
-coreRouter.post('/cash-out', async (req: Request, res: Response) => {
+coreRouter.post('/cash-out', sessionLimiter, async (req: Request, res: Response) => {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    const proof = circleProofFromRequest(req);
+    const owned = await requireViewerSessionOwnership(userId, proof.userToken, proof.returnAddress);
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
 
     try {
         if (sessionService.hasActiveSession(userId)) await sessionService.recordPartAndSettle(userId);
@@ -392,17 +441,21 @@ coreRouter.post('/cash-out', async (req: Request, res: Response) => {
     }
 });
 
-coreRouter.get('/session-status', (req: Request, res: Response) => {
-    const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+coreRouter.post('/session-status', async (req: Request, res: Response) => {
+    const userId = req.body?.userId as string;
+    const proof = circleProofFromRequest(req);
+    const owned = await requireViewerSessionOwnership(userId, proof.userToken, proof.returnAddress);
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
     return walletService.hasSessionRecord(userId)
         ? res.status(200).json({ status: 'active' })
         : res.status(404).json({ error: 'No active session key found' });
 });
 
-coreRouter.get('/session-balance', async (req: Request, res: Response) => {
-    const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+coreRouter.post('/session-balance', async (req: Request, res: Response) => {
+    const userId = req.body?.userId as string;
+    const proof = circleProofFromRequest(req);
+    const owned = await requireViewerSessionOwnership(userId, proof.userToken, proof.returnAddress);
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
     try {
         if (!walletService.hasSessionRecord(userId)) return res.status(404).json({ error: 'Session not found' });
         const sessionRecord = walletService.getSessionRecord(userId);
@@ -417,7 +470,9 @@ coreRouter.get('/session-balance', async (req: Request, res: Response) => {
 
 coreRouter.post('/topup-session', sessionLimiter, async (req: Request, res: Response) => {
     const { userId, expectFunds } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    const proof = circleProofFromRequest(req);
+    const owned = await requireViewerSessionOwnership(userId, proof.userToken, proof.returnAddress);
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
     try {
         if (!walletService.hasSessionRecord(userId)) return res.status(404).json({ error: 'Session not found' });
         const sessionRecord = walletService.getSessionRecord(userId);
