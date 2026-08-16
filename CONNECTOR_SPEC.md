@@ -92,6 +92,11 @@ The bundle does **not** auto-init. Load it from Tessera or from your relay, then
 </script>
 ```
 
+**Admin vs creator**
+
+- Platform has an admin **and** creators: use both. Admin: settings page (§3). Creator: `initCreatorEarnings`.
+- Platform is admin-only: use the admin one (§3).
+
 **API base derivation:** paywall resolves `ARC_API_BASE` from the script URL by stripping `/assets/<bundle>`. Example:
 
 - Script: `https://tessera.example.com/assets/paywall.bundle.js` → API `https://tessera.example.com`
@@ -104,7 +109,10 @@ If the bundle is served from the wrong path, all `/api/core/*` calls go to the w
 | File | Required | Notes |
 |---|---|---|
 | `paywall.bundle.js` | Yes | You load this via `<script src>`. |
-| `paywall.css` | Auto | Injected by the bundle from the same directory as the script. |
+| `paywall.css` | Auto | Injected by `initPaywall`, `initTipMode`, and `initCreatorEarnings` from the same directory as the script. |
+| `creator-earnings.css` | Auto | Injected by `initCreatorEarnings` from the same directory as the script. |
+
+Viewer paywall, tip button, and creator earnings are Tessera UI. Plugins call `initPaywall` / `initTipMode` / `initCreatorEarnings`. They do not restyle `.arc-tessera-root`.
 
 No other static files are required for the viewer paywall.
 
@@ -125,6 +133,7 @@ Proxy at minimum:
 |---|---|
 | `/assets/paywall.bundle.js` | Paywall script |
 | `/assets/paywall.css` | Paywall styles (if not loaded via bundle injection path) |
+| `/assets/creator-earnings.css` | Creator earnings styles (if not loaded via bundle injection path) |
 | `/api/core/*` | Paywall wallet, session, tips, Circle auth |
 
 The reference [PeerTube plugin](https://github.com/JaDi03/peertube-plugin-tessera) serves assets and relays API calls. Copy that pattern: expose a stable browser origin; keep **Base URL** as the server-to-server Tessera address for HMAC.
@@ -344,7 +353,7 @@ Sign the exact bytes you send as the body.
 
 ## 6. Creator earnings API
 
-Embed creator balance and withdraw with `window.ArcCashier.initCreatorEarnings({ wallet, apiBase?, mount?, title? })`.
+Embed creator balance and withdraw with `window.ArcCashier.initCreatorEarnings({ wallet, apiBase?, mount?, title? })`. Same Tessera chrome as the viewer widgets: the call injects `paywall.css` and `creator-earnings.css`.
 
 - `wallet` (required): creator `0x` address.
 - `apiBase` (optional): override API origin; defaults to script URL derivation.

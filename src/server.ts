@@ -1,34 +1,27 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import coreRouter from './core/routes';
 import circleRouter from './core/circle-routes';
 import instanceInfoRouter from './core/instance-info';
 import { sessionService } from './core/session';
-import type { Connector, ConnectorConfig } from './core/types';
 import { TESSERA_VERSION } from './version';
 
-/**
- * Connector Registry
- * Maps connector names to their module paths.
- * When adding a new connector, register it here.
- */
-const CONNECTOR_REGISTRY: Record<string, () => Promise<{ default: Connector }>> = {
-    owncast: () => import('./connectors/owncast'),
-    peertube: () => import('./connectors/peertube'),
-    jellyfin: () => import('./connectors/jellyfin'),
-};
+function resolveUiAssetsDir(): string {
+    const distUi = path.join(process.cwd(), 'dist', 'ui');
+    const srcUi = path.join(process.cwd(), 'src', 'ui');
+    if (fs.existsSync(distUi)) return distUi;
+    if (fs.existsSync(srcUi)) return srcUi;
+    return path.join(__dirname, 'ui');
+}
 
-export async function createServer(connectors: ConnectorConfig[]) {
+export async function createServer() {
     const app = express();
 
-    // Trust the first proxy in the chain (nginx → PeerTube plugin relay → sidecar).
-    // Required after Phase 3: all browser requests arrive via the plugin relay, which
-    // causes nginx to set X-Forwarded-For. Without this, express-rate-limit throws
-    // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+    // nginx / plugin relay sets X-Forwarded-For; required by express-rate-limit.
     app.set('trust proxy', 1);
 
-    // Logging middleware MUST be first to catch everything.
-    // Skip high-frequency payment/poll paths: Session already logs Payment ok/fail.
     const QUIET_PATHS = [
         '/stream-access',
         '/session-status',
@@ -37,7 +30,6 @@ export async function createServer(connectors: ConnectorConfig[]) {
     app.use((req, res, next) => {
         const quiet = QUIET_PATHS.some((p) => req.url.includes(p));
         if (!quiet) {
-            // Redact wallet addresses from query strings (admin balance/stats).
             const safeUrl = req.url.replace(
                 /([?&]address=)0x[a-fA-F0-9]{40}/g,
                 '$1[redacted]'
@@ -47,73 +39,40 @@ export async function createServer(connectors: ConnectorConfig[]) {
         next();
     });
 
-    // Base middlewares
     app.use(cors());
 
-    // Only parse JSON for our own API routes, NOT globally
-    app.use('/api/core', express.json());
-    // Attach rawBody for connectors (required for PeerTube HMAC signature verification)
-    app.use('/api/connectors', express.json({
-        type: '*/*',
-        verify: (req: any, res, buf) => {
+    app.use('/api/core', express.json({
+        verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
             req.rawBody = buf;
         }
     }));
 
-    // 1. Register Core Engine routes (agnostic to platforms)
+    app.use('/assets', express.static(resolveUiAssetsDir()));
+
     app.use('/api/core', coreRouter);
-
-    // 1b. Circle SDK + CCTP routes (extracted from core for separation of concerns)
-    //     External paths remain unchanged: /api/core/circle/*
     app.use('/api/core', circleRouter);
-
-    // 2. Register public Tessera identity endpoint (no auth — read by remote sidecars)
-    //    Used by federated display instances to discover this sidecar's wallet and fees.
     app.use('/api/tessera', instanceInfoRouter);
 
-
-
-    // 3. Dynamically load and register connectors from config
-    for (const config of connectors) {
-        const loader = CONNECTOR_REGISTRY[config.name];
-        if (!loader) {
-            console.error(`[Engine] ❌ Unknown connector: "${config.name}". Skipping.`);
-            continue;
-        }
-
+    app.get('/health', async (_req, res) => {
         try {
-            const module = await loader();
-            const connector = module.default;
-            connector.register(app, config);
-            console.log(`[Engine] 🔌 Connector "${connector.name}" registered (upstream: ${config.upstreamUrl})`);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[Engine] ❌ Failed to load connector "${config.name}":`, err.message);
-        }
-    }
-
-    // Healthcheck
-    app.get('/health', async (req, res) => {
-        try {
-            // Basic connectivity check to Circle API (with 3 second timeout)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000);
-            
-            const gatewayHealth = await fetch('https://api-testnet.circle.com/ping', { 
-                signal: controller.signal 
+
+            const gatewayHealth = await fetch('https://api-testnet.circle.com/ping', {
+                signal: controller.signal
             }).catch(() => ({ ok: false }));
-            
+
             clearTimeout(timeoutId);
 
-            res.json({ 
-                status: 'healthy', 
+            res.json({
+                status: 'healthy',
                 version: TESSERA_VERSION,
                 gateway: gatewayHealth.ok ? 'connected' : 'degraded',
                 activeSessions: sessionService.getActiveSessionCount(),
             });
-        } catch (error) {
-            res.status(503).json({ 
-                status: 'degraded', 
+        } catch {
+            res.status(503).json({
+                status: 'degraded',
                 gateway: 'unreachable',
                 activeSessions: sessionService.getActiveSessionCount()
             });

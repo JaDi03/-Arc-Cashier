@@ -1,9 +1,7 @@
-import type { Express } from 'express';
-
 export interface Split {
     address: string;
     fraction: number;
-    /** For logs only. */
+    /** Log label only. */
     label?: string;
 }
 
@@ -33,28 +31,7 @@ export interface TipRequest {
     amount: string;
 }
 
-/**
- * Interface every connector must implement.
- * Translates platform events into calls to the core's HTTP contract:
- *   POST /api/core/v1/sessions/start
- *   POST /api/core/v1/sessions/stop
- *   POST /api/core/v1/tips
- */
-export interface Connector {
-    readonly name: string;
-    register(app: Express, config: ConnectorConfig): void;
-}
-
-export interface ConnectorConfig {
-    name: string;
-    upstreamUrl: string;
-    ratePerSecond?: number;
-    /** Default payee for single-operator connectors (e.g. Owncast). */
-    payoutAddress?: string;
-}
-
 export interface CashierConfig {
     port?: number;
     sellerAddress?: string;
-    connectors: ConnectorConfig[];
 }
