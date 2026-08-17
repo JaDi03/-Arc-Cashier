@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A payment sidecar that adds per-second nanopayments to any self-hosted platform.">
+        <meta name="description" content="USDC support engine for self-hosted platforms">
       
       
       
@@ -301,28 +301,17 @@
   
   
   
-    
-    
-      
-  
-  
+    <li class="md-tabs__item">
+      <a href="../platforms/" class="md-tabs__link">
+        
   
   
     
-    
-      <li class="md-tabs__item">
-        <a href="../platforms/peertube/" class="md-tabs__link">
-          
-  
   
   Integrated Platforms
 
-        </a>
-      </li>
-    
-  
-
-    
+      </a>
+    </li>
   
 
       
@@ -351,18 +340,17 @@
   
   
   
-    
-    
-      <li class="md-tabs__item">
-        <a href="../connectors/" class="md-tabs__link">
-          
+    <li class="md-tabs__item">
+      <a href="../connectors/spec/" class="md-tabs__link">
+        
   
+  
+    
   
   Connectors
 
-        </a>
-      </li>
-    
+      </a>
+    </li>
   
 
       
@@ -504,30 +492,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#production-architecture-v1" class="md-nav__link">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Production &amp; Architecture (V1)
+        Architecture
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Production &amp; Architecture (V1)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#architecture-universal-deposits-cctp-arc-settlement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture: Universal Deposits (CCTP) &amp; Arc Settlement
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -570,17 +541,6 @@
     <span class="md-ellipsis">
       
         Observability
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#v1-limitations-trade-offs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        V1 Limitations &amp; Trade-offs
       
     </span>
   </a>
@@ -660,27 +620,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../platforms/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -694,315 +636,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Integrated Platforms
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PeerTube
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    PeerTube
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/configuration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Owncast (soon)
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Owncast (soon)
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/managing-creators/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Managing Creators
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/monitoring/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Monitoring
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/withdrawals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Withdrawals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1158,27 +792,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../connectors/spec/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -1192,79 +808,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Connectors
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/building-a-connector/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building a Connector
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1296,30 +840,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#production-architecture-v1" class="md-nav__link">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Production &amp; Architecture (V1)
+        Architecture
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Production &amp; Architecture (V1)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#architecture-universal-deposits-cctp-arc-settlement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture: Universal Deposits (CCTP) &amp; Arc Settlement
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1368,17 +895,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#v1-limitations-trade-offs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        V1 Limitations &amp; Trade-offs
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -1413,77 +929,75 @@
 
 
 <h1 id="architecture-fees">Architecture &amp; Fees<a class="headerlink" href="#architecture-fees" title="Permanent link">&para;</a></h1>
-<h2 id="production-architecture-v1">Production &amp; Architecture (V1)<a class="headerlink" href="#production-architecture-v1" title="Permanent link">&para;</a></h2>
-<p>Tessera V1 is designed to be a robust, developer-friendly MVP. To ensure stability and ease of deployment, the following architectural decisions and limitations are present in this version:</p>
-<h3 id="architecture-universal-deposits-cctp-arc-settlement">Architecture: Universal Deposits (CCTP) &amp; Arc Settlement<a class="headerlink" href="#architecture-universal-deposits-cctp-arc-settlement" title="Permanent link">&para;</a></h3>
-<p>While Tessera requires the <strong>Arc Network</strong> to operate its core billing engine, <strong>viewers can fund their sessions from any supported network</strong> (Ethereum, Base, etc.) thanks to <strong>Circle's CCTP</strong> (Cross-Chain Transfer Protocol).</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<p>Tessera settles per-second support on <strong>Arc Testnet</strong> through Circle Gateway. Viewers can fund the Circle SCA on Arc directly, or bridge USDC in with Circle CCTP (Bridge Kit + Forwarding) from Ethereum Sepolia, Base Sepolia, or Arbitrum Sepolia. CCTP mints to the SCA; Tessera then deposits that USDC into Gateway (<code>prepare-deposit</code>).</p>
 <pre class="mermaid"><code>flowchart LR
-    %% Custom Premium Styling
     classDef origin fill:#1A1B26,stroke:#7AA2F7,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef cctp fill:#1F2335,stroke:#9ECE6A,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef arc fill:#24283B,stroke:#BB9AF7,stroke-width:3px,color:#FFFFFF,rx:10,ry:10,stroke-dasharray: 5 5
     classDef blockchain fill:#24283B,stroke:#F7768E,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef engine fill:#1F2335,stroke:#7DCFFF,stroke-width:2px,color:#FFFFFF,rx:5,ry:5
 
-    subgraph Origins ["🌐 Origin Networks"]
+    subgraph Origins ["Origin testnets"]
         direction TB
-        ETH["Ethereum"]:::origin
-        BAS["Base"]:::origin
+        ETH["Ethereum Sepolia"]:::origin
+        BAS["Base Sepolia"]:::origin
+        ARB["Arbitrum Sepolia"]:::origin
     end
 
-    CCTP(("🔄 Circle CCTP")):::cctp
+    CCTP(("Circle CCTP + Forwarding")):::cctp
 
-    subgraph ArcNet ["⚡ Arc Network"]
+    subgraph ArcNet ["Arc Testnet"]
         direction TB
-        Gateway["💎 Gateway Contract"]:::blockchain
-        Engine["⚙️ Billing Engine"]:::engine
+        SCA["Viewer Circle SCA"]:::blockchain
+        Gateway["Gateway"]:::blockchain
+        Engine["Sidecar billing loop"]:::engine
     end
     class ArcNet arc
 
-    ETH --&gt;|"USDC"| CCTP
-    BAS --&gt;|"USDC"| CCTP
+    ETH --&gt;|"USDC burn"| CCTP
+    BAS --&gt;|"USDC burn"| CCTP
+    ARB --&gt;|"USDC burn"| CCTP
 
-    CCTP ---&gt;|"Route &amp; Fund"| Gateway
-    Engine -.-&gt;|"Batched settlement claims"| Gateway</code></pre>
+    CCTP --&gt;|"mint to SCA"| SCA
+    SCA --&gt;|"prepare-deposit"| Gateway
+    Engine -.-&gt;|"GatewayClient.pay each second"| Gateway</code></pre>
 <h2 id="fee-structure">Fee Structure<a class="headerlink" href="#fee-structure" title="Permanent link">&para;</a></h2>
-<p>Because Tessera relies heavily on off-chain EIP-3009 signatures, viewers only pay network fees for two on-chain transactions during the entire lifecycle of a session:</p>
+<p>Billing ticks are off-chain. Each second the sidecar signs with the ephemeral Gateway key (<code>GatewayClient.pay</code> to <code>POST /api/core/stream-access</code>). Ticks do not cost Arc gas.</p>
+<p>On-chain USDC movement for a typical exclusive session:</p>
 <ol>
-<li><strong>Deposit (Gateway Funding):</strong> When moving funds into the Gateway Smart Contract.</li>
-<li><strong>Withdrawal (Cash Out):</strong> When settling the session and pulling unused funds back to their wallet.</li>
+<li><strong>Deposit (Gateway funding):</strong> SCA USDC into Gateway (<code>prepare-deposit</code>), or leftover ephemeral-wallet USDC via <code>register-session</code>.</li>
+<li><strong>Cash-out (optional):</strong> Manual withdraw of unused Gateway balance back to the SCA. Leaving the player (<code>sessions/stop</code>) does <strong>not</strong> withdraw. Creator earnings already moved on each billing tick.</li>
 </ol>
-<p>On the Arc Network, these transactions cost approximately <strong>$0.01 USDC</strong> in network fees (gas). </p>
-<p><strong>Cross-Chain Forwarding Fees:</strong>
-If a viewer decides to bridge funds from another network (e.g., Ethereum or Base) using Circle's CCTP Forwarding Service instead of direct funding, the Forwarding Service charges a flat <strong>$0.20 USDC</strong> service fee for the transfer.</p>
+<p>SCA USDC can also go to an external address via <code>quote-external-withdraw</code> / <code>prepare-external-withdraw</code> (Circle challenge, then <code>poll-challenge</code>).</p>
+<p>Those Arc transactions use USDC for gas. Tessera keeps a small buffer on the ephemeral wallet (<code>RETAINED_GAS_AMOUNT</code>, default 0.01 USDC) so deposit and cash-out can pay gas. Arc's published target is about <strong>$0.01 USDC</strong> per transaction.</p>
+<p><strong>CCTP (optional):</strong> Bridge Kit burns on the source chain and Circle Forwarding mints on Arc. The Forwarding fee is <strong>0.20 USDC</strong>. The mint credits the SCA; Gateway funding is still <code>prepare-deposit</code>.</p>
 <hr />
-<p><strong>Why must the settlement engine run exclusively on Arc?</strong></p>
-<p>Tessera is designed for <strong>high-frequency, per-second billing</strong>. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. </p>
-<p>By leveraging the <strong>Arc Network</strong> combined with the <strong>x402 protocol</strong>:</p>
+<p><strong>Why Arc Testnet</strong></p>
+<p>Tessera bills <strong>per second</strong>. Settlement runs on Arc Testnet (<code>@circle-fin/x402-batching</code>, <code>eip155:5042002</code>) so ticks can stay off-chain while deposit and cash-out use USDC gas.</p>
 <ul>
-<li><strong>Native USDC Gas</strong>: Forget about needing to hold a separate, volatile native token just to pay for transactions. Arc uses USDC natively for gas, meaning zero friction for users and creators.</li>
-<li><strong>Predictable, Ultra-Low Costs</strong>: Arc is specifically designed for stablecoin-native applications, targeting an average transaction fee of <strong>~$0.01 USDC</strong>.</li>
-<li><strong>Gasless Streaming</strong>: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.</li>
-<li><strong>Batched Settlement</strong>: The Circle Gateway aggregates thousands of these off-chain signatures and settles the final balances efficiently on the Arc Network.</li>
-<li><strong>Economic Viability</strong>: On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc's ~$0.01 fees make the math work, ensuring that network costs never consume the actual value of the stream.</li>
+<li><strong>Native USDC gas:</strong> Deposit and cash-out pay gas in USDC. No extra native token.</li>
+<li><strong>Low per-tx cost:</strong> Arc targets about <strong>~$0.01 USDC</strong> gas.</li>
+<li><strong>Gasless ticks:</strong> After Gateway is funded, <code>GatewayClient.pay</code> runs once per second with no wallet popup.</li>
+<li><strong>Why Arc:</strong> A 10-minute exclusive session is hundreds of ticks. On-chain gas per tick would dwarf the content rate.</li>
 </ul>
 <h3 id="environment-configuration">Environment Configuration<a class="headerlink" href="#environment-configuration" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Dynamic Routing:</strong> <code>PUBLIC_URL</code> is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded <code>localhost</code> limitations.</li>
-<li><strong>Gas Buffer:</strong> <code>RETAINED_GAS_AMOUNT</code> (default 0.01 USDC) is utilized to ensure the ephemeral wallet always retains enough native token for on-chain interactions without failing.</li>
+<li><strong><code>PUBLIC_URL</code>:</strong> Public origin of the sidecar. Circle auth cookies are <code>Secure</code> when this is <code>https://</code>, or when <code>COOKIE_SECURE=true</code>, or when <code>NODE_ENV=production</code>.</li>
+<li><strong>Gas Buffer:</strong> <code>RETAINED_GAS_AMOUNT</code> (default 0.01 USDC) keeps USDC on the ephemeral wallet so on-chain deposit/cash-out can pay Arc gas.</li>
 </ul>
 <h3 id="security-performance">Security &amp; Performance<a class="headerlink" href="#security-performance" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Rate Limiting:</strong> Critical endpoints (<code>/register-session</code> and <code>/end-session</code>) are protected by IP rate limiting to prevent spam and DDoS attempts.</li>
-<li><strong>Memory Optimization:</strong> <code>GatewayClient</code> instances are cached in memory. Ephemeral keys and instances are strictly wiped using a safe sweep upon session termination.</li>
-<li><strong>Dynamic Top-Up:</strong> Viewers are alerted dynamically when their balance drops below 5 minutes of viewing time, allowing them to top-up without interrupting the video stream.</li>
+<li><strong>Ingest HMAC:</strong> <code>POST /api/core/v1/sessions/start</code> and <code>stop</code> require <code>TESSERA_INGEST_SECRET</code>. Tips and session money routes use Circle wallet proof (<code>userToken</code> + <code>returnAddress</code>).</li>
+<li><strong>USDC deposits:</strong> <code>POST /api/core/circle/prepare-deposit</code> transfers USDC only.</li>
+<li><strong>Rate limiting:</strong> Session routes (<code>register-session</code>, <code>start</code>/<code>stop</code>, <code>tips</code>, <code>end-session</code>, <code>cash-out</code>, <code>topup-session</code>) share an IP limiter. <code>sync-session</code> has its own. Circle routes use a separate IP limiter.</li>
+<li><strong>Session store:</strong> The ephemeral Gateway key survives <code>sessions/stop</code>. <code>cash-out</code> withdraws leftover USDC to the SCA and then clears the record.</li>
+<li><strong>Dynamic top-up:</strong> Viewers can add Gateway balance without leaving the overlay (<code>topup-session</code>).</li>
 </ul>
 <h3 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Healthcheck:</strong> A robust endpoint at <code>GET /health</code> provides real-time status of active sessions and connectivity to the Circle Gateway, suitable for integration with Prometheus or UptimeKuma.</li>
-</ul>
-<h3 id="v1-limitations-trade-offs">V1 Limitations &amp; Trade-offs<a class="headerlink" href="#v1-limitations-trade-offs" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Polling over Webhooks:</strong> To maximize developer experience (DX) and allow seamless testing on <code>localhost</code> without tunnels (like ngrok), V1 actively polls Circle for deposit confirmations instead of relying on Webhooks.</li>
-<li><strong>Fixed Payment Scheme</strong>: The protocol currently forces the <code>GatewayWalletBatched</code> scheme on Arc Testnet. While x402 supports dynamic schemes like <code>CompositeEvmScheme</code>, they are disabled in V1 to maintain strict focus on streaming nanopayments.</li>
+<li><strong>Healthcheck:</strong> <code>GET /health</code> returns sidecar version, a ping to <code>https://api-testnet.circle.com/ping</code>, and active session count.</li>
+<li><strong>Challenge confirmations:</strong> After deposit or cash-out, the overlay calls <code>POST /api/core/circle/poll-challenge</code> until the status is <code>COMPLETE</code>, <code>FAILED</code>, or <code>EXPIRED</code>.</li>
 </ul>
 
 

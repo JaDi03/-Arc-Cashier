@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A payment sidecar that adds per-second nanopayments to any self-hosted platform.">
+        <meta name="description" content="USDC support engine for self-hosted platforms">
       
       
       
@@ -14,7 +14,7 @@
         <link rel="prev" href="../payment-models/">
       
       
-        <link rel="next" href="../platforms/peertube/">
+        <link rel="next" href="../platforms/">
       
       
         
@@ -301,28 +301,17 @@
   
   
   
-    
-    
-      
-  
-  
+    <li class="md-tabs__item">
+      <a href="../platforms/" class="md-tabs__link">
+        
   
   
     
-    
-      <li class="md-tabs__item">
-        <a href="../platforms/peertube/" class="md-tabs__link">
-          
-  
   
   Integrated Platforms
 
-        </a>
-      </li>
-    
-  
-
-    
+      </a>
+    </li>
   
 
       
@@ -351,18 +340,17 @@
   
   
   
-    
-    
-      <li class="md-tabs__item">
-        <a href="../connectors/" class="md-tabs__link">
-          
+    <li class="md-tabs__item">
+      <a href="../connectors/spec/" class="md-tabs__link">
+        
   
+  
+    
   
   Connectors
 
-        </a>
-      </li>
-    
+      </a>
+    </li>
   
 
       
@@ -569,22 +557,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-installation-setup" class="md-nav__link">
+  <a href="#2-installation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Installation &amp; Setup
+        2. Installation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="2. Installation &amp; Setup">
+    <nav class="md-nav" aria-label="2. Installation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#configure-environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configure Environment Variables
+        Configure environment variables
       
     </span>
   </a>
@@ -597,10 +585,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-deployment" class="md-nav__link">
+  <a href="#3-tessera-base-url" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Deployment
+        3. Tessera Base URL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-docker-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Docker deploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Next
       
     </span>
   </a>
@@ -621,27 +631,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../platforms/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -655,315 +647,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Integrated Platforms
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PeerTube
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    PeerTube
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/configuration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Owncast (soon)
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Owncast (soon)
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/managing-creators/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Managing Creators
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/monitoring/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Monitoring
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/withdrawals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Withdrawals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1119,27 +803,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../connectors/spec/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -1153,79 +819,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Connectors
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/building-a-connector/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building a Connector
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1268,22 +862,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-installation-setup" class="md-nav__link">
+  <a href="#2-installation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Installation &amp; Setup
+        2. Installation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="2. Installation &amp; Setup">
+    <nav class="md-nav" aria-label="2. Installation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#configure-environment-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configure Environment Variables
+        Configure environment variables
       
     </span>
   </a>
@@ -1296,10 +890,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-deployment" class="md-nav__link">
+  <a href="#3-tessera-base-url" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Deployment
+        3. Tessera Base URL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-docker-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Docker deploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Next
       
     </span>
   </a>
@@ -1335,51 +951,85 @@
 
 
 <h1 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h1>
-<p>Tessera is designed to be lightweight, but it relies on modern infrastructure and the Circle x402 Gateway. Follow these steps to get your sidecar running.</p>
+<p>Tessera is a USDC support sidecar. Run it locally, then point your platform plugin at it.</p>
 <h2 id="1-prerequisites">1. Prerequisites<a class="headerlink" href="#1-prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Node.js</strong>: Version <strong>22 or higher</strong> is required.</li>
-<li><strong>Git &amp; Docker</strong>: Required to clone and deploy the repository in production.</li>
-<li><strong>Circle Developer Account</strong>: You need your <code>CIRCLE_API_KEY</code> and <code>CIRCLE_APP_ID</code>. <a href="../tutorials/circle-api-key/">See the guide</a> if you don't have them yet.</li>
-<li><strong>A Destination Wallet</strong>: A standard EVM-compatible wallet address. Earnings accumulate in the Circle Gateway and you will use this wallet later to cryptographically sign your withdrawals.</li>
+<li><strong>Node.js 22</strong> or higher (CI and the Docker image use 22)</li>
+<li><strong>Git</strong></li>
+<li><strong>Circle Developer account:</strong> <code>CIRCLE_API_KEY</code> (<a href="../tutorials/circle-api-key/">API key</a>) and <code>CIRCLE_APP_ID</code> (<a href="../tutorials/circle-app-id/">App ID</a>)</li>
 </ul>
-<h2 id="2-installation-setup">2. Installation &amp; Setup<a class="headerlink" href="#2-installation-setup" title="Permanent link">&para;</a></h2>
-<p>Begin by cloning the official repository to the machine where you intend to run the sidecar.</p>
+<p>Docker is optional. The repo includes a <code>Dockerfile</code> (port <code>7878</code>, data volume <code>/app/data</code>).</p>
+<h2 id="2-installation">2. Installation<a class="headerlink" href="#2-installation" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/JaDi03/tessera.git
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>tessera
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>npm<span class="w"> </span>install
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>cp<span class="w"> </span>.env.example<span class="w"> </span>.env
 </span></code></pre></div>
-<p>Tessera includes an interactive setup wizard that configures the sidecar for your specific platform. Run the setup script:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>npm<span class="w"> </span>run<span class="w"> </span>setup
+<h3 id="configure-environment-variables">Configure environment variables<a class="headerlink" href="#configure-environment-variables" title="Permanent link">&para;</a></h3>
+<p>Edit <code>.env</code>. Required:</p>
+<ul>
+<li><code>CIRCLE_API_KEY</code></li>
+<li><code>CIRCLE_APP_ID</code></li>
+<li><code>MASTER_KEY</code> (32+ random characters)</li>
+<li><code>TESSERA_INGEST_SECRET</code> (same value in your platform plugin; Tessera exits on start if this is missing)</li>
+</ul>
+<p>Optional: <code>PUBLIC_URL</code>, <code>PORT</code> (default <code>7878</code>), <code>ARC_RPC_URL</code>, <code>CIRCLE_GOOGLE_CLIENT_ID</code>. Full list: <a href="https://github.com/JaDi03/tessera/blob/main/.env.example"><code>.env.example</code></a>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>npm<span class="w"> </span>run<span class="w"> </span>build
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>npm<span class="w"> </span>start
 </span></code></pre></div>
-<p><img alt="Tessera Setup Wizard" src="../assets/run_setup.png" /></p>
-<p>This wizard will automatically:
-1. Ask which platform you want to monetize (e.g., PeerTube, Owncast).
-2. Ask for the <strong>Upstream URL</strong>. This must be the <strong>public URL</strong> where your platform is currently running (e.g., <code>https://peertube.yourdomain.com</code>).
-3. Generate a secure <code>.env</code> file (including webhook secrets if needed).</p>
-<h3 id="configure-environment-variables">Configure Environment Variables<a class="headerlink" href="#configure-environment-variables" title="Permanent link">&para;</a></h3>
-<p>For security reasons, the script won't ask for your API keys in the terminal. Open the automatically generated <code>.env</code> file in your code editor:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nano<span class="w"> </span>.env
+<p>The process listens on <code>0.0.0.0</code> and logs <code>Tessera running on http://localhost:7878</code> (or your <code>PORT</code>). Check:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-sS<span class="w"> </span>http://127.0.0.1:7878/health
 </span></code></pre></div>
-<p><img alt=".env configuration" src="../assets/nano_env.png" /></p>
-<p>Fill in the required variables to run the engine:
-- <code>CIRCLE_API_KEY</code>: Circle API Key.
-- <code>CIRCLE_APP_ID</code>: Circle App ID.
-- <code>SELLER_ADDRESS</code>: Platform admin wallet address to receive payouts.
-- <code>SELLER_PRIVATE_KEY</code>: Platform admin private key for withdrawal signatures.</p>
-<blockquote>
-<p>[!CAUTION]
-Use a <strong>dedicated wallet</strong> for Tessera, not your personal wallet. This key signs withdrawal transactions on-chain. Never reuse it across services.</p>
-<p>[!NOTE]
-<code>MASTER_KEY</code> (and <code>PEERTUBE_WEBHOOK_SECRET</code> for PeerTube) are automatically generated and configured in your <code>.env</code> file during the <code>npm run setup</code> wizard. You do not need to configure them manually.</p>
-</blockquote>
-<h2 id="3-deployment">3. Deployment<a class="headerlink" href="#3-deployment" title="Permanent link">&para;</a></h2>
-<p>Do <strong>not</strong> use <code>npm run start</code> for production environments, as it will block your terminal and shut down when you disconnect your SSH session. </p>
-<p>Instead, use the included deployment script which leverages Docker to run Tessera safely in the background:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>chmod<span class="w"> </span>+x<span class="w"> </span>deploy.sh
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>./deploy.sh
+<h2 id="3-tessera-base-url">3. Tessera Base URL<a class="headerlink" href="#3-tessera-base-url" title="Permanent link">&para;</a></h2>
+<p>The <strong>Tessera Base URL</strong> is the origin the <strong>plugin server</strong> uses to POST <code>sessions/start</code> and <code>sessions/stop</code> (scheme + host + port). Put the same <code>TESSERA_INGEST_SECRET</code> in the plugin.</p>
+<table>
+<thead>
+<tr>
+<th>Where Tessera and the platform run</th>
+<th>Base URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Same machine, no containers</td>
+<td><code>http://127.0.0.1:</code> + Tessera port (default <code>7878</code>)</td>
+</tr>
+<tr>
+<td>Platform in a container, Tessera on the host</td>
+<td>Host address as seen from the container (often <code>http://172.17.0.1:</code> + port on Docker's default bridge). Confirm with the check below.</td>
+</tr>
+<tr>
+<td>Both in containers on the same Docker network</td>
+<td><code>http://</code> + Tessera service name + <code>:</code> + port</td>
+</tr>
+<tr>
+<td>Tessera on its own domain</td>
+<td>That HTTPS origin</td>
+</tr>
+</tbody>
+</table>
+<p>Verify from the host or container that runs the plugin:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-sS<span class="w"> </span>http://HOST:PORT/health
 </span></code></pre></div>
-<p>This script will compile the code, mount the data volumes, and restart the sidecar as a background service. You are now ready to install the plugin on your streaming platform!</p>
+<p>If that succeeds, that origin is the Base URL.</p>
+<p>Viewers load the overlay from the plugin relay on the platform origin, or from <code>{sidecar}/assets/</code>. HMAC contract: <a href="../connectors/spec/">Connector spec</a>.</p>
+<h2 id="4-docker-deploy">4. Docker deploy<a class="headerlink" href="#4-docker-deploy" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/JaDi03/tessera/blob/main/deploy.sh"><code>deploy.sh</code></a> rebuilds the image and restarts the container. From the repo root, with Docker and a filled <code>.env</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>./deploy.sh
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># or: ./deploy.sh main</span>
+</span></code></pre></div>
+<p>The script:</p>
+<ol>
+<li><code>git fetch origin</code> and <code>git reset --hard origin/&lt;branch&gt;</code> (<code>main</code> if you omit the argument)</li>
+<li><code>docker build --no-cache -t tessera-backend .</code></li>
+<li>Recreates container <code>tessera-backend</code>: <code>-p 7878:7878</code>, <code>--env-file .env</code>, volume <code>./data</code> → <code>/app/data</code>, network <code>tessera_net</code>, <code>--restart unless-stopped</code></li>
+</ol>
+<p>On that Docker network the plugin Base URL is <code>http://tessera-backend:7878</code>. Confirm with <code>GET /health</code>.</p>
+<h2 id="5-next">5. Next<a class="headerlink" href="#5-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Platform install: <a href="../platforms/">Integrated Platforms</a></li>
+<li>Overlay login: <a href="../tutorials/viewer-wallet/">Viewer wallet</a></li>
+</ul>
 
 
 

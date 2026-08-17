@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A payment sidecar that adds per-second nanopayments to any self-hosted platform.">
+        <meta name="description" content="USDC support engine for self-hosted platforms">
       
       
       
@@ -301,28 +301,17 @@
   
   
   
-    
-    
-      
-  
-  
+    <li class="md-tabs__item">
+      <a href="../platforms/" class="md-tabs__link">
+        
   
   
     
-    
-      <li class="md-tabs__item">
-        <a href="../platforms/peertube/" class="md-tabs__link">
-          
-  
   
   Integrated Platforms
 
-        </a>
-      </li>
-    
-  
-
-    
+      </a>
+    </li>
   
 
       
@@ -351,18 +340,17 @@
   
   
   
-    
-    
-      <li class="md-tabs__item">
-        <a href="../connectors/" class="md-tabs__link">
-          
+    <li class="md-tabs__item">
+      <a href="../connectors/spec/" class="md-tabs__link">
+        
   
+  
+    
   
   Connectors
 
-        </a>
-      </li>
-    
+      </a>
+    </li>
   
 
       
@@ -531,10 +519,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-per-second-streaming-time-based" class="md-nav__link">
+  <a href="#exclusive-per-second" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Per-Second Streaming (Time-based)
+        Exclusive (per-second)
       
     </span>
   </a>
@@ -542,10 +530,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-direct-tipping-event-based" class="md-nav__link">
+  <a href="#free-manual-tip" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Direct Tipping (Event-based)
+        Free (manual tip)
       
     </span>
   </a>
@@ -593,27 +581,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../platforms/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -627,315 +597,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Integrated Platforms
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PeerTube
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    PeerTube
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/peertube/configuration/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Owncast (soon)
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Owncast (soon)
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/managing-creators/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Managing Creators
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/monitoring/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Monitoring
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../platforms/owncast/withdrawals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Withdrawals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1091,27 +753,9 @@
   
   
   
-    
-    
-    
-    
-      
-      
+    <li class="md-nav__item">
+      <a href="../connectors/spec/" class="md-nav__link">
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
@@ -1125,79 +769,7 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Connectors
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../connectors/building-a-connector/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building a Connector
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1229,10 +801,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-per-second-streaming-time-based" class="md-nav__link">
+  <a href="#exclusive-per-second" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Per-Second Streaming (Time-based)
+        Exclusive (per-second)
       
     </span>
   </a>
@@ -1240,10 +812,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-direct-tipping-event-based" class="md-nav__link">
+  <a href="#free-manual-tip" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Direct Tipping (Event-based)
+        Free (manual tip)
       
     </span>
   </a>
@@ -1279,18 +851,54 @@
 
 
 <h1 id="payment-models">Payment Models<a class="headerlink" href="#payment-models" title="Permanent link">&para;</a></h1>
-<p>Tessera supports two distinct payment mechanisms natively within the same sidecar infrastructure. Both operate entirely off-chain until the session ends.</p>
+<p>The platform plugin picks <strong>one mode per resource</strong>: exclusive (per-second) or free (manual tip).</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Plugin UI</th>
+<th>Billing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Exclusive</td>
+<td><code>initPaywall()</code></td>
+<td>HMAC <code>sessions/start</code> then <code>sessions/stop</code>. Sidecar pays <code>ratePerSecond</code> each second.</td>
+</tr>
+<tr>
+<td>Free</td>
+<td><code>initTipMode(creatorWallet, amount)</code></td>
+<td>Browser <code>POST /v1/tips</code> when the viewer taps tip. No lock, no <code>start</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Fields, HMAC, and <code>userId</code>: <a href="../connectors/spec/">Connector spec</a>. Fees and Gateway: <a href="../ARCHITECTURE/">Architecture</a>.</p>
 <hr />
-<h2 id="1-per-second-streaming-time-based">1. Per-Second Streaming (Time-based)<a class="headerlink" href="#1-per-second-streaming-time-based" title="Permanent link">&para;</a></h2>
-<p>This is the default mode for continuous content like live streams, music, or video playback. </p>
-<p>As long as the viewer's connection is active, the Tessera client silently generates an EIP-3009 cryptographic signature every second. The billing engine accumulates these signatures off-chain, verifying that the user has enough balance. The viewer is strictly charged for the exact time consumed.</p>
-<p>To ensure perfect transparency, the visual paywall modal synchronizes directly with the Circle Gateway every 5 seconds. This guarantees that viewers always see the exact, verifiably deducted amount of USDC in real-time, eliminating any risk of discrepancies between the UI and the blockchain.</p>
-<p><img alt="Streaming UI" src="../assets/streaming_ui.png" /></p>
+<h2 id="exclusive-per-second">Exclusive (per-second)<a class="headerlink" href="#exclusive-per-second" title="Permanent link">&para;</a></h2>
+<p>Use this for video, live, or audio while it plays.</p>
+<ol>
+<li>Overlay locks the player (<code>initPaywall</code>) until the viewer funds Gateway (<code>prepare-deposit</code>) and unlocks.</li>
+<li>Plugin POSTs HMAC <code>sessions/start</code> with <code>ratePerSecond</code> and <code>payoutAddress</code>.</li>
+<li>Each second the sidecar runs <code>GatewayClient.pay</code> to the creator (and optional <code>splits</code>).</li>
+<li>HMAC <code>sessions/stop</code> or overlay <strong>Just Leave</strong> (<code>POST /end-session</code>) stops billing. Unused USDC stays in Gateway.</li>
+<li><strong>Cash Out &amp; Exit</strong> (<code>POST /cash-out</code>) withdraws leftover Gateway USDC to the viewer's SCA.</li>
+</ol>
+<p>The Active Session widget shows rate, video cost, and balance. Cost between refreshes is <code>seconds × rate</code>. Every 5 seconds the overlay reads <code>session-status</code> and <code>session-balance</code>.</p>
+<p><img alt="Active Session widget" src="../assets/streaming_ui.png" /></p>
+<p><code>start</code> can include <code>splits</code> (each <code>{ address, fraction }</code>, sum <code>&lt;= 1</code>). Remainder goes to <code>payoutAddress</code>. Tips have no splits.</p>
+<p><img alt="Time-based split: viewer, creator, admin" src="../assets/sustainability_model_split.png" /></p>
 <hr />
-<h2 id="2-direct-tipping-event-based">2. Direct Tipping (Event-based)<a class="headerlink" href="#2-direct-tipping-event-based" title="Permanent link">&para;</a></h2>
-<p>Viewers can send one-off, voluntary contributions directly to the creator. </p>
-<p>When a viewer clicks the "Tip" button, a single, larger authorization signature is generated. This can occur simultaneously alongside an active per-second streaming session. Tips are aggregated into the same off-chain balance and settled together with the streaming costs when the session concludes.</p>
-<p><img alt="Tipping Modal" src="../assets/tipping_modal.png" /></p>
+<h2 id="free-manual-tip">Free (manual tip)<a class="headerlink" href="#free-manual-tip" title="Permanent link">&para;</a></h2>
+<p>Use this for photos, posts, or any item tagged <code>tessera:free</code>.</p>
+<ol>
+<li>Overlay does not lock media (<code>initTipMode</code>).</li>
+<li>Viewer funds Gateway, then taps the tip button.</li>
+<li>Each tap POSTs <code>/api/core/v1/tips</code> with Circle proof. The sidecar pays that <code>amount</code> to <code>payoutAddress</code> immediately.</li>
+<li><strong>Cash Out &amp; Exit</strong> withdraws leftover Gateway USDC to the SCA, same as exclusive.</li>
+</ol>
+<p>The Support Creator widget shows Gateway balance and tips already sent. It refreshes balance every 5 seconds.</p>
+<p><img alt="Support Creator widget" src="../assets/tipping_modal.png" /></p>
 
 
 

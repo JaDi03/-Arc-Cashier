@@ -1,0 +1,2013 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="USDC support engine for self-hosted platforms">
+      
+      
+      
+      
+        <link rel="prev" href="../../tutorials/viewer-wallet/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Connectors - Tessera</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tessera-connector-spec" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Tessera" class="md-header__button md-logo" aria-label="Tessera" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Tessera
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Connectors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/JaDi03/tessera" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    JaDi03/tessera
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ARCHITECTURE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture & Fees
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../payment-models/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Payment Models
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../platforms/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Integrated Platforms
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/circle-api-key/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Connectors
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Tessera" class="md-nav__button md-logo" aria-label="Tessera" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    Tessera
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/JaDi03/tessera" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    JaDi03/tessera
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../payment-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Payment Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrated Platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/circle-api-key/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Circle API Key
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/circle-app-id/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Circle App ID
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/viewer-wallet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Viewer Wallet Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#which-of-the-three-to-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which of the three to call
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-the-plugin-must-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What the plugin must have
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. What the plugin must have">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reach-tessera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reach Tessera
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolve-before-you-post" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolve before you POST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#userid-format-critical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        userId format (critical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-browser-ui-and-relay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Browser UI and relay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Browser UI and relay">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#embed-the-paywall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embed the paywall
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-relay-recommended-in-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin relay (recommended in production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tips-flow-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips flow (browser)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-plugin-settings-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Plugin settings dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-native-events-tessera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Native events → Tessera
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Native events → Tessera">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-v1sessionsstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/sessions/start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1sessionsstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/sessions/stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/tips
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hmac-start-and-stop-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. HMAC (start and stop only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-creator-earnings-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Creator earnings API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Creator earnings API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-creatorbalanceaddress0x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /creator/balance?address=0x...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creatorprepare-withdraw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /creator/prepare-withdraw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creatorcomplete-withdraw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /creator/complete-withdraw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-creatorstatsaddress0x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /creator/stats?address=0x...
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-verification-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Verification checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#which-of-the-three-to-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which of the three to call
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-the-plugin-must-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What the plugin must have
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. What the plugin must have">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reach-tessera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reach Tessera
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolve-before-you-post" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolve before you POST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#userid-format-critical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        userId format (critical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-browser-ui-and-relay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Browser UI and relay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Browser UI and relay">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#embed-the-paywall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embed the paywall
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-relay-recommended-in-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin relay (recommended in production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tips-flow-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips flow (browser)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-plugin-settings-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Plugin settings dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-native-events-tessera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Native events → Tessera
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Native events → Tessera">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-v1sessionsstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/sessions/start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1sessionsstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/sessions/stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/tips
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hmac-start-and-stop-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. HMAC (start and stop only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-creator-earnings-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Creator earnings API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Creator earnings API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-creatorbalanceaddress0x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /creator/balance?address=0x...
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creatorprepare-withdraw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /creator/prepare-withdraw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-creatorcomplete-withdraw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /creator/complete-withdraw
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-creatorstatsaddress0x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /creator/stats?address=0x...
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-verification-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Verification checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tessera-connector-spec">Tessera connector spec<a class="headerlink" href="#tessera-connector-spec" title="Permanent link">&para;</a></h1>
+<p>This document is for whoever writes a <strong>plugin, webhook, or native service</strong> on a platform.</p>
+<p>Read native events, translate them, and call <code>start</code>, <code>stop</code>, or <code>tips</code>. Load Tessera UI in the browser for viewer wallets and paywalls.</p>
+<p><strong>Also read:</strong> <a href="../../getting-started/#3-tessera-base-url">Getting Started</a> · <a href="../../tutorials/viewer-wallet/">Viewer wallet</a> · <a href="../../platforms/">Integrated Platforms</a></p>
+<h2 id="which-of-the-three-to-call">Which of the three to call<a class="headerlink" href="#which-of-the-three-to-call" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Time</strong> (video, live, a track or podcast while it plays): <code>sessions/start</code> then <code>sessions/stop</code>.</li>
+<li><strong>A gesture</strong> (photo, post, boost, citation, download, "support this"): <code>tips</code>.</li>
+</ul>
+<p>Do <strong>not</strong> call <code>start</code> for tip-only resources. Use <code>initTipMode</code> in the browser and <code>tips</code> when the viewer taps support.</p>
+<h2 id="1-what-the-plugin-must-have">1. What the plugin must have<a class="headerlink" href="#1-what-the-plugin-must-have" title="Permanent link">&para;</a></h2>
+<h3 id="reach-tessera">Reach Tessera<a class="headerlink" href="#reach-tessera" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Tessera Base URL</strong>: origin the <strong>platform server</strong> uses to POST. How to pick it: <a href="../../getting-started/#3-tessera-base-url">Getting Started</a>. Confirm with <code>GET {Base URL}/health</code>.</li>
+<li><strong>Ingest secret</strong>: same value as <code>TESSERA_INGEST_SECRET</code> on Tessera (<a href="https://github.com/JaDi03/tessera/blob/main/.env.example"><code>.env.example</code></a>). Used only for HMAC on <code>start</code> and <code>stop</code>.</li>
+</ul>
+<p>Paths below are relative to <code>{Base URL}/api/core</code>. <code>CIRCLE_*</code> keys stay in Tessera <code>.env</code>, not in the plugin.</p>
+<p><strong>Base URL vs browser URL</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Used by</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Base URL</strong></td>
+<td>Plugin server (<code>start</code> / <code>stop</code> HMAC)</td>
+<td><code>http://127.0.0.1:7878</code></td>
+</tr>
+<tr>
+<td><strong>Browser / PUBLIC_URL</strong></td>
+<td>Viewer loading <code>paywall.bundle.js</code> and paywall API calls</td>
+<td><code>https://tessera.example.com</code> or your plugin relay origin</td>
+</tr>
+</tbody>
+</table>
+<p>They are often the same origin in dev. In production the browser usually hits a <strong>plugin relay</strong> on the platform origin (see Browser UI and relay).</p>
+<h3 id="resolve-before-you-post">Resolve before you POST<a class="headerlink" href="#resolve-before-you-post" title="Permanent link">&para;</a></h3>
+<p>The plugin computes these before each POST:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>userId</code></td>
+<td>Tessera viewer id (see <strong>userId format</strong> below). Same value on <code>start</code>, <code>stop</code>, and <code>tips</code>.</td>
+</tr>
+<tr>
+<td><code>resourceId</code></td>
+<td><code>videoId</code>, <code>trackId</code>, <code>photoId</code>, <code>postId</code>, <code>streamId</code>, ...</td>
+</tr>
+<tr>
+<td><code>payoutAddress</code></td>
+<td>Creator (or primary payee) USDC address on Arc.</td>
+</tr>
+<tr>
+<td><code>ratePerSecond</code></td>
+<td>Decimal USDC string. <strong>Required</strong> on time-based <code>start</code>. Must be <code>&gt;= 0</code>; use a value <code>&gt; 0</code> for real billing.</td>
+</tr>
+<tr>
+<td><code>splits</code></td>
+<td>Optional array. Each entry: <code>{ address, fraction, label? }</code>. Sum of fractions <code>&lt;= 1</code>. Remainder goes to <code>payoutAddress</code>. <code>label</code> is log-only. Time-based <code>start</code> only.</td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>Decimal USDC string (e.g. <code>"0.100000"</code>). <code>tips</code> only.</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>Optional. Opaque key/value strings for your connector logs. Tessera billing does not read it today.</td>
+</tr>
+</tbody>
+</table>
+<p><code>tips</code> has no <code>splits</code>. One <code>payoutAddress</code> per tip.</p>
+<h3 id="userid-format-critical">userId format (critical)<a class="headerlink" href="#userid-format-critical" title="Permanent link">&para;</a></h3>
+<p><code>userId</code> is <strong>not</strong> your platform's native account id. Tessera assigns it after the viewer signs in through the paywall (Circle email OTP or Google).</p>
+<p>Valid formats (7-256 chars):</p>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Example</th>
+<th>When set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>email:</code></td>
+<td><code>email:viewer@example.com</code></td>
+<td>Email OTP login</td>
+</tr>
+<tr>
+<td><code>social:</code></td>
+<td><code>social:104083036205001006721</code></td>
+<td>Google / Facebook login</td>
+</tr>
+<tr>
+<td><code>arc_</code></td>
+<td><code>arc_mlbogxpfyg</code></td>
+<td>Legacy sessions only</td>
+</tr>
+</tbody>
+</table>
+<p>Invalid: <code>user-42</code>, PeerTube account ids, Jellyfin user ids, random UUIDs without a valid prefix.</p>
+<p><strong>Rule:</strong> the browser paywall and your server must use the <strong>same</strong> <code>userId</code>.</p>
+<ol>
+<li>Load <code>paywall.bundle.js</code> and call <code>initPaywall()</code> or <code>initTipMode()</code>.</li>
+<li>Viewer completes Circle login in the paywall.</li>
+<li>Paywall stores <code>userId</code> in <code>localStorage</code> under <code>arc_cashier_user_id</code>.</li>
+<li>Your connector client reads that value and sends it on <code>start</code> / <code>stop</code> pings to your plugin server.</li>
+<li>Your plugin server forwards the same <code>userId</code> in HMAC <code>start</code> / <code>stop</code> (and the browser sends it on <code>tips</code>).</li>
+</ol>
+<p>If you POST <code>start</code> before the viewer has logged in, or with a platform-native id, <code>register-session</code> and <code>tips</code> will fail.</p>
+<h2 id="2-browser-ui-and-relay">2. Browser UI and relay<a class="headerlink" href="#2-browser-ui-and-relay" title="Permanent link">&para;</a></h2>
+<h3 id="embed-the-paywall">Embed the paywall<a class="headerlink" href="#embed-the-paywall" title="Permanent link">&para;</a></h3>
+<p>The bundle does <strong>not</strong> auto-init. Load it from Tessera or from your relay, then call the right init for the resource billing mode.</p>
+<div class="language-html highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="cm">&lt;!-- Serve from Tessera PUBLIC_URL or from your plugin relay (see below) --&gt;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;https://tessera.example.com/assets/paywall.bundle.js&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="c1">// Exclusive / pay-per-second (locks media until funded)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nb">window</span><span class="p">.</span><span class="nx">ArcCashier</span><span class="p">.</span><span class="nx">initPaywall</span><span class="p">();</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="c1">// Free / tip-only (optional second argument: default tip amount in USDC, e.g. 0.10)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="c1">// window.ArcCashier.initTipMode(&#39;0xCreatorAddress...&#39;, 0.10);</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="c1">// Creator earnings panel in your platform settings UI</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="c1">// window.ArcCashier.initCreatorEarnings({ wallet: &#39;0xCreator...&#39;, mount: &#39;#earnings&#39; });</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</span></code></pre></div>
+<p><strong>Admin vs creator</strong></p>
+<ul>
+<li>Platform has an admin <strong>and</strong> creators: use both. Admin: plugin settings dashboard. Creator: <code>initCreatorEarnings</code>.</li>
+<li>Platform is admin-only: use the admin one (plugin settings dashboard).</li>
+</ul>
+<p><strong>API base derivation:</strong> paywall resolves <code>ARC_API_BASE</code> from the script URL by stripping <code>/assets/&lt;bundle&gt;</code>. Example:</p>
+<ul>
+<li>Script: <code>https://tessera.example.com/assets/paywall.bundle.js</code> → API <code>https://tessera.example.com</code></li>
+<li>Script: <code>https://peertube.example.com/plugins/tessera/assets/paywall.bundle.js</code> → API <code>https://peertube.example.com/plugins/tessera</code></li>
+</ul>
+<p>If the bundle is served from the wrong path, all <code>/api/core/*</code> calls go to the wrong host.</p>
+<p><strong>Assets</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paywall.bundle.js</code></td>
+<td>Yes</td>
+<td>You load this via <code>&lt;script src&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>paywall.css</code></td>
+<td>Auto</td>
+<td>Injected by <code>initPaywall</code>, <code>initTipMode</code>, and <code>initCreatorEarnings</code> from the same directory as the script.</td>
+</tr>
+<tr>
+<td><code>creator-earnings.css</code></td>
+<td>Auto</td>
+<td>Injected by <code>initCreatorEarnings</code> from the same directory as the script.</td>
+</tr>
+</tbody>
+</table>
+<p>Viewer paywall, tip button, and creator earnings are Tessera UI. Plugins call <code>initPaywall</code> / <code>initTipMode</code> / <code>initCreatorEarnings</code>. They do not restyle <code>.arc-tessera-root</code>.</p>
+<p>No other static files are required for the viewer paywall.</p>
+<p><strong><code>initPaywall(targetContainer)</code></strong>  -  optional <code>HTMLElement</code> or CSS selector. Accepted for API compatibility; the overlay currently mounts fullscreen on <code>document.body</code> (player-contained mounts break hit-testing on some hosts).</p>
+<p><strong><code>initTipMode(creatorWallet, tipAmount)</code></strong>  -  <code>creatorWallet</code> is a <code>0x</code> EVM address. <code>tipAmount</code> is a USDC number (default <code>0.10</code> if omitted). Tips are sent as decimal strings with up to 6 places.</p>
+<h3 id="plugin-relay-recommended-in-production">Plugin relay (recommended in production)<a class="headerlink" href="#plugin-relay-recommended-in-production" title="Permanent link">&para;</a></h3>
+<p>Tessera enables CORS on all routes, but production setups usually <strong>proxy</strong> Tessera through the platform so:</p>
+<ul>
+<li>The browser stays on the platform origin (cookies, OAuth redirects).</li>
+<li>Tessera can remain server-to-server only for ingest HMAC.</li>
+</ul>
+<p>Proxy at minimum:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/assets/paywall.bundle.js</code></td>
+<td>Paywall script</td>
+</tr>
+<tr>
+<td><code>/assets/paywall.css</code></td>
+<td>Paywall styles (if not loaded via bundle injection path)</td>
+</tr>
+<tr>
+<td><code>/assets/creator-earnings.css</code></td>
+<td>Creator earnings styles (if not loaded via bundle injection path)</td>
+</tr>
+<tr>
+<td><code>/api/core/*</code></td>
+<td>Paywall wallet, session, tips, Circle auth</td>
+</tr>
+</tbody>
+</table>
+<p>Live plugins (<a href="../../platforms/">Integrated Platforms</a>) serve assets and relay API calls. Copy that pattern: expose a stable browser origin; keep <strong>Base URL</strong> as the server-to-server Tessera address for HMAC.</p>
+<p>Tessera does <strong>not</strong> have to be on the public internet if the platform server and relay can reach it.</p>
+<h3 id="tips-flow-browser">Tips flow (browser)<a class="headerlink" href="#tips-flow-browser" title="Permanent link">&para;</a></h3>
+<p><code>POST /v1/tips</code> is called from the <strong>browser</strong> (paywall tip button), not from your ingest HMAC server. A server POST is only valid if it also sends a live Circle <code>userToken</code> and the session <code>returnAddress</code>. The usual path is:</p>
+<ol>
+<li>Load <code>paywall.bundle.js</code>.</li>
+<li><code>initTipMode(creatorWallet, tipAmount)</code>.</li>
+<li>Viewer signs in (email or Google) and funds wallet in the paywall UI.</li>
+<li>Paywall calls <code>POST /api/core/register-session</code> (Gateway deposit). This requires a valid <code>userId</code> and Circle <code>userToken</code>.</li>
+<li>Viewer clicks tip → paywall calls <code>POST /api/core/v1/tips</code> with <code>{ userId, payoutAddress, amount, userToken, returnAddress }</code>.</li>
+<li><code>401</code> = Circle session does not own <code>returnAddress</code>, or it does not match the stored Gateway session. <code>402</code> = insufficient Gateway balance. <code>404</code> = no session for <code>userId</code> (viewer has not completed step 4).</li>
+</ol>
+<p>Server-side <code>start</code> / <code>stop</code> do <strong>not</strong> fund the viewer wallet. Funding is always through the paywall.</p>
+<h2 id="3-plugin-settings-dashboard">3. Plugin settings dashboard<a class="headerlink" href="#3-plugin-settings-dashboard" title="Permanent link">&para;</a></h2>
+<p>Ship an admin page on the platform (your plugin settings UI, webhook config page, or admin panel route). That config belongs to the plugin  -  not to Tessera <code>.env</code>.</p>
+<p><strong>Required for any connector:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Maps to</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tessera Base URL</td>
+<td>Server-to-server POST origin</td>
+<td>Used for HMAC <code>start</code> / <code>stop</code>. Confirm: <code>GET {Base URL}/health</code>.</td>
+</tr>
+<tr>
+<td>Tessera Ingest Secret</td>
+<td><code>TESSERA_INGEST_SECRET</code></td>
+<td>Copy from Tessera <code>.env.example</code>. Never expose to the browser.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>For time-based billing  -  add only if your platform meters consumption over time (video, audio, live):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Maps to</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Creator wallet</td>
+<td><code>payoutAddress</code></td>
+<td>Per-channel, per-artist, or per-resource.</td>
+</tr>
+<tr>
+<td>Rate per second (USDC)</td>
+<td><code>ratePerSecond</code> on <code>start</code></td>
+<td>e.g. <code>0.000100</code>.</td>
+</tr>
+<tr>
+<td>Platform fee wallet</td>
+<td><code>splits[].address</code></td>
+<td>Optional. Your platform's cut.</td>
+</tr>
+<tr>
+<td>Platform fee fraction</td>
+<td><code>splits[].fraction</code></td>
+<td>e.g. <code>0.1</code> = 10%. Remainder → creator.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>For tip-only billing  -  all platforms need this if they support tips:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Maps to</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Creator wallet</td>
+<td><code>payoutAddress</code> in <code>tips</code></td>
+<td>Resolve from EXIF, feed author, post metadata  -  whatever your platform exposes.</td>
+</tr>
+<tr>
+<td>Default tip amount (USDC)</td>
+<td><code>initTipMode(wallet, amount)</code></td>
+<td>Optional. Default <code>0.10</code> if omitted.</td>
+</tr>
+</tbody>
+</table>
+<p>If your platform is exclusively tip-based (photos, posts, RSS, newsletter, fediverse): you only need the Required fields and the tip-only section above.</p>
+<h2 id="4-native-events-tessera">4. Native events → Tessera<a class="headerlink" href="#4-native-events-tessera" title="Permanent link">&para;</a></h2>
+<p>Map each native event to one of the three calls.</p>
+<h3 id="post-v1sessionsstart"><code>POST /v1/sessions/start</code><a class="headerlink" href="#post-v1sessionsstart" title="Permanent link">&para;</a></h3>
+<p>Time started. HMAC required.</p>
+<p>Typical native events: <code>userJoined</code>, PlaybackStart, Play, NowPlaying, exclusive VOD/live start, podcast/music <strong>listen start while it is playing</strong>.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;userId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;email:viewer@example.com&quot;</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;resourceId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;content-abc&quot;</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;ratePerSecond&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.000100&quot;</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">&quot;payoutAddress&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x...&quot;</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;splits&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;label&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;platform-fee&quot;</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;platform&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your-platform&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;channelId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3&quot;</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><code>ratePerSecond</code>: USDC decimal string. Must be <code>&gt;= 0</code>. Values <code>&gt; 0</code> bill per second. <code>"0"</code> is accepted but bills nothing; for tip-only content use <code>initTipMode</code> and <code>tips</code>, not <code>start</code>.</li>
+<li><code>splits</code>: optional; sum of fractions <code>&lt;= 1</code>.</li>
+<li>Billing is wall-clock from this call until <code>stop</code>. <code>stop</code> has no duration field.</li>
+</ul>
+<p>Response: <code>{ "status": "session_started", "sessionId": "userId" }</code></p>
+<p><strong>Viewer funding:</strong> <code>start</code> does not check the viewer's Gateway balance  -  the paywall does that before unlocking playback. If the viewer is not yet funded, <code>initPaywall()</code> will block media and prompt a deposit before your connector ever sends <code>start</code>.</p>
+<p><strong>Session edge cases</strong></p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Switch resource while charging</td>
+<td><code>stop</code> previous <code>userId</code>, then <code>start</code> with new <code>resourceId</code> / rate.</td>
+</tr>
+<tr>
+<td>Second <code>start</code> same <code>userId</code> without <code>stop</code></td>
+<td>Overwrites the active session (new rate/resource). Prefer <code>stop</code> first.</td>
+</tr>
+<tr>
+<td>Pause should stop billing</td>
+<td>Send <code>stop</code>. Send <code>start</code> again on resume if you still charge.</td>
+</tr>
+<tr>
+<td>Tab close / disconnect</td>
+<td>Send <code>stop</code> on best-effort (<code>beforeunload</code>, websocket leave, idle timeout).</td>
+</tr>
+<tr>
+<td>Viewer not logged in yet</td>
+<td>Do not <code>start</code> until <code>arc_cashier_user_id</code> is available from the paywall client.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-v1sessionsstop"><code>POST /v1/sessions/stop</code><a class="headerlink" href="#post-v1sessionsstop" title="Permanent link">&para;</a></h3>
+<p>Time ended. HMAC required.</p>
+<p>Typical native events: <code>userParted</code>, PlaybackStopped, Stop, leave, pause (if charging should stop), listen end <strong>if you already sent <code>start</code></strong>.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">&quot;userId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;email:viewer@example.com&quot;</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<p>Response: <code>{ "status": "session_stopped" }</code></p>
+<h3 id="post-v1tips"><code>POST /v1/tips</code><a class="headerlink" href="#post-v1tips" title="Permanent link">&para;</a></h3>
+<p>One amount, now. <strong>No ingest HMAC.</strong> Requires a Gateway session for <code>userId</code> plus Circle proof that <code>userToken</code> owns <code>returnAddress</code>, and that address matches the stored session (same pattern as <code>sync-session</code>).</p>
+<p>Typical native events: tip button click (browser). Do not POST <code>tips</code> from the plugin server unless you also hold a live Circle <code>userToken</code> for that viewer.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;userId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;email:viewer@example.com&quot;</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;payoutAddress&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x...&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.100000&quot;</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">&quot;userToken&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;circle-user-token&gt;&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">&quot;returnAddress&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x...&quot;</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Response: <code>{ "status": "success", "amount", "payoutAddress" }</code></p>
+<p>PlaybackProgress, ping, and heartbeat: ignore for billing. The meter already runs after <code>start</code>. Resolve payee (wallet, EXIF artist, MBID) in the plugin, then POST.</p>
+<h3 id="by-surface">By surface<a class="headerlink" href="#by-surface" title="Permanent link">&para;</a></h3>
+<p><strong>Live / VOD (Jellyfin, PeerTube)</strong></p>
+<ul>
+<li>Exclusive: play → <code>start</code>; leave/stop/pause → <code>stop</code>. UI: <code>initPaywall()</code>.</li>
+<li>Free: UI: <code>initTipMode()</code>. Tips from browser. Do not <code>start</code>.</li>
+<li>Progress webhooks: ignore.</li>
+</ul>
+<p><strong>Music server (Navidrome, Subsonic, Airsonic, Ampache, ...)</strong></p>
+<ul>
+<li>Platform emits play/stop in real-time: <code>NowPlaying</code> / <code>play</code> → <code>start</code>; stop/pause → <code>stop</code>.</li>
+<li>Platform only emits a scrobble at track end (no live play event): use <code>tips</code> with the computed amount. Do not invent a <code>start</code> you cannot pair with a <code>stop</code>.</li>
+<li><code>payoutAddress</code>: resolve from track metadata (MusicBrainz artist, Beets custom field). Do not use the platform's native account id.</li>
+</ul>
+<p><strong>Music metadata tools (Beets, Maloja, Picard)</strong></p>
+<p>These are not billing surfaces  -  they resolve identity and wallet addresses.</p>
+<ul>
+<li>Beets / Picard: query before POSTing <code>start</code> or <code>tips</code> to get <code>payoutAddress</code> and <code>splits</code> from artist/composer credits.</li>
+<li>Maloja: accepts scrobbles inbound → map to <code>tips</code> (same as scrobble-only music server above).</li>
+<li>Do not call <code>start</code> / <code>stop</code> from a tagging tool.</li>
+</ul>
+<p><strong>Podcasting + audio (Audiobookshelf, Castopod, AntennaPod)</strong></p>
+<ul>
+<li>Support while it plays: play event → <code>start</code>; stop/pause → <code>stop</code>.</li>
+<li>Support this episode (one-time gesture): <code>tips</code> only.</li>
+<li>If the platform uses Podcasting 2.0 <code>&lt;podcast:value&gt;</code> tags or Castopod Premium: those are separate payment rails. Tessera is additive  -  do not replace them.</li>
+</ul>
+<p><strong>Photos / galleries (Immich, PhotoPrism, Lychee, ...)</strong></p>
+<p>Photos have no duration  -  there is nothing to meter. Never call <code>start</code> or <code>stop</code>.</p>
+<ul>
+<li>UI: <code>initTipMode(creatorWallet)</code>. The paywall renders a tip button next to the image.</li>
+<li>On tip gesture (download, like, support button): <code>POST /v1/tips</code> from the browser or your server.</li>
+<li><code>payoutAddress</code>: resolve from EXIF metadata (photographer's wallet), not from the platform account system.</li>
+<li><code>resourceId</code> is optional since there is no timed session; pass it via <code>metadata</code> if you need per-photo earnings in stats.</li>
+</ul>
+<p><strong>Feeds + RSS (FreshRSS, Miniflux, Wallabag)</strong></p>
+<p>Always <code>tips</code> only  -  reading an article is not a timed session.</p>
+<ul>
+<li><code>resourceId</code>: use the canonical URL of the article (stable, unique per post).</li>
+<li><code>payoutAddress</code>: resolve from the feed's <code>&lt;author&gt;</code> or a wallet tag in the feed.</li>
+<li>UI: inject <code>initTipMode</code> next to each item in the reader UI.</li>
+</ul>
+<p><strong>Publishing + newsletter (Ghost, WriteFreely, Halo)</strong></p>
+<p>Always <code>tips</code> only  -  a post or newsletter is not metered by the second.</p>
+<ul>
+<li><code>initTipMode</code> in the post template or alongside a subscribe button.</li>
+</ul>
+<p><strong>Fediverse (Mastodon, Lemmy, Pixelfed)</strong></p>
+<ul>
+<li><code>tips</code> only. Do not meter reading a post by the second.</li>
+<li>Map a native tip, boost, or donation gesture to <code>POST /v1/tips</code>.</li>
+<li>Or inject <code>initTipMode</code> in the post or profile view.</li>
+</ul>
+<h2 id="5-hmac-start-and-stop-only">5. HMAC (<code>start</code> and <code>stop</code> only)<a class="headerlink" href="#5-hmac-start-and-stop-only" title="Permanent link">&para;</a></h2>
+<p>Headers:</p>
+<ul>
+<li><code>X-Tessera-Timestamp</code>: unix ms</li>
+<li><code>X-Tessera-Nonce</code>: unique string (single use)</li>
+<li><code>X-Tessera-Signature</code>: hex HMAC-SHA256 of <code>timestamp.nonce.rawBody</code> with the ingest secret</li>
+</ul>
+<p>Replay window: 60 seconds. Duplicate nonce: 401.</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">crypto</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;crypto&#39;</span><span class="p">);</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">TESSERA_INGEST_SECRET</span><span class="p">;</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">rawBody</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;email:viewer@example.com&#39;</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nx">resourceId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;content-abc&#39;</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nx">ratePerSecond</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;0.000100&#39;</span><span class="p">,</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nx">payoutAddress</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;0x...&#39;</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">});</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="kd">const</span><span class="w"> </span><span class="nx">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">().</span><span class="nx">toString</span><span class="p">();</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="kd">const</span><span class="w"> </span><span class="nx">nonce</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">crypto</span><span class="p">.</span><span class="nx">randomUUID</span><span class="p">();</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="kd">const</span><span class="w"> </span><span class="nx">signature</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">crypto</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="p">.</span><span class="nx">createHmac</span><span class="p">(</span><span class="s1">&#39;sha256&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">secret</span><span class="p">)</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="p">.</span><span class="nx">update</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">timestamp</span><span class="si">}</span><span class="sb">.</span><span class="si">${</span><span class="nx">nonce</span><span class="si">}</span><span class="sb">.</span><span class="si">${</span><span class="nx">rawBody</span><span class="si">}</span><span class="sb">`</span><span class="p">)</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">  </span><span class="p">.</span><span class="nx">digest</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">);</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="k">await</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">baseUrl</span><span class="si">}</span><span class="sb">/api/core/v1/sessions/start`</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;POST&#39;</span><span class="p">,</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">  </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">    </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/json&#39;</span><span class="p">,</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">    </span><span class="s1">&#39;X-Tessera-Timestamp&#39;</span><span class="o">:</span><span class="w"> </span><span class="nx">timestamp</span><span class="p">,</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="s1">&#39;X-Tessera-Nonce&#39;</span><span class="o">:</span><span class="w"> </span><span class="nx">nonce</span><span class="p">,</span>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">    </span><span class="s1">&#39;X-Tessera-Signature&#39;</span><span class="o">:</span><span class="w"> </span><span class="nx">signature</span><span class="p">,</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">  </span><span class="nx">body</span><span class="o">:</span><span class="w"> </span><span class="nx">rawBody</span><span class="p">,</span>
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="p">});</span>
+</span></code></pre></div>
+<p>Sign the exact bytes you send as the body.</p>
+<h2 id="6-creator-earnings-api">6. Creator earnings API<a class="headerlink" href="#6-creator-earnings-api" title="Permanent link">&para;</a></h2>
+<p>Embed creator balance and withdraw with <code>window.ArcCashier.initCreatorEarnings({ wallet, apiBase?, mount?, title? })</code>. Same Tessera chrome as the viewer widgets: the call injects <code>paywall.css</code> and <code>creator-earnings.css</code>.</p>
+<ul>
+<li><code>wallet</code> (required): creator <code>0x</code> address.</li>
+<li><code>apiBase</code> (optional): override API origin; defaults to script URL derivation.</li>
+<li><code>mount</code> (optional): <code>HTMLElement</code> or selector; defaults to <code>document.body</code>.</li>
+<li><code>title</code> (optional): panel heading.</li>
+</ul>
+<p>HTTP routes (relative to <code>/api/core</code>):</p>
+<h3 id="get-creatorbalanceaddress0x"><code>GET /creator/balance?address=0x...</code><a class="headerlink" href="#get-creatorbalanceaddress0x" title="Permanent link">&para;</a></h3>
+<p>Response:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0x...&quot;</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">&quot;gatewayAvailable&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.234567&quot;</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">&quot;gatewayWithdrawable&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.234567&quot;</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">&quot;gatewayTotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.234567&quot;</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="post-creatorprepare-withdraw"><code>POST /creator/prepare-withdraw</code><a class="headerlink" href="#post-creatorprepare-withdraw" title="Permanent link">&para;</a></h3>
+<p>Body: <code>{ "address": "0x..." }</code></p>
+<p>Response when ready: <code>{ "status": "ready", "amount", "burnIntent", "typedData" }</code><br />
+Response when balance too low: <code>{ "status": "no_funds", ... }</code></p>
+<h3 id="post-creatorcomplete-withdraw"><code>POST /creator/complete-withdraw</code><a class="headerlink" href="#post-creatorcomplete-withdraw" title="Permanent link">&para;</a></h3>
+<p>Body: <code>{ "address", "burnIntent", "signature" }</code> (EIP-712 from MetaMask)</p>
+<p>Response: <code>{ "status": "ready_to_mint", "transferId", "txRequest" }</code></p>
+<h3 id="get-creatorstatsaddress0x"><code>GET /creator/stats?address=0x...</code><a class="headerlink" href="#get-creatorstatsaddress0x" title="Permanent link">&para;</a></h3>
+<p>Response:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;resourceId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;resource-abc&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.05</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;resourceId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;resource-xyz&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.20</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Each entry is a <code>resourceId</code> your connector sent on <code>start</code> (or via <code>tips</code>) that generated earnings for <code>address</code>. <code>amount</code> is in USDC. Tessera does not interpret the value  -  it is whatever your connector passed.</p>
+<h2 id="7-errors">7. Errors<a class="headerlink" href="#7-errors" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>HTTP</th>
+<th>Endpoint</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td><code>start</code></td>
+<td>Missing <code>userId</code>, <code>resourceId</code>, <code>ratePerSecond</code>, or <code>payoutAddress</code>; invalid address or split fraction</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>start</code></td>
+<td><code>splits</code> fractions sum &gt; 1</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>stop</code></td>
+<td>Missing <code>userId</code></td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>start</code>, <code>stop</code></td>
+<td>Missing/invalid HMAC, expired timestamp (&gt; 60 s), or duplicate nonce</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>tips</code></td>
+<td>Missing <code>userToken</code> or <code>returnAddress</code></td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>tips</code></td>
+<td>Circle session does not own <code>returnAddress</code>, or it does not match the stored Gateway session</td>
+</tr>
+<tr>
+<td>402</td>
+<td><code>tips</code></td>
+<td>Insufficient Gateway balance</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>tips</code></td>
+<td>No Gateway session for <code>userId</code> (viewer has not funded wallet)</td>
+</tr>
+<tr>
+<td>500</td>
+<td><code>stop</code>, creator</td>
+<td>Settlement failed or Tessera server error</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-verification-checklist">8. Verification checklist<a class="headerlink" href="#8-verification-checklist" title="Permanent link">&para;</a></h2>
+<p>Run in order when wiring a new connector:</p>
+<ol>
+<li><code>curl -sS {Base URL}/health</code> → <code>status: healthy</code></li>
+<li>HMAC <code>POST /api/core/v1/sessions/start</code> with a test <code>userId</code> / <code>resourceId</code> → <code>session_started</code></li>
+<li>HMAC <code>POST /api/core/v1/sessions/stop</code> → <code>session_stopped</code></li>
+<li>Browser loads <code>{origin}/assets/paywall.bundle.js</code> without 404</li>
+<li><code>initPaywall()</code> or <code>initTipMode()</code> → Circle login completes</li>
+<li><code>localStorage.getItem('arc_cashier_user_id')</code> returns <code>email:...</code> or <code>social:...</code></li>
+<li>Connector server uses that same <code>userId</code> on <code>start</code> / <code>stop</code></li>
+<li>Fund wallet in paywall → <code>register-session</code> succeeds</li>
+<li>Tip button → <code>POST /v1/tips</code> → <code>success</code></li>
+<li>Creator panel → <code>GET /creator/balance</code> returns funds after sessions</li>
+</ol>
+<p>Live plugins: <a href="../../platforms/">Integrated Platforms</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Tessera Contributors. Licensed under Apache-2.0.
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/JaDi03/tessera" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.select", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
