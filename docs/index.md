@@ -22,7 +22,7 @@
 
 Tessera sits next to your self-hosted platform so audiences can support creators and instance hosts in USDC: an optional tip on free content, or per-second support on exclusives.
 
-The sidecar does not replace your app. A platform plugin loads the Tessera overlay and tells the sidecar when someone starts, stops, or tips. You install that plugin on the platform; you do not fork Tessera.
+A platform plugin loads the Tessera overlay and tells the sidecar when someone starts, stops, or tips. You install that plugin on the platform.
 
 ---
 
