@@ -4,7 +4,7 @@ This document is for whoever writes a **plugin, webhook, or native service** on 
 
 Read native events, translate them, and call `start`, `stop`, or `tips`. Load Tessera UI in the browser for viewer wallets and paywalls.
 
-**Also read:** [Getting Started](docs/getting-started/index.md#3-tessera-base-url) · [Viewer wallet](docs/tutorials/viewer-wallet.md) · [Integrated Platforms](docs/platforms/index.md)
+**Also read:** [Getting Started](../getting-started/index.md#3-tessera-base-url) · [Viewer wallet](../tutorials/viewer-wallet.md) · [Integrated Platforms](../platforms/index.md)
 
 ## Which of the three to call
 
@@ -17,8 +17,8 @@ Do **not** call `start` for tip-only resources. Use `initTipMode` in the browser
 
 ### Reach Tessera
 
-- **Tessera Base URL**: origin the **platform server** uses to POST. How to pick it: [Getting Started](docs/getting-started/index.md#3-tessera-base-url). Confirm with `GET {Base URL}/health`.
-- **Ingest secret**: same value as `TESSERA_INGEST_SECRET` on Tessera ([`.env.example`](.env.example)). Used only for HMAC on `start` and `stop`.
+- **Tessera Base URL**: origin the **platform server** uses to POST. How to pick it: [Getting Started](../getting-started/index.md#3-tessera-base-url). Confirm with `GET {Base URL}/health`.
+- **Ingest secret**: same value as `TESSERA_INGEST_SECRET` on Tessera ([`.env.example`](https://github.com/JaDi03/tessera/blob/main/.env.example)). Used only for HMAC on `start` and `stop`.
 
 Paths below are relative to `{Base URL}/api/core`. `CIRCLE_*` keys stay in Tessera `.env`, not in the plugin.
 
@@ -116,9 +116,9 @@ Viewer paywall, tip button, and creator earnings are Tessera UI. Plugins call `i
 
 No other static files are required for the viewer paywall.
 
-**`initPaywall(targetContainer)`** — optional `HTMLElement` or CSS selector. Accepted for API compatibility; the overlay currently mounts fullscreen on `document.body` (player-contained mounts break hit-testing on some hosts).
+**`initPaywall(targetContainer)`**  -  optional `HTMLElement` or CSS selector. Accepted for API compatibility; the overlay currently mounts fullscreen on `document.body` (player-contained mounts break hit-testing on some hosts).
 
-**`initTipMode(creatorWallet, tipAmount)`** — `creatorWallet` is a `0x` EVM address. `tipAmount` is a USDC number (default `0.10` if omitted). Tips are sent as decimal strings with up to 6 places.
+**`initTipMode(creatorWallet, tipAmount)`**  -  `creatorWallet` is a `0x` EVM address. `tipAmount` is a USDC number (default `0.10` if omitted). Tips are sent as decimal strings with up to 6 places.
 
 ### Plugin relay (recommended in production)
 
@@ -136,7 +136,7 @@ Proxy at minimum:
 | `/assets/creator-earnings.css` | Creator earnings styles (if not loaded via bundle injection path) |
 | `/api/core/*` | Paywall wallet, session, tips, Circle auth |
 
-Live plugins ([Integrated Platforms](docs/platforms/index.md)) serve assets and relay API calls. Copy that pattern: expose a stable browser origin; keep **Base URL** as the server-to-server Tessera address for HMAC.
+Live plugins ([Integrated Platforms](../platforms/index.md)) serve assets and relay API calls. Copy that pattern: expose a stable browser origin; keep **Base URL** as the server-to-server Tessera address for HMAC.
 
 Tessera does **not** have to be on the public internet if the platform server and relay can reach it.
 
@@ -155,7 +155,7 @@ Server-side `start` / `stop` do **not** fund the viewer wallet. Funding is alway
 
 ## 3. Plugin settings dashboard
 
-Ship an admin page on the platform (your plugin settings UI, webhook config page, or admin panel route). That config belongs to the plugin — not to Tessera `.env`.
+Ship an admin page on the platform (your plugin settings UI, webhook config page, or admin panel route). That config belongs to the plugin  -  not to Tessera `.env`.
 
 **Required for any connector:**
 
@@ -164,7 +164,7 @@ Ship an admin page on the platform (your plugin settings UI, webhook config page
 | Tessera Base URL | Server-to-server POST origin | Used for HMAC `start` / `stop`. Confirm: `GET {Base URL}/health`. |
 | Tessera Ingest Secret | `TESSERA_INGEST_SECRET` | Copy from Tessera `.env.example`. Never expose to the browser. |
 
-**For time-based billing — add only if your platform meters consumption over time (video, audio, live):**
+**For time-based billing  -  add only if your platform meters consumption over time (video, audio, live):**
 
 | Setting | Maps to | Notes |
 |---|---|---|
@@ -173,11 +173,11 @@ Ship an admin page on the platform (your plugin settings UI, webhook config page
 | Platform fee wallet | `splits[].address` | Optional. Your platform's cut. |
 | Platform fee fraction | `splits[].fraction` | e.g. `0.1` = 10%. Remainder → creator. |
 
-**For tip-only billing — all platforms need this if they support tips:**
+**For tip-only billing  -  all platforms need this if they support tips:**
 
 | Setting | Maps to | Notes |
 |---|---|---|
-| Creator wallet | `payoutAddress` in `tips` | Resolve from EXIF, feed author, post metadata — whatever your platform exposes. |
+| Creator wallet | `payoutAddress` in `tips` | Resolve from EXIF, feed author, post metadata  -  whatever your platform exposes. |
 | Default tip amount (USDC) | `initTipMode(wallet, amount)` | Optional. Default `0.10` if omitted. |
 
 If your platform is exclusively tip-based (photos, posts, RSS, newsletter, fediverse): you only need the Required fields and the tip-only section above.
@@ -211,7 +211,7 @@ Typical native events: `userJoined`, PlaybackStart, Play, NowPlaying, exclusive 
 
 Response: `{ "status": "session_started", "sessionId": "userId" }`
 
-**Viewer funding:** `start` does not check the viewer's Gateway balance — the paywall does that before unlocking playback. If the viewer is not yet funded, `initPaywall()` will block media and prompt a deposit before your connector ever sends `start`.
+**Viewer funding:** `start` does not check the viewer's Gateway balance  -  the paywall does that before unlocking playback. If the viewer is not yet funded, `initPaywall()` will block media and prompt a deposit before your connector ever sends `start`.
 
 **Session edge cases**
 
@@ -271,7 +271,7 @@ PlaybackProgress, ping, and heartbeat: ignore for billing. The meter already run
 
 **Music metadata tools (Beets, Maloja, Picard)**
 
-These are not billing surfaces — they resolve identity and wallet addresses.
+These are not billing surfaces  -  they resolve identity and wallet addresses.
 
 - Beets / Picard: query before POSTing `start` or `tips` to get `payoutAddress` and `splits` from artist/composer credits.
 - Maloja: accepts scrobbles inbound → map to `tips` (same as scrobble-only music server above).
@@ -281,11 +281,11 @@ These are not billing surfaces — they resolve identity and wallet addresses.
 
 - Support while it plays: play event → `start`; stop/pause → `stop`.
 - Support this episode (one-time gesture): `tips` only.
-- If the platform uses Podcasting 2.0 `<podcast:value>` tags or Castopod Premium: those are separate payment rails. Tessera is additive — do not replace them.
+- If the platform uses Podcasting 2.0 `<podcast:value>` tags or Castopod Premium: those are separate payment rails. Tessera is additive  -  do not replace them.
 
 **Photos / galleries (Immich, PhotoPrism, Lychee, ...)**
 
-Photos have no duration — there is nothing to meter. Never call `start` or `stop`.
+Photos have no duration  -  there is nothing to meter. Never call `start` or `stop`.
 
 - UI: `initTipMode(creatorWallet)`. The paywall renders a tip button next to the image.
 - On tip gesture (download, like, support button): `POST /v1/tips` from the browser or your server.
@@ -294,7 +294,7 @@ Photos have no duration — there is nothing to meter. Never call `start` or `st
 
 **Feeds + RSS (FreshRSS, Miniflux, Wallabag)**
 
-Always `tips` only — reading an article is not a timed session.
+Always `tips` only  -  reading an article is not a timed session.
 
 - `resourceId`: use the canonical URL of the article (stable, unique per post).
 - `payoutAddress`: resolve from the feed's `<author>` or a wallet tag in the feed.
@@ -302,7 +302,7 @@ Always `tips` only — reading an article is not a timed session.
 
 **Publishing + newsletter (Ghost, WriteFreely, Halo)**
 
-Always `tips` only — a post or newsletter is not metered by the second.
+Always `tips` only  -  a post or newsletter is not metered by the second.
 
 - `initTipMode` in the post template or alongside a subscribe button.
 
@@ -405,7 +405,7 @@ Response:
 }
 ```
 
-Each entry is a `resourceId` your connector sent on `start` (or via `tips`) that generated earnings for `address`. `amount` is in USDC. Tessera does not interpret the value — it is whatever your connector passed.
+Each entry is a `resourceId` your connector sent on `start` (or via `tips`) that generated earnings for `address`. `amount` is in USDC. Tessera does not interpret the value  -  it is whatever your connector passed.
 
 ## 7. Errors
 
@@ -436,4 +436,4 @@ Run in order when wiring a new connector:
 9. Tip button → `POST /v1/tips` → `success`
 10. Creator panel → `GET /creator/balance` returns funds after sessions
 
-Live plugins: [Integrated Platforms](docs/platforms/index.md).
+Live plugins: [Integrated Platforms](../platforms/index.md).

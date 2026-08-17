@@ -2,12 +2,12 @@
 
 <img src="assets/logo_yellow.svg" alt="Tessera Logo" width="400">
 
-**Payment Sidecar for Self-Hosted Platforms**
+**USDC support engine for self-hosted platforms**
 
-*Per-second nanopayments powered by [Circle x402](https://www.circle.com/nanopayments) & [Arc](https://www.arc.network)*
+*Per-second and one-off support on [Circle x402](https://www.circle.com/nanopayments) and [Arc](https://www.arc.network)*
 
 [![Build Passing](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/JaDi03/tessera/actions)
-[![Version](https://img.shields.io/badge/version-1.3.1-blue?style=for-the-badge)](https://github.com/JaDi03/tessera/releases)
+[![Version](https://img.shields.io/github/package-json/v/JaDi03/tessera?style=for-the-badge)](https://github.com/JaDi03/tessera/releases)
 [![License](https://img.shields.io/badge/license-Apache_2.0-yellow?style=for-the-badge)](https://github.com/JaDi03/tessera/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -20,31 +20,29 @@
 
 ## TL;DR
 
-Point Tessera at your self-hosted platform and your users start paying in USDC - by the second, by the article, or as a tip. No platform modification required.
+Tessera sits next to your self-hosted platform so audiences can support creators and instance hosts in USDC: an optional tip on free content, or per-second support on exclusives.
 
-Tessera is a **payment sidecar**: a companion service that runs alongside your platform, manages client paywall sessions, and handles the entire [Circle Gateway](https://developers.circle.com/gateway) lifecycle (deposit → authorize → batch settle → withdraw) - without touching your platform's source code.
-
-The platform emits events as it always has. Whether that is a webhook for a live stream, an API call for a music track, or a tip event, Tessera processes these signals and does the rest.
+The sidecar does not replace your app. A platform plugin loads the Tessera overlay and tells the sidecar when someone starts, stops, or tips. You install that plugin on the platform; you do not fork Tessera.
 
 ---
 
 ## The Problem
 
-Self-hosted platforms empower creators and communities with ownership and control, but they leave a critical gap unfilled: **there is no native way for audiences to support the infrastructure and creators they value.**
+Self-hosted platforms give communities ownership, but they leave a gap: **there is no native way for audiences to support the infrastructure and creators they value.**
 
 | Stakeholder | Pain Point |
 |---|---|
-| **Instance Administrators** | Bear 100% of infrastructure costs - servers, storage, bandwidth - with limited tools to recoup expenses beyond donations or ads |
-| **Creators** | Produce content on platforms they don't control, with no built-in mechanism to receive direct support from their audience |
-| **Viewers / Readers** | Want to support creators they love, but are forced into platform-wide subscriptions that don't reflect actual consumption |
+| **Instance Administrators** | Bear 100% of infrastructure costs (servers, storage, bandwidth) with few tools beyond donations or ads |
+| **Creators** | Publish on platforms they do not control, with no built-in path to direct support from their audience |
+| **Viewers / Readers** | Want to support people they follow, but platform-wide subscriptions do not match what they actually consume |
 
-The result is a sustainability crisis: instances shut down when admins can no longer afford them, creators migrate to commercial platforms, and communities fragment.
+Instances shut down when admins can no longer afford them. Creators move to commercial platforms. Communities fragment.
 
 ---
 
 ## The Solution
 
-Tessera is a **payment sidecar**: a companion service that runs alongside your platform, adding a flexible nanopayment layer (be it per-second, per-action, or direct tips) without modifying any platform code.
+Tessera is a **USDC support engine**: a sidecar next to your platform, plus a plugin that loads the overlay. Free items stay open (`tessera:free`) with a manual tip. Exclusive items ask for a USDC deposit, then bill by the second while the viewer stays.
 
 ```mermaid
 flowchart LR
@@ -63,21 +61,21 @@ flowchart LR
     end
 
     V -- "1. Consumes Content" --> P
-    P -- "2. Emits Native Events" --> T
-    V -. "3. Approves Nanopayments" .-> T
-    T -- "4. Batches & Settles" --> C
-    C -- "5. Final Payout (USDC)" --> W
+    P -- "2. Plugin events" --> T
+    V -. "3. Tip or per-second support" .-> T
+    T -- "4. Batches and settles" --> C
+    C -- "5. USDC to creator" --> W
 
     style T fill:#ffb300,stroke:#333,stroke-width:2px,color:#000
     style W fill:#6C63FF,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
-**Key Design Principles:**
+**How support works:**
 
-- **Zero platform modification** - Tessera operates as an independent companion sidecar; your platform's core code remains untouched
-- **Pay only for what you consume (or tip)**: Whether it is per-second billing for a stream, a fee for an article, or a voluntary tip for a creator, the audience pays directly for value without rigid monthly subscriptions
-- **Gas-free streaming** - Off-chain EIP-3009 signatures every second; batch settlement only happens when the session ends
-- **Cross-chain deposits** - Viewers can fund from any supported chain via Circle CCTP; settlement happens on Arc Testnet
+- **Free content** (`tessera:free`): no lock, no billing. Tip is manual only
+- **Exclusive content**: viewer deposits USDC, then per-second support while they stay. Leave and replay do not freeze the player
+- **Gas-free ticks**: the sidecar authorizes a nanopayment each second; settlement is batched
+- **Cross-chain funding**: viewers can fund via Circle CCTP; settlement is on Arc Testnet
 
 ---
 
@@ -85,69 +83,42 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    actor Viewer as Viewer
-    participant Browser as paywall.js (Client)
-    participant Platform as Self-Hosted Platform
-    participant Tessera as Tessera Sidecar
-    participant Gateway as Circle Gateway
-    actor Creator as Creator Wallet
+    actor Viewer
+    participant Paywall as paywall.js
+    participant Plugin as PlatformPlugin
+    participant Sidecar as TesseraSidecar
+    participant Circle as CircleUCW_Gateway
 
-    %% 1. Initial Load & Integration
-    Viewer->>Platform: visits site / watch video
-    Platform-->>Viewer: returns page (loads paywall.js from Tessera)
-
-    %% 2. Wallet setup & deposit
-    Viewer->>Browser: Clicks "Connect & Fund"
-    Note over Browser: Circle UCW SDK creates SCA on Arc Testnet
-    Browser->>Gateway: Deposits USDC into Gateway contract (on-chain)
-    Gateway-->>Browser: Deposit confirmed
-
-    %% 3. Session registration
-    Browser->>Tessera: POST /api/core/register-session
-    Note over Browser,Tessera: Sends ephemeral private key (session key)
-    Tessera->>Gateway: GatewayClient.pay() → x402 authorization (off-chain)
-    Gateway-->>Tessera: Signature verified, access granted
-    Tessera-->>Browser: 200 OK - session active
-
-    %% 4. Streaming & billing (off-chain)
-    Platform->>Tessera: POST /api/core/v1/sessions/start
+    Viewer->>Paywall: opens content
+    Paywall->>Circle: email or social plus SCA
+    Paywall->>Sidecar: POST /api/core/circle/prepare-deposit
+    Circle-->>Paywall: USDC deposit challenge
+    Paywall->>Sidecar: POST /api/core/sync-session or register-session
+    Plugin->>Sidecar: HMAC POST /api/core/v1/sessions/start
     loop Every second while connected
-        Note over Tessera,Gateway: EIP-3009 off-chain signatures (no gas per tick)
+        Sidecar->>Circle: Gateway pay to creator
     end
-    Platform->>Tessera: POST /api/core/v1/sessions/stop
-
-    %% 5. End session & refund
-    Viewer->>Browser: Clicks "End Session"
-    Browser->>Tessera: POST /api/core/end-session
-    Tessera->>Gateway: GatewayClient.withdraw() - batch settles & refunds
-    Gateway-->>Creator: Transfers USDC earnings
-    Gateway-->>Tessera: Withdrawal confirmed
-    Tessera-->>Browser: 200 OK - unused balance returned
+    Plugin->>Sidecar: HMAC POST /api/core/v1/sessions/stop
+    Note over Sidecar: Funds stay in Gateway
+    Viewer->>Paywall: optional cash-out
+    Paywall->>Sidecar: POST /api/core/cash-out
 ```
 
 **In plain terms:**
 
-1. **Viewer opens the platform** → The platform client loads the Tessera paywall script (`paywall.js`) dynamically.
-2. **Viewer funds a session** → A Circle Smart Contract Account (SCA) is created on Arc Testnet. The viewer deposits USDC into the Circle Gateway. This is one of the two on-chain transactions (along with the subsequent cash-out/withdrawal).
-3. **Session registers** → The client posts the ephemeral session key to Tessera. The GatewayClient makes a single x402 authorization call to unlock access
-4. **Billing runs off-chain** → Every second, an EIP-3009 signature authorizes a nanopayment. No gas. No blockchain transaction per tick
-5. **Viewer leaves** → The client calls `/end-session`. Tessera stops billing, and the remaining funds stay in the Gateway contract. The viewer can manually withdraw/refund their balance to their wallet at any time via a `/cash-out` transaction.
+1. **Viewer opens content** → The platform plugin loads the Tessera overlay (`paywall.js`).
+2. **Viewer funds support** → Circle UCW (email OTP or social) creates an SCA on Arc Testnet. Exclusive content uses `POST /api/core/circle/prepare-deposit` (USDC) and a Circle challenge.
+3. **Session key** → The overlay calls `POST /api/core/sync-session` (returning viewer) or `POST /api/core/register-session` (new key). Both prove Circle wallet ownership. Register may also deposit leftover SCA USDC into Gateway.
+4. **Support ticks off-chain** → The plugin sends HMAC-signed `POST /api/core/v1/sessions/start`. Each second Tessera authorizes a nanopayment to the creator `payoutAddress`. `POST /api/core/v1/sessions/stop` (also HMAC) ends billing.
+5. **Viewer leaves** → Funds stay in Gateway. A manual `POST /api/core/cash-out` returns unused USDC to the viewer's SCA. Tips use `POST /api/core/v1/tips` with Circle proof.
+
+HMAC header details and the connector contract: [Connector spec](connectors/spec.md).
 
 ---
 
-## Supported Platforms & Use Cases
+## Integrated Platforms
 
-| Platform | Integration Type | Status |
-|---|---|---|
-| [PeerTube](https://joinpeertube.org/) | Plugin | Live |
-
-Tessera is designed to plug into the open-source creator stack where communities already live. Because it relies on standard event streams, it can be easily extended to support:
-
-- **Music Servers (Navidrome, Koel)**: Per-listen royalties triggered by scrobble events.
-- **Photo Libraries (Immich)**: Fractional licensing fees on shared-link resolves.
-- **Feeds & Blogs (RSSHub, Ghost)**: Citation tolls or per-article subscriptions.
-
-Want to add your platform? Call the [integration contract](../CONNECTOR_SPEC.md) from a plugin or native webhook. No Tessera code changes required.
+Tessera is live on PeerTube, Jellyfin, and Piwigo. Plugin install lives in each repo: [Integrated Platforms](platforms/index.md).
 
 ---
 
@@ -155,13 +126,13 @@ Want to add your platform? Call the [integration contract](../CONNECTOR_SPEC.md)
 
 | Technology | Purpose | Why It Matters |
 |---|---|---|
-| [**Circle x402 Gateway**](https://developers.circle.com/gateway/nanopayments) | Batched nanopayment settlement & protocol | Enables gas-free USDC payments as small as $0.000001 using the open HTTP 402 standard |
+| [**Circle x402 Gateway**](https://developers.circle.com/gateway/nanopayments) | Batched settlement | USDC support as small as $0.000001 using HTTP 402 |
 | [**Circle UCW SDK**](https://developers.circle.com/wallets/user-controlled) | Smart Contract Accounts on Arc Testnet | Non-custodial wallets with email OTP or social login |
-| [**Circle CCTP Forwarding**](https://www.circle.com/cross-chain-transfer-protocol) | Cross-chain USDC bridging (Domain 26) | Allows viewers to deposit USDC from any supported source chain |
-| [**Arc Testnet**](https://docs.arc.network) | Settlement layer (Chain ID 5042002) | Native USDC gas, sub-second finality, purpose-built for payments |
-| [**EIP-3009**](https://eips.ethereum.org/EIPS/eip-3009) | Off-chain transfer authorization | Gasless cryptographic signatures for nanopayments |
-| [**viem**](https://viem.sh/) | Type-safe EVM interactions | Modern TypeScript library for blockchain operations |
-| [**Express**](https://expressjs.com/) | Web Application Server | Industry-standard Node.js web framework |
+| [**Circle CCTP Forwarding**](https://www.circle.com/cross-chain-transfer-protocol) | Cross-chain USDC bridging (Domain 26) | Viewers can fund USDC from a supported source chain |
+| [**Arc Testnet**](https://docs.arc.network) | Settlement layer (Chain ID 5042002) | Native USDC gas, sub-second finality |
+| [**EIP-3009**](https://eips.ethereum.org/EIPS/eip-3009) | Off-chain transfer authorization | Gasless signatures for per-second ticks |
+| [**viem**](https://viem.sh/) | Type-safe EVM interactions | TypeScript library for chain calls |
+| [**Express**](https://expressjs.com/) | Web application server | Node.js HTTP for the sidecar |
 
 ---
 
@@ -171,22 +142,19 @@ Tessera uses a **sidecar pattern**. Two layers in this repo:
 
 **Core Engine** (`src/core/`) - Session management, per-second billing, wallet ops, Circle Gateway / x402.
 
-**Client Overlay** (`src/ui/`) - Paywall UI. Platforms load it from `/assets/`.
+**Client Overlay** (`src/ui/`) - Overlay UI. Platforms load it from `/assets/`.
 
 Platform plugins live outside this repo and call the HTTP contract.
 
-For detailed architecture diagrams, fee breakdowns, and settlement logic, see [docs/ARCHITECTURE.md](ARCHITECTURE.md).
+Diagrams, fees, and settlement: [docs/ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
 ## What This Enables
 
-Tessera transforms how self-hosted platforms sustain themselves:
-
-- **Creators** receive direct, per-second support from their audience, with settled earnings accumulating in their Gateway balance
-- **Viewers** pay only for what they actually consume - no subscriptions, no lock-in, and zero platform fees
-
-The economic model is simple: if a viewer watches a 10-minute stream at $0.01/minute, they pay $0.10. These nanopayments are aggregated off-chain and settled to the creator's Gateway balance, which the creator can subsequently withdraw to their personal wallet. Everyone wins.
+- **Creators** get direct support (tips on free items, per-second on exclusives). Earnings accumulate in Gateway, then the creator withdraws to their wallet
+- **Admins** can take a configurable share on time-based content to help cover hosting
+- **Viewers** tip only if they want on free content, and pay only for the seconds they watch on exclusives. No platform-wide subscription
 
 ---
 

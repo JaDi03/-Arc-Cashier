@@ -1,5 +1,5 @@
 site_name: Tessera
-site_description: A payment sidecar that adds per-second nanopayments to any self-hosted platform.
+site_description: USDC support engine for self-hosted platforms
 repo_url: https://github.com/JaDi03/tessera
 repo_name: JaDi03/tessera
 
@@ -46,7 +46,11 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path:
+        - .
+        - docs
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -80,22 +84,12 @@ nav:
   - Architecture & Fees: ARCHITECTURE.md
   - Payment Models: payment-models.md
   - Getting Started: getting-started/index.md
-  - Integrated Platforms:
-    - PeerTube:
-      - Overview: platforms/peertube/index.md
-      - Configuration: platforms/peertube/configuration.md
-    - Owncast (soon):
-      - Overview: platforms/owncast/index.md
-      - Managing Creators: platforms/owncast/managing-creators.md
-      - Monitoring: platforms/owncast/monitoring.md
-      - Withdrawals: platforms/owncast/withdrawals.md
+  - Integrated Platforms: platforms/index.md
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md
     - Viewer Wallet Setup: tutorials/viewer-wallet.md
-  - Connectors:
-    - Overview: connectors/index.md
-    - Building a Connector: connectors/building-a-connector.md
+  - Connectors: connectors/spec.md
 
 extra_css:
   - stylesheets/extra.css

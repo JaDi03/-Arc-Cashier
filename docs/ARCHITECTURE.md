@@ -1,82 +1,80 @@
 # Architecture & Fees
 
-## Production & Architecture (V1)
+## Architecture
 
-Tessera V1 is designed to be a robust, developer-friendly MVP. To ensure stability and ease of deployment, the following architectural decisions and limitations are present in this version:
-
-### Architecture: Universal Deposits (CCTP) & Arc Settlement
-
-While Tessera requires the **Arc Network** to operate its core billing engine, **viewers can fund their sessions from any supported network** (Ethereum, Base, etc.) thanks to **Circle's CCTP** (Cross-Chain Transfer Protocol).
+Tessera settles per-second support on **Arc Testnet** through Circle Gateway. Viewers can fund the Circle SCA on Arc directly, or bridge USDC in with Circle CCTP (Bridge Kit + Forwarding) from Ethereum Sepolia, Base Sepolia, or Arbitrum Sepolia. CCTP mints to the SCA; Tessera then deposits that USDC into Gateway (`prepare-deposit`).
 
 ```mermaid
 flowchart LR
-    %% Custom Premium Styling
     classDef origin fill:#1A1B26,stroke:#7AA2F7,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef cctp fill:#1F2335,stroke:#9ECE6A,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef arc fill:#24283B,stroke:#BB9AF7,stroke-width:3px,color:#FFFFFF,rx:10,ry:10,stroke-dasharray: 5 5
     classDef blockchain fill:#24283B,stroke:#F7768E,stroke-width:2px,color:#FFFFFF,rx:10,ry:10
     classDef engine fill:#1F2335,stroke:#7DCFFF,stroke-width:2px,color:#FFFFFF,rx:5,ry:5
 
-    subgraph Origins ["🌐 Origin Networks"]
+    subgraph Origins ["Origin testnets"]
         direction TB
-        ETH["Ethereum"]:::origin
-        BAS["Base"]:::origin
+        ETH["Ethereum Sepolia"]:::origin
+        BAS["Base Sepolia"]:::origin
+        ARB["Arbitrum Sepolia"]:::origin
     end
 
-    CCTP(("🔄 Circle CCTP")):::cctp
-    
-    subgraph ArcNet ["⚡ Arc Network"]
+    CCTP(("Circle CCTP + Forwarding")):::cctp
+
+    subgraph ArcNet ["Arc Testnet"]
         direction TB
-        Gateway["💎 Gateway Contract"]:::blockchain
-        Engine["⚙️ Billing Engine"]:::engine
+        SCA["Viewer Circle SCA"]:::blockchain
+        Gateway["Gateway"]:::blockchain
+        Engine["Sidecar billing loop"]:::engine
     end
     class ArcNet arc
 
-    ETH -->|"USDC"| CCTP
-    BAS -->|"USDC"| CCTP
-    
-    CCTP --->|"Route & Fund"| Gateway
-    Engine -.->|"Batched settlement claims"| Gateway
+    ETH -->|"USDC burn"| CCTP
+    BAS -->|"USDC burn"| CCTP
+    ARB -->|"USDC burn"| CCTP
+
+    CCTP -->|"mint to SCA"| SCA
+    SCA -->|"prepare-deposit"| Gateway
+    Engine -.->|"GatewayClient.pay each second"| Gateway
 ```
 
 ## Fee Structure
 
-Because Tessera relies heavily on off-chain EIP-3009 signatures, viewers only pay network fees for two on-chain transactions during the entire lifecycle of a session:
+Billing ticks are off-chain. Each second the sidecar signs with the ephemeral Gateway key (`GatewayClient.pay` to `POST /api/core/stream-access`). Ticks do not cost Arc gas.
 
-1. **Deposit (Gateway Funding):** When moving funds into the Gateway Smart Contract.
-2. **Withdrawal (Cash Out):** When settling the session and pulling unused funds back to their wallet.
+On-chain USDC movement for a typical exclusive session:
 
-On the Arc Network, these transactions cost approximately **$0.01 USDC** in network fees (gas). 
+1. **Deposit (Gateway funding):** SCA USDC into Gateway (`prepare-deposit`), or leftover ephemeral-wallet USDC via `register-session`.
+2. **Cash-out (optional):** Manual withdraw of unused Gateway balance back to the SCA. Leaving the player (`sessions/stop`) does **not** withdraw. Creator earnings already moved on each billing tick.
 
-**Cross-Chain Forwarding Fees:**
-If a viewer decides to bridge funds from another network (e.g., Ethereum or Base) using Circle's CCTP Forwarding Service instead of direct funding, the Forwarding Service charges a flat **$0.20 USDC** service fee for the transfer.
+SCA USDC can also go to an external address via `quote-external-withdraw` / `prepare-external-withdraw` (Circle challenge, then `poll-challenge`).
+
+Those Arc transactions use USDC for gas. Tessera keeps a small buffer on the ephemeral wallet (`RETAINED_GAS_AMOUNT`, default 0.01 USDC) so deposit and cash-out can pay gas. Arc's published target is about **$0.01 USDC** per transaction.
+
+**CCTP (optional):** Bridge Kit burns on the source chain and Circle Forwarding mints on Arc. The Forwarding fee is **0.20 USDC**. The mint credits the SCA; Gateway funding is still `prepare-deposit`.
 
 ---
 
-**Why must the settlement engine run exclusively on Arc?**
+**Why Arc Testnet**
 
-Tessera is designed for **high-frequency, per-second billing**. Implementing this economic model on traditional EVM networks is economically unviable due to unpredictable gas fees. 
+Tessera bills **per second**. Settlement runs on Arc Testnet (`@circle-fin/x402-batching`, `eip155:5042002`) so ticks can stay off-chain while deposit and cash-out use USDC gas.
 
-By leveraging the **Arc Network** combined with the **x402 protocol**:
-
-- **Native USDC Gas**: Forget about needing to hold a separate, volatile native token just to pay for transactions. Arc uses USDC natively for gas, meaning zero friction for users and creators.
-- **Predictable, Ultra-Low Costs**: Arc is specifically designed for stablecoin-native applications, targeting an average transaction fee of **~$0.01 USDC**.
-- **Gasless Streaming**: Once the session begins, viewers sign off-chain cryptographic proofs every second without paying any gas.
-- **Batched Settlement**: The Circle Gateway aggregates thousands of these off-chain signatures and settles the final balances efficiently on the Arc Network.
-- **Economic Viability**: On traditional networks, watching a 10-minute stream could cost more in gas than the content itself. Arc's ~$0.01 fees make the math work, ensuring that network costs never consume the actual value of the stream.
+- **Native USDC gas:** Deposit and cash-out pay gas in USDC. No extra native token.
+- **Low per-tx cost:** Arc targets about **~$0.01 USDC** gas.
+- **Gasless ticks:** After Gateway is funded, `GatewayClient.pay` runs once per second with no wallet popup.
+- **Why Arc:** A 10-minute exclusive session is hundreds of ticks. On-chain gas per tick would dwarf the content rate.
 
 ### Environment Configuration
-- **Dynamic Routing:** `PUBLIC_URL` is required in production to ensure the Gateway can map callbacks and references correctly, bypassing the hardcoded `localhost` limitations.
-- **Gas Buffer:** `RETAINED_GAS_AMOUNT` (default 0.01 USDC) is utilized to ensure the ephemeral wallet always retains enough native token for on-chain interactions without failing.
+- **`PUBLIC_URL`:** Public origin of the sidecar. Circle auth cookies are `Secure` when this is `https://`, or when `COOKIE_SECURE=true`, or when `NODE_ENV=production`.
+- **Gas Buffer:** `RETAINED_GAS_AMOUNT` (default 0.01 USDC) keeps USDC on the ephemeral wallet so on-chain deposit/cash-out can pay Arc gas.
 
 ### Security & Performance
-- **Rate Limiting:** Critical endpoints (`/register-session` and `/end-session`) are protected by IP rate limiting to prevent spam and DDoS attempts.
-- **Memory Optimization:** `GatewayClient` instances are cached in memory. Ephemeral keys and instances are strictly wiped using a safe sweep upon session termination.
-- **Dynamic Top-Up:** Viewers are alerted dynamically when their balance drops below 5 minutes of viewing time, allowing them to top-up without interrupting the video stream.
+- **Ingest HMAC:** `POST /api/core/v1/sessions/start` and `stop` require `TESSERA_INGEST_SECRET`. Tips and session money routes use Circle wallet proof (`userToken` + `returnAddress`).
+- **USDC deposits:** `POST /api/core/circle/prepare-deposit` transfers USDC only.
+- **Rate limiting:** Session routes (`register-session`, `start`/`stop`, `tips`, `end-session`, `cash-out`, `topup-session`) share an IP limiter. `sync-session` has its own. Circle routes use a separate IP limiter.
+- **Session store:** The ephemeral Gateway key survives `sessions/stop`. `cash-out` withdraws leftover USDC to the SCA and then clears the record.
+- **Dynamic top-up:** Viewers can add Gateway balance without leaving the overlay (`topup-session`).
 
 ### Observability
-- **Healthcheck:** A robust endpoint at `GET /health` provides real-time status of active sessions and connectivity to the Circle Gateway, suitable for integration with Prometheus or UptimeKuma.
-
-### V1 Limitations & Trade-offs
-- **Polling over Webhooks:** To maximize developer experience (DX) and allow seamless testing on `localhost` without tunnels (like ngrok), V1 actively polls Circle for deposit confirmations instead of relying on Webhooks.
-- **Fixed Payment Scheme**: The protocol currently forces the `GatewayWalletBatched` scheme on Arc Testnet. While x402 supports dynamic schemes like `CompositeEvmScheme`, they are disabled in V1 to maintain strict focus on streaming nanopayments.
+- **Healthcheck:** `GET /health` returns sidecar version, a ping to `https://api-testnet.circle.com/ping`, and active session count.
+- **Challenge confirmations:** After deposit or cash-out, the overlay calls `POST /api/core/circle/poll-challenge` until the status is `COMPLETE`, `FAILED`, or `EXPIRED`.

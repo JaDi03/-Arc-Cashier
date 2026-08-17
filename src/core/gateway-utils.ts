@@ -2,7 +2,7 @@ import { isAddress, parseUnits } from 'viem';
 
 /**
  * Generic Gateway utilities for the Tessera core.
- * Platform-agnostic — no PeerTube or Owncast specific logic.
+ * Platform-agnostic Gateway utilities. Same helpers for every connector.
  */
 
 /**
