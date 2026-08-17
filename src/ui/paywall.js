@@ -243,6 +243,15 @@ function hasResumableCircleSession() {
     );
 }
 
+/** Tips spend Gateway via userToken + returnAddress. encryptionKey is only for Circle execute (deposit). */
+function canSendManualTip() {
+    return Boolean(
+        viewerState.userId
+        && viewerState.walletAddress
+        && viewerState.userToken
+    );
+}
+
 function circleProofFields() {
     return {
         userToken: viewerState.userToken,
@@ -342,13 +351,9 @@ document.addEventListener('fullscreenchange', () => {
 
 function getRequiredMinBalance() {
     if (isTipMode) {
-        // Tipping mode: require at least the tip amount (e.g. 0.10 USDC)
-        const tipBtn = document.getElementById('arc-tip-btn');
-        if (tipBtn) {
-            const match = tipBtn.textContent.match(/\$([0-9.]+)/);
-            if (match) return parseFloat(match[1]) || 0.10;
-        }
-        return 0.10; // fallback tip amount
+        const n = parseFloat(tipAmountVal);
+        if (Number.isFinite(n) && n > 0) return n;
+        return 0.10;
     } else {
         // Pay-per-second mode: require at least 1 second of playback rate
         return typeof currentRatePerSecond !== 'undefined' ? currentRatePerSecond : 0.0001;
@@ -501,11 +506,15 @@ async function checkAutoUnlock() {
         hasFundsResult = gatewayAvailable >= minReq;
 
         if (gatewayAvailable >= minReq) {
-            // Tip mode: never auto-start a paid session timer / initPaywall path.
+            // Tip mode: Gateway already covers the tip. Close the deposit overlay
+            // so the viewer tips from the widget instead of depositing again.
             if (isTipMode) {
                 autoUnlockBranch = 'tip-enable';
+                autoUnlocked = true;
                 setFundStatus('');
-                enableUnlockButton();
+                const tipOverlay = document.getElementById('arc-paywall-overlay');
+                if (tipOverlay) tipOverlay.remove();
+                document.body.classList.remove('arc-locked');
                 return;
             }
 
@@ -3285,8 +3294,7 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
     btn.addEventListener('click', async () => {
         await ensureCircleAuthHydrated();
 
-        // No Circle session / no funds: go straight to deposit onboarding (no tip POST).
-        if (!viewerState.userId || !hasResumableCircleSession()) {
+        if (!canSendManualTip()) {
             openTipOnboarding();
             return;
         }
@@ -3299,10 +3307,6 @@ window.arcShowTipButton = function (creatorWallet, tipAmount) {
 
         if (!viewerState.ephemeralPk) {
             try { await ensureEphemeralKey(); } catch (_) { /* ignore */ }
-        }
-        if (!viewerState.ephemeralPk) {
-            openTipOnboarding();
-            return;
         }
 
         btn.disabled = true;
