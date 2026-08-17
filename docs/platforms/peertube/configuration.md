@@ -1,9 +1,5 @@
 # PeerTube configuration
 
-In **Administration > Plugins > Tessera**, set:
+Plugin admin settings (Base URL, ingest secret, display fee, admin wallet) are documented in [peertube-plugin-tessera](https://github.com/JaDi03/peertube-plugin-tessera).
 
-1. **Tessera Base URL** and **Tessera Ingest Secret** as described in [Quick Start §3](../../getting-started/index.md#3-tessera-base-url).
-2. **Admin Wallet** - receives the display fee split (default 10%).
-3. **Display Fee** - fraction to this instance; remainder to the creator.
-
-The plugin calls `POST /api/core/v1/sessions/start|stop` with HMAC. See [Integration Contract](../../CONNECTOR_SPEC.md).
+How to choose the Base URL: [Getting Started](../../getting-started/index.md#3-tessera-base-url).
