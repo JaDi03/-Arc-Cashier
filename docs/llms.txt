@@ -1,0 +1,37 @@
+# Tessera: Per-Second Streaming Payments on Arc
+
+> Per-second streaming payments sidecar and MCP metering proxy on Arc (Chain ID: 5042002), powered by Circle Gateway (x402 nanopayments), Circle Wallets, and CCTP.
+
+## Overview
+Tessera enables real-time monetization of continuous resources:
+- **AI Tools & Agent Runtimes**: Meter execution time of Model Context Protocol (MCP) tool servers (Puppeteer, Python sandboxes, scrapers) with automated watchdog protection.
+- **Media & Platforms**: Per-second streaming payments for PeerTube, Jellyfin, and Piwigo.
+- **Currency & Settlement**: Gasless USDC settlement on Arc Testnet via Circle Gateway.
+
+## Quick Links for AI Agents
+- [MCP & Autonomous Agents](docs/agents/mcp.md): How to wrap MCP tools and consume paid tools autonomously with EVM private keys.
+- [Connector Specification](CONNECTOR_SPEC.md): Full specification for `sessions/start`, `sessions/stop`, `v1/tips`, and HMAC ingest verification.
+- [Architecture & Fees](docs/ARCHITECTURE.md): Gateway batching, gasless ticks, and fee structure on Arc.
+
+## Autonomous Agent Integration (MCP Consumer)
+```typescript
+import { TesseraMcpConsumer } from 'tessera/mcp';
+
+const consumer = new TesseraMcpConsumer({
+  agentPrivateKey: '0x...', // Arc EVM private key
+  maxBudgetUsdc: 5.0,        // Spend cap in USDC
+  tesseraBaseUrl: 'http://127.0.0.1:7878',
+  targetCommand: 'node dist/mcp/proxy.js --target "npx -y @modelcontextprotocol/server-puppeteer"',
+});
+
+await consumer.connect();
+const result = await consumer.callTool('puppeteer_navigate', { url: 'https://arc.network' });
+await consumer.disconnect();
+```
+
+## API Endpoints (Tessera Core)
+- `GET /health`: Healthcheck endpoint.
+- `POST /api/core/v1/sessions/start`: Start a timed session (HMAC signed).
+- `POST /api/core/v1/sessions/stop`: Stop a timed session and settle on Arc (HMAC signed).
+- `POST /api/core/v1/tips`: Instant USDC tip with Circle wallet ownership proof.
+- `GET /api/core/stream-access`: Nanopayment validation endpoint for Circle Gateway ticks.

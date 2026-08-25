@@ -312,6 +312,17 @@ Always `tips` only — a post or newsletter is not metered by the second.
 - Map a native tip, boost, or donation gesture to `POST /v1/tips`.
 - Or inject `initTipMode` in the post or profile view.
 
+**AI Tool Servers & Agent Runtimes (Model Context Protocol / MCP)**
+
+Meter execution time for persistent AI tools (browser automation, compute sandboxes, scrapers).
+
+- Transport: stdio JSON-RPC 2.0 or HTTP stream.
+- Zero code modification: Wrap any existing MCP server with `McpMeteredProxy` or CLI command.
+- Discovery (`initialize`, `tools/list`, `ping`): Passed through unmetered.
+- Tool Call (`tools/call`): Triggers HMAC `POST /v1/sessions/start` with `resourceId = mcp:<tool_name>`. While the tool executes, Gateway ticks stream per second. Upon tool completion, `POST /v1/sessions/stop` settles the duration.
+- **Watchdog protection**: If the child tool process hangs beyond `watchdogTimeoutMs`, billing is cut immediately, the tool process is restarted, and a sanitized JSON-RPC error is returned.
+- Autonomous Agents: Consumer client (`TesseraMcpConsumer`) signs Gateway ticks autonomously using standard EVM private keys (`0x...`) on Arc testnet with budget cap enforcement (`maxBudgetUsdc`).
+
 ## 5. HMAC (`start` and `stop` only)
 
 Headers:

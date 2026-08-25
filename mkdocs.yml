@@ -85,6 +85,7 @@ nav:
   - Payment Models: payment-models.md
   - Getting Started: getting-started/index.md
   - Integrated Platforms: platforms/index.md
+  - AI Agents & MCP: agents/mcp.md
   - Tutorials:
     - Circle API Key: tutorials/circle-api-key.md
     - Circle App ID: tutorials/circle-app-id.md
