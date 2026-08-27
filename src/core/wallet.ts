@@ -7,6 +7,8 @@ export interface SessionRecord {
     privateKey: Hex;
     returnAddress: string;
     sourceChain?: string;
+    /** Agent sessions only: true until /agent/fund-session deposits into Gateway. */
+    pending?: boolean;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -126,16 +128,38 @@ export class WalletService {
     }
 
     /**
-     * Registers a funded ephemeral key and return address for a user.
+     * Registers an ephemeral Gateway key and return address for a user.
+     * Pass pending=true for agent sessions that still need /agent/fund-session.
      */
-    public registerSessionKey(userId: string, privateKey: string, returnAddress: string, sourceChain?: string): void {
-        this.sessionRecords.set(userId, {
+    public registerSessionKey(userId: string, privateKey: string, returnAddress: string, sourceChain?: string, pending = false): void {
+        const record: SessionRecord = {
             privateKey: privateKey as Hex,
             returnAddress,
-            sourceChain
-        });
+            sourceChain,
+        };
+        if (pending) record.pending = true;
+        this.sessionRecords.set(userId, record);
         this.saveDb();
-        console.log(`[Wallet] 🔐 Ephemeral Key registered for user: ${userId}`);
+        console.log(`[Wallet] Ephemeral key registered for user: ${userId}${pending ? ' (pending funds)' : ''}`);
+    }
+
+    /**
+     * Clears the pending flag after a successful Gateway deposit.
+     */
+    public markSessionFunded(userId: string): void {
+        const record = this.getSessionRecord(userId);
+        if (!record.pending) return;
+        delete record.pending;
+        this.sessionRecords.set(userId, record);
+        this.saveDb();
+    }
+
+    /**
+     * True when no record exists, or the record is still waiting for Gateway deposit.
+     */
+    public isSessionUnfunded(userId: string): boolean {
+        if (!this.hasSessionRecord(userId)) return true;
+        return this.getSessionRecord(userId).pending === true;
     }
 
     /**

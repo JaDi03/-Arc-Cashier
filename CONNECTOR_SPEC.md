@@ -49,7 +49,11 @@ The plugin computes these before each POST:
 
 ### userId format (critical)
 
-`userId` is **not** your platform's native account id. Tessera assigns it after the viewer signs in through the paywall (Circle email OTP or Google).
+`userId` is **not** your platform's native account id.
+
+**Humans:** Tessera assigns it after the viewer signs in through the paywall (Circle email OTP or Google).
+
+**Agents:** the caller creates a Circle Agent Wallet on their side (`circle wallet login --testnet`). Tessera does **not** call `get-wallet` / `createUserPinWithWallets` for them. Use the `userId` returned by `POST /agent/begin-session`.
 
 Valid formats (7-256 chars):
 
@@ -57,9 +61,10 @@ Valid formats (7-256 chars):
 |---|---|---|
 | `email:` | `email:viewer@example.com` | Email OTP login |
 | `social:` | `social:104083036205001006721` | Google / Facebook login |
+| `agent:` | `agent:0x1111222233334444555566667777888899990000` | Circle Agent Stack wallet (EOA or SCA address) |
 | `arc_` | `arc_mlbogxpfyg` | Legacy sessions only |
 
-Invalid: `user-42`, PeerTube account ids, Jellyfin user ids, random UUIDs without a valid prefix.
+Invalid: `user-42`, PeerTube account ids, Jellyfin user ids, random UUIDs without a valid prefix, `agent_<uuid>`.
 
 **Rule:** the browser paywall and your server must use the **same** `userId`.
 
@@ -70,6 +75,22 @@ Invalid: `user-42`, PeerTube account ids, Jellyfin user ids, random UUIDs withou
 5. Your plugin server forwards the same `userId` in HMAC `start` / `stop` (and the browser sends it on `tips`).
 
 If you POST `start` before the viewer has logged in, or with a platform-native id, `register-session` and `tips` will fail.
+
+### Agent callers (Circle Agent Stack)
+
+Tessera does not create the agent's Circle wallet. The agent does that with Circle CLI, then proves ownership with a signed challenge (Circle CLI does not document exporting a `userToken`).
+
+1. `circle wallet login you@example.com --testnet` (wallets are created on all supported chains, including `ARC-TESTNET`).
+2. `circle wallet list --type agent --chain ARC-TESTNET` (copy the address).
+3. Testnet faucet: `circle wallet fund --address 0xAgent --chain ARC-TESTNET` (omit `--method` and `--amount`; Circle auto-funds 20 USDC).
+4. `POST {Base URL}/api/core/agent/challenge` with `{ "address": "0xAgent" }`.
+5. Sign `message` from that response: `circle wallet sign message "<message>" --address 0xAgent --chain ARC-TESTNET`.
+6. `POST {Base URL}/api/core/agent/begin-session` with `{ "address", "signature" }`. Response includes `userId` (`agent:0x...`) and `ephemeralAddress`. Tessera minted the Gateway ephemeral key. It did not create a Circle wallet.
+7. Transfer USDC from the agent wallet to `ephemeralAddress`: `circle wallet transfer <ephemeralAddress> --amount <usdc> --address 0xAgent --chain ARC-TESTNET`.
+8. `POST {Base URL}/api/core/agent/fund-session` with the same `{ "address", "signature" }` (challenge is valid for 10 minutes).
+9. Plugin HMAC `start` / `stop` with that `userId`. `start` returns **402** until step 8 succeeds.
+
+`POST /api/core/circle/get-wallet` with an `agent:` userId returns 400. Humans still use OTP/Google + `get-wallet`.
 
 ## 2. Browser UI and relay
 
@@ -415,6 +436,7 @@ Each entry is a `resourceId` your connector sent on `start` (or via `tips`) that
 | 400 | `start` | `splits` fractions sum > 1 |
 | 400 | `stop` | Missing `userId` |
 | 401 | `start`, `stop` | Missing/invalid HMAC, expired timestamp (> 60 s), or duplicate nonce |
+| 402 | `start` | `userId` is `agent:` and Gateway session is missing or still pending funds |
 | 400 | `tips` | Missing `userToken` or `returnAddress` |
 | 401 | `tips` | Circle session does not own `returnAddress`, or it does not match the stored Gateway session |
 | 402 | `tips` | Insufficient Gateway balance |

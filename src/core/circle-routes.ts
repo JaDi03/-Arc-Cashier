@@ -30,6 +30,7 @@ import crypto from 'crypto';
 import { parse as parseCookie, serialize as serializeCookie } from 'cookie';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initiateUserControlledWalletsClient } from '@circle-fin/user-controlled-wallets';
+import { isAgentUserId } from './session-key-auth';
 
 // ---------------------------------------------------------------------------
 // Circle SDK client
@@ -441,6 +442,11 @@ circleRouter.post('/circle/get-wallet', circleRateLimiter, async (req: Request, 
 
     if (!userId || !userToken) {
         return res.status(400).json({ error: 'Missing userId or userToken' });
+    }
+    if (isAgentUserId(userId)) {
+        return res.status(400).json({
+            error: 'Agent wallets are created by Circle Agent Stack on the caller side. Tessera does not create them.',
+        });
     }
 
     // Viewer auth is email OTP or social login only. Wallet creation uses the

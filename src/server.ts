@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import coreRouter from './core/routes';
 import circleRouter from './core/circle-routes';
+import agentRouter from './core/agent-routes';
 import instanceInfoRouter from './core/instance-info';
 import { sessionService } from './core/session';
 import { TESSERA_VERSION } from './version';
@@ -51,6 +52,7 @@ export async function createServer() {
 
     app.use('/api/core', coreRouter);
     app.use('/api/core', circleRouter);
+    app.use('/api/core', agentRouter);
     app.use('/api/tessera', instanceInfoRouter);
 
     app.get('/health', async (_req, res) => {

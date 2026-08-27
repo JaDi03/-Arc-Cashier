@@ -73,4 +73,15 @@ describe('WalletService', () => {
         const fileContent = fs.readFileSync(DB_PATH, 'utf-8');
         expect(fileContent.startsWith('{')).toBe(false);
     });
+
+    it('tracks pending agent sessions until markSessionFunded', () => {
+        const userId = 'agent:0x1111222233334444555566667777888899990000';
+        expect(walletService.isSessionUnfunded(userId)).toBe(true);
+        walletService.registerSessionKey(userId, '0x123', '0xabc', undefined, true);
+        expect(walletService.getSessionRecord(userId).pending).toBe(true);
+        expect(walletService.isSessionUnfunded(userId)).toBe(true);
+        walletService.markSessionFunded(userId);
+        expect(walletService.getSessionRecord(userId).pending).toBeUndefined();
+        expect(walletService.isSessionUnfunded(userId)).toBe(false);
+    });
 });
