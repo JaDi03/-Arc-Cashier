@@ -7,6 +7,7 @@ const mockCircleClient = {
     createTransaction: vi.fn(),
     getUserChallenge: vi.fn(),
     listWallets: vi.fn(),
+    createUserPinWithWallets: vi.fn(),
 };
 
 vi.mock('@circle-fin/user-controlled-wallets', () => ({
@@ -292,5 +293,22 @@ describe('POST /circle/prepare-deposit', () => {
         expect(getStatus()).toBe(400);
         expect(getJson().error).toContain('Insufficient USDC');
         expect(mockCircleClient.createTransaction).not.toHaveBeenCalled();
+    });
+});
+
+describe('POST /circle/get-wallet', () => {
+    it('does not create a Circle wallet for agent userIds', async () => {
+        const handler = getRouteHandler('/circle/get-wallet');
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userId: 'agent:0x1111222233334444555566667777888899990000',
+                userToken: 'x'.repeat(40),
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(400);
+        expect(getJson().error).toMatch(/Agent Stack/i);
+        expect(mockCircleClient.listWallets).not.toHaveBeenCalled();
+        expect(mockCircleClient.createUserPinWithWallets).not.toHaveBeenCalled();
     });
 });

@@ -7,7 +7,7 @@ import { statsService } from './stats';
 import { GATEWAY_FEE_BUFFER } from './gateway-utils';
 import creatorRouter from './creator-routes';
 import { verifyCircleWalletOwnership } from './circle-routes';
-import { addressesEqual, isValidPrivateKeyHex, isValidViewerUserId } from './session-key-auth';
+import { addressesEqual, isAgentUserId, isValidPrivateKeyHex, isValidViewerUserId } from './session-key-auth';
 import { verifyIngestSignature } from './security/verify-ingest-signature';
 import rateLimit from 'express-rate-limit';
 import { isAddress, isHex, createPublicClient, http, formatUnits, parseUnits } from 'viem';
@@ -151,6 +151,11 @@ coreRouter.post('/v1/sessions/start', sessionLimiter, verifyIngestSignature, (re
             if (typeof split.fraction !== 'number' || split.fraction < 0 || split.fraction > 1)
                 return res.status(400).json({ error: `Invalid split fraction: ${split?.fraction}` });
         }
+    }
+    if (isAgentUserId(userId) && walletService.isSessionUnfunded(userId)) {
+        return res.status(402).json({
+            error: 'Agent Gateway session is not funded. Complete POST /api/core/agent/fund-session first.',
+        });
     }
 
     try {

@@ -382,3 +382,46 @@ describe('POST /session-balance', () => {
         expect(getJson().error).toMatch(/Missing/);
     });
 });
+
+describe('POST /v1/sessions/start', () => {
+    const payoutAddress = '0x1111222233334444555566667777888899990000';
+    let handler: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        handler = getRouteHandler('/v1/sessions/start');
+    });
+
+    it('starts a human session without an agent funding check', async () => {
+        const join = vi.spyOn(sessionService, 'recordJoin').mockImplementation(() => {});
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userId: 'email:viewer@example.com',
+                resourceId: 'video-1',
+                ratePerSecond: '0.000100',
+                payoutAddress,
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(200);
+        expect(getJson()).toEqual({ status: 'session_started', sessionId: 'email:viewer@example.com' });
+        expect(join).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 402 when an agent session is not funded', async () => {
+        vi.spyOn(walletService, 'isSessionUnfunded').mockReturnValue(true);
+        const join = vi.spyOn(sessionService, 'recordJoin').mockImplementation(() => {});
+        const { res, getStatus, getJson } = mockRes();
+        await handler({
+            body: {
+                userId: 'agent:0x1111222233334444555566667777888899990000',
+                resourceId: 'deep_web_research',
+                ratePerSecond: '0.002',
+                payoutAddress,
+            },
+        } as Request, res);
+        expect(getStatus()).toBe(402);
+        expect(getJson().error).toMatch(/not funded/i);
+        expect(join).not.toHaveBeenCalled();
+    });
+});
