@@ -109,7 +109,7 @@ coreRouter.get('/stream-access', (req: Request, res: Response, next: NextFunctio
         if (userRate !== null) ratePerSecond = userRate;
     }
 
-    const priceMiddleware = dynamicGateway.require(`$${ratePerSecond.toFixed(4)}`);
+    const priceMiddleware = dynamicGateway.require(`$${ratePerSecond.toFixed(6)}`);
     priceMiddleware(req as any, res as any, (err?: any) => {
         if (err) return next(err);
         next();
@@ -494,7 +494,7 @@ coreRouter.get('/tip-access', (req: Request, res: Response, next: NextFunction) 
     const tipAmount = req.headers['x-tip-amount'] as string || '0.10';
 
     const tipGateway = createGatewayMiddleware({ sellerAddress: creatorAddress, facilitatorUrl: 'https://gateway-api-testnet.circle.com', networks: ['eip155:5042002'] });
-    const priceMiddleware = tipGateway.require(`$${parseFloat(tipAmount).toFixed(4)}`);
+    const priceMiddleware = tipGateway.require(`$${parseFloat(tipAmount).toFixed(6)}`);
     priceMiddleware(req as any, res as any, next);
 }, (req: Request, res: Response) => {
     res.json({ success: true });
